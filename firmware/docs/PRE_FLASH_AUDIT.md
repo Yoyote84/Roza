@@ -78,7 +78,7 @@ Aucun fichier de dessin, de rendu, de thème ou de disposition de l'interface n'
 - Batterie : estimation logicielle non calibrée sur plusieurs cycles de la carte réelle.
 - LED RGB : son alimentation partage la ligne du rétroéclairage ; quand la LED est active, le firmware force le rétroéclairage à pleine luminosité.
 - Audio, clavier ADV TCA8418, BMI270, écran, veille/réveil et USB natif compilent, mais nécessitent des essais physiques.
-- Bluetooth : la pile BLE garde une part importante de la RAM et le firmware la suspend/libère selon les applications. L'initialisation BLE coupe le Wi-Fi ; le gestionnaire réseau attend la libération BLE avant de relancer une connexion. Le chemin de démontage manuel dans `bt.cpp` est complexe et les commentaires historiques décrivent des blocages possibles dans l'ancienne séquence de deinit. Il faut tester plusieurs cycles scan/HID → sortie → retour Wi-Fi sur la carte réelle.
+- Bluetooth : la pile BLE garde une part importante de la RAM et le firmware la suspend/libère selon les applications. L'initialisation BLE coupe le Wi-Fi ; le gestionnaire réseau attend la libération BLE avant de relancer une connexion. Le rapport mémoire existant signale une perte permanente d'environ 13 Ko de heap par démontage complet BLE, limitation acceptée liée à la bibliothèque Arduino BLE. `memsweep.py` exclut donc les apps BLE par défaut. Le chemin de démontage manuel dans `bt.cpp` est complexe et les commentaires historiques décrivent des blocages possibles dans l'ancienne séquence de deinit. Il faut tester plusieurs cycles scan/HID → sortie → retour Wi-Fi sur la carte réelle.
 - Sans PSRAM, les fonctions lourdes (TLS/Chat, carte GNSS, BLE, audio et gros flux) peuvent manquer de mémoire contiguë. Les mécanismes de libération et de repli du code doivent être éprouvés en utilisation réelle.
 
 ### Réseau et services externes
@@ -91,6 +91,7 @@ Aucun fichier de dessin, de rendu, de thème ou de disposition de l'interface n'
 ## 5. Tests logiciels disponibles et limites de simulation
 
 - Les suites hôte couvrent notamment les calculs GNSS, le protocole LoRa de flux, le décodage Remote ID, l'encodage IR, la batterie simulée, l'horloge, les calculs astronomiques, le JSON en flux, la calculatrice, Hash Oven et les structures Router/RID.
+- La CI lance aussi `tools/memsweep.py --selftest` : cela valide le scénario de mesure mémoire avec un faux périphérique, pas la mémoire réelle de la carte. Le balayage série réel reste à effectuer après flash.
 - Le simulateur `uisim` compile le vrai code de dessin et rend des PNG ; il utilise des stubs pour l'écran, le réseau et les périphériques. Ce n'est pas un émulateur complet de l'ESP32 ni une preuve de fonctionnement matériel.
 - Aucun projet/configuration Wokwi n'est présent dans le dépôt à la date de cet audit.
 - Les tests hôte ne valident pas les broches, le câblage, l'alimentation, la réception RF, l'ADC, l'audio réel ni les performances thermiques.
