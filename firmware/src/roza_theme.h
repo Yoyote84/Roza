@@ -5,8 +5,8 @@
 
 static constexpr uint16_t ROZA_INK         = 0x31A5; // encre / vert très sombre
 static constexpr uint16_t ROZA_CARD        = 0x4244; // panneau olive sombre
-static constexpr uint16_t ROZA_OLIVE_DARK  = 0x5B29; // olive patiné
-static constexpr uint16_t ROZA_OLIVE       = 0x6388; // olive moyen
+static constexpr uint16_t ROZA_OLIVE_DARK  = 0x4244; // olive patiné
+static constexpr uint16_t ROZA_OLIVE       = 0x5B29; // olive moyen
 static constexpr uint16_t ROZA_OLIVE_LIGHT = 0x6388; // olive clair
 static constexpr uint16_t ROZA_PAPER       = 0xEEF8; // ivoire vieilli
 static constexpr uint16_t ROZA_PAPER_DIM   = 0xC5D2; // ivoire atténué
