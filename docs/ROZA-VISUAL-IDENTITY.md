@@ -1,8 +1,8 @@
-# Identité visuelle ROZA
+# Identité visuelle РO3A
 
 ## Intention
 
-ROZA imagine le Cardputer ADV comme un instrument personnel que Roza Chanina aurait pu emporter avec elle si cette technologie avait existé dans les années 1940. Il ne s'agit pas d'un thème cyber ou d'un décor militaire générique : l'appareil doit évoquer un petit instrument de terrain, entretenu et utilisé au quotidien.
+РO3A imagine le Cardputer ADV comme un instrument personnel que Roza Chanina aurait pu emporter avec elle si cette technologie avait existé dans les années 1940. Il ne s'agit pas d'un thème cyber ou d'un décor militaire générique : l'appareil doit évoquer un petit instrument de terrain, entretenu et utilisé au quotidien.
 
 ## Principes non négociables
 
