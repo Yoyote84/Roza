@@ -33,9 +33,9 @@
 #ifndef CFG_HOTSPOT_SSID
 #define CFG_HOTSPOT_SSID "Cardputer-ADV"
 #endif
-// 首次使用、NVS 里还没存密码时的默认密码（WPA2 至少 8 位）。公开固件请务必改掉。
+#if CFG_HOTSPOT_DEFAULT_PW not set, ROZA generates and stores a unique random WPA2 passphrase on first use.
 #ifndef CFG_HOTSPOT_DEFAULT_PW
-#define CFG_HOTSPOT_DEFAULT_PW "cardputer123"
+#define CFG_HOTSPOT_DEFAULT_PW ""
 #endif
 
 // --- 网络探测（NetProbe app）---
