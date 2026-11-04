@@ -1062,8 +1062,9 @@ void setup() {
   // On les désactive ici pour respecter la politique "non négociable" de ROZA.
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
-  // Bluetooth désactivation via M5Unified
-  if (M5.Bt.isInit()) { M5.Bt.stop(); M5.Bt.deinit(); }
+  // M5Unified 0.2.20 ne fournit pas d’API M5.Bt. Le Bluetooth BLE
+  // n’est initialisé que par bt.cpp lors d’une action explicite de l’utilisateur ;
+  // ne pas appeler BLEDevice::init() au démarrage.
 
   // ⚠️ 这一枪必须打在 M5.begin() **之前**：它记的是"静态段都分配完了、动态的还一个没花"
   // 那个时刻的余量，也就是 README 里 94,876 -> 119,420 该拿来对比的那个数。
