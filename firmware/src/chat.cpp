@@ -193,8 +193,7 @@ static void chatWorkerBody() {
 
   // 配置错误不必先连 Wi-Fi；否则 key 漏填时会先白等 15 秒，用户只看到像网络坏了。
   if (!CHAT_BASE_URL || !CHAT_BASE_URL[0]) err = "no CHAT_BASE_URL configured";
-  else if (!CHAT_API_KEY || !CHAT_API_KEY[0] || !strcmp(CHAT_API_KEY, "sk-REPLACE-ME"))
-    err = "no CHAT_API_KEY configured";
+
 
   // Wi-Fi 也在这儿连。以前这步走的是 connectWith()，它会往屏上刷握手日志，只能留在
   // 主线程，于是没连网时按下回车照样卡 15s。这里用静默版：不碰 cv，只轮询状态。
@@ -260,7 +259,8 @@ static void chatWorkerBody() {
     err = "http begin failed";
   } else {
     http.addHeader("Content-Type", "application/json");
-    http.addHeader("Authorization", String("Bearer ") + CHAT_API_KEY);
+    if (CHAT_API_KEY && CHAT_API_KEY[0])
+      http.addHeader("Authorization", String("Bearer ") + CHAT_API_KEY);
 
     int code = http.POST(workerBody);
     workerBody = ""; // 发完请求体立即释放，给后续 TLS 响应流与 JsonDocument 腾出堆空间
