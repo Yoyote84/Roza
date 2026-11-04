@@ -16,7 +16,7 @@ au dépôt. Aucun secret fictif ou clé de remplacement n'est fourni.
 | Application | Configuration facultative | Comportement sans configuration |
 |---|---|---|
 | Chat | `CHAT_BASE_URL`, `CHAT_API_KEY` ; facultatifs : `CHAT_MODEL`, `CHAT_ROOT_CA`, `CHAT_ALLOW_INSECURE` | L'application compile et indique que l'URL ou la clé manque ; aucune requête n'est envoyée. |
-| Satellite Radar | `N2YO_API_KEY` | Le radar compile ; la récupération N2YO indique que la clé manque. Les calculs locaux restent disponibles. |
+| Satellite Radar | `N2YO_API_KEY` | Le radar compile ; sans clé, la récupération distante indique qu'une configuration est nécessaire et n'envoie aucune requête N2YO. |
 | Router / Clash | `CLASH_BASE`, `CLASH_PROXY_GROUP` ; `CLASH_SECRET` facultatif selon la configuration du serveur | L'application compile. Sans URL, elle indique que le serveur Clash n'est pas configuré. Sans jeton, aucun en-tête Authorization vide n'est envoyé. |
 | GitHub Contributions | `GITHUB_USER` (nom de compte, pas une clé API) | L'application compile et indique qu'un nom de compte doit être configuré. |
 
@@ -30,9 +30,7 @@ dépend d'une connexion réseau, du service distant et de ses conditions d'utili
 
 ## Exemple de configuration locale
 
-Créer localement `firmware/src/secrets.h` avec uniquement les valeurs que l'utilisateur
-possède réellement. Les valeurs ci-dessous sont volontairement vides : il ne s'agit pas
-de clés de démonstration.
+Copier `firmware/src/secrets.h.example` vers `firmware/src/secrets.h` en local, puis renseigner uniquement les valeurs réellement disponibles. Les valeurs d'exemple sont volontairement vides.
 
 ```cpp
 #pragma once
