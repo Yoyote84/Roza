@@ -12,7 +12,7 @@ python3 - "$SITE/screens" "$SITE/screens.json" <<'PY'
 import json, pathlib, sys
 folder, target = map(pathlib.Path, sys.argv[1:])
 screens = sorted(p.name for p in folder.glob("*.png"))
-target.write_text(json.dumps({"screens": screens}, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+target.write_text(json.dumps({"screens": screens}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 if not screens:
     raise SystemExit("Aucune capture PNG générée par uisim.")
 print(f"Site prêt : {len(screens)} captures, {target}")
