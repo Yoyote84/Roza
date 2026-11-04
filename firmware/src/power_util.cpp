@@ -295,7 +295,7 @@ int powerBatteryLevel() {
 // À 50% : environ 2-4 heures restant.
 // Renvoie -1 si impossible à estimer.
 int powerRemainingTime() {
-  if (chargeActive) return 0;  // En charge, on ne peut pas estimer
+  if (chargeActive) return -1;  // En charge, on ne peut pas estimer
   if (lastKnownPct <= 0 || lastKnownPct > 100) return -1;
   // Consommation moyenne estimée : 120 mA
   // Capacité batterie estimée : 500 mAh
