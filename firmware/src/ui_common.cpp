@@ -599,7 +599,16 @@ void drawBootFrame(uint32_t t) {
   cv.setTextDatum(middle_center);
   cv.setTextSize(2);
   cv.setTextColor(ROZA_PAPER, ROZA_INK);
-  cv.drawString("\xD0\xA0O3A", cx, 72);
+  // Font0 est une police ASCII : dessiner le Р cyrillique comme un glyphe vectoriel
+  // (forme identique au P latin) évite le caractère de remplacement sur l'ESP32.
+  // Le nom reste РO3A dans les métadonnées et la documentation ; seul son glyphe est tracé ici.
+  const int logoX = cx - 24;
+  const int logoY = 64;
+  cv.fillRect(logoX, logoY, 2, 14, ROZA_PAPER);
+  cv.fillRect(logoX, logoY, 10, 2, ROZA_PAPER);
+  cv.fillRect(logoX + 8, logoY, 2, 8, ROZA_PAPER);
+  cv.fillRect(logoX, logoY + 6, 10, 2, ROZA_PAPER);
+  cv.drawString("O3A", cx + 6, 72);
   cv.setTextSize(1);
   cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
   cv.drawString("INSTRUMENT PERSONNEL", cx, 88);
