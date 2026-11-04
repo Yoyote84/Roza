@@ -22,13 +22,16 @@
 
 **Important :** ce projet actif n'est pas un projet ESP-IDF natif. Ne pas utiliser `idf.py build` pour compiler ce firmware. Le workflow GitHub Actions doit appeler PlatformIO.
 
-- **Validation CI GitHub Actions #38** : compilation PlatformIO `pio run -e cardputer-adv` réussie le `2026-11-04` sur commit `3f1d5c59c115fb3d30357084df733ab073582d3b`.
-  - La compilation logicielle réussit dans l'environnement d'exécution cloud.
-  - Les tests logiciels disponibles (vérification de syntaxe, vérification des dépendances) passent.
-  - **Essais physiques sur Cardputer ADV réel** : non encore effectués. Cette compilation ne constitue pas une validation matérielle du fonctionnement du dispositif sur carte.
-  - Statut : CI SUCCESS, mais essais physiques en attente.
+- **Validation CI GitHub Actions #39** : exécution réussie le `2026-11-04` sur le commit `6b57da60850bbcdb7e0c260a1a5071b854783093`.
+  - Le workflow installe PlatformIO `6.1.6` et exécute `platformio run -e cardputer-adv`.
+  - Il vérifie la présence de `firmware.bin`, `firmware.elf`, `bootloader.bin` et `partitions.bin`, puis publie ces artefacts.
+  - RAM : `115612 / 327680 octets (35,3 %)` ; Flash : `3680085 / 8257536 octets (44,6 %)`.
+  - Taille du fichier `firmware.bin` : `3680448 octets`.
+  - Avertissements non bloquants dans LibSSH-ESP32 : perte du qualificatif `const` sur certains pointeurs et appels à des fonctions dépréciées.
+  - **Le workflow ne lance pas de tests unitaires, de tests de syntaxe séparés ni de tests sur carte.** Il valide la compilation croisée et la génération des binaires uniquement.
+  - **Essais physiques sur Cardputer ADV et Cap LoRa-1262 : non effectués.** La compilation CI ne prouve ni le démarrage sur carte, ni la réception RF, ni le fonctionnement des périphériques.
 
-- Outils de compilation et de vérification :
+- Lien de l'exécution : https://github.com/Yoyote84/Roza/actions/runs/41769762257
 
 ## Dépendances déclarées dans platformio.ini
 
@@ -60,10 +63,11 @@ Le fichier `firmware/LICENSE` contient la licence MIT du dépôt amont et son av
 7. Respect des limites matérielles : ESP32-S3FN8, 8 Mo Flash, pas de PSRAM.
 8. Aucun test matériel ne doit être déclaré sans essai physique réel.
 
-## Vérifications encore nécessaires
+## Vérifications restantes
 
-- Compiler réellement avec PlatformIO sur CI et examiner les erreurs jusqu'à obtenir une compilation propre.
-- Vérifier la taille du binaire et les marges de Flash/RAM ; ne pas confondre compilation réussie et validation matérielle.
-- Auditer tous les chemins de démarrage et toutes les applications pour confirmer que Wi-Fi/Bluetooth/LoRa ne s'activent pas automatiquement.
-- Identifier le format réel de la microSD 128 Go avant d'activer son montage/écriture sur l'appareil.
-- Vérifier les obligations réglementaires françaises/européennes avant de définir les paramètres d'émission LoRa.
+- Réaliser des essais physiques sur le Cardputer ADV réel : démarrage, clavier, écran, audio, GNSS, microSD et stabilité mémoire.
+- Tester physiquement la réception LoRa avec le Cap SX1262, une antenne adaptée et un signal de test autorisé ; vérifier aussi la coexistence SPI avec la microSD.
+- Effectuer un audit exhaustif de toutes les applications et de tous les chemins d'activation Wi-Fi/Bluetooth/LoRa. Les contrôles du démarrage principal ne remplacent pas cet audit complet.
+- Identifier le système de fichiers réellement utilisé par la microSD 128 Go avant toute décision d'écriture ou de formatage. Aucun formatage automatique ne doit être ajouté.
+- Vérifier les obligations réglementaires françaises et européennes avant de définir ou d'activer les paramètres d'émission LoRa.
+- Examiner les avertissements de compilation LibSSH-ESP32 sans modifier le comportement ni les sources tierces sans justification.

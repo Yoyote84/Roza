@@ -395,6 +395,11 @@ void loraEnter() {
   // qui ne fait qu'un balayage RSSI). L'émission n'a lieu que sur action
   // explicite de l'utilisateur.
   mode = LORA_LISTEN;
+  if (loraReady) {
+    // Armer réellement le SX1262, pas seulement afficher le mode écoute.
+    // loraStartListen() applique le preset et appelle radio.startReceive().
+    loraStartListen();
+  }
 }
 
 // 切换扫描频段：VHF 用 FSK + 窄接收带宽，ISM 回到当前 LoRa 预设。
@@ -1022,27 +1027,27 @@ static void drawScanView() {
   char hdr[64];
   cv.setTextDatum(top_left); cv.setTextSize(1);
   if (vhfBand && vhfWatch && vhfCal) {
-    snprintf(hdr, sizeof(hdr), "PICKING CONTROL FREQS  %d%%", scanPos * 100 / NBINS);
+    snprintf(hdr, sizeof(hdr), "CALAGE FREQUENCES  %d%%", scanPos * 100 / NBINS);
     cv.setTextColor(TFT_YELLOW, 0x0000);
   } else if (vhfBand && vhfWatch && vhfRounds <= VHF_WARMUP) {
-    snprintf(hdr, sizeof(hdr), "WARMING UP  %lu/%lu ROUNDS",
+    snprintf(hdr, sizeof(hdr), "PREPARATION  %lu/%lu",
              (unsigned long)vhfRounds, (unsigned long)VHF_WARMUP);
     cv.setTextColor(TFT_YELLOW, 0x0000);
   } else if (vhfBand && vhfWatch) {
     uint32_t sec = (millis() - vhfWatchStart) / 1000;
-    snprintf(hdr, sizeof(hdr), "AIS ENERGY  %lu:%02lu  %lur %s",
+    snprintf(hdr, sizeof(hdr), "ENERGIE AIS  %lu:%02lu  %lur %s",
              (unsigned long)(sec / 60), (unsigned long)(sec % 60), (unsigned long)vhfRounds,
              vhfLogOk ? "SD" : "NOLOG");
     cv.setTextColor(vhfLogOk ? 0x07E0 : 0xFDA0, 0x0000);
   } else {
-    snprintf(hdr, sizeof(hdr), "%s", vhfBand ? "VHF 161.5-162.5  AIS PROBE" : "ISM 863-928 MHz  LORA SCOPE");
+    snprintf(hdr, sizeof(hdr), "%s", vhfBand ? "VHF 161.5-162.5  MESURE AIS" : "ISM 863-928 MHz  LORA SCOPE");
     cv.setTextColor(vhfBand ? 0xFDA0 : 0x07FF, 0x0000);
   }
   cv.drawString(hdr, 6, 18);
 
   cv.setTextDatum(top_right);
   cv.setTextColor(0x8410, 0x0000);
-  cv.drawString(vhfBand ? (vhfWatch ? "A=STOP" : "A=WATCH") : "V=BAND", SW - 6, 18);
+  cv.drawString(vhfBand ? (vhfWatch ? "A=ARRET" : "A=VEILLE") : "V=BANDE", SW - 6, 18);
 
   // 1. Spectrum Scope Card Frame (y: 28..104)
   cv.fillRoundRect(4, scopeY, SW - 8, scopeH, 3, 0x0000);
@@ -1148,7 +1153,7 @@ static void drawScanView() {
     cv.drawString(b, 8, 109);
 
     cv.setTextDatum(top_right);
-    snprintf(b, sizeof(b), "UP:%lu  DN:%lu", (unsigned long)vhfHits, (unsigned long)vhfNulls);
+    snprintf(b, sizeof(b), "HAUT:%lu  BAS:%lu", (unsigned long)vhfHits, (unsigned long)vhfNulls);
     cv.setTextColor(0x07E0, hitFlash ? 0x03E0 : 0x0821);
     cv.drawString(b, SW - 8, 109);
 
@@ -1159,7 +1164,7 @@ static void drawScanView() {
 
     cv.setTextDatum(top_right);
     cv.setTextColor(vhfLogOk ? 0x07E0 : 0xFDA0, hitFlash ? 0x03E0 : 0x0821);
-    cv.drawString(vhfLogOk ? "[A]STOP (SD)" : "[A]STOP (NOLOG)", SW - 8, 119);
+    cv.drawString(vhfLogOk ? "[A]ARRET (SD)" : "[A]ARRET (SANS SD)", SW - 8, 119);
   } else if (vhfBand) {
     float a1, a2, floorDb;
     vhfProbeStats(a1, a2, floorDb);
@@ -1181,30 +1186,30 @@ static void drawScanView() {
 
     cv.setTextDatum(top_right);
     cv.setTextColor(0xFDA0, 0x0821);
-    cv.drawString("[A]WATCH  [V]ISM", SW - 8, 119);
+    cv.drawString("[A]VEILLE [V]ISM", SW - 8, 119);
   } else {
     cv.setTextDatum(top_left);
     if (peakBins[pk] > RSSI_FLOOR + 8) {
       float pf = scanLo() + (scanHi() - scanLo()) * pk / (NBINS - 1);
-      snprintf(b, sizeof(b), "PEAK: %.1fMHz  %ddBm", pf, (int)peakBins[pk]);
+      snprintf(b, sizeof(b), "PIC: %.1fMHz  %ddBm", pf, (int)peakBins[pk]);
       cv.setTextColor(0x07E0, 0x0821);
       cv.drawString(b, 8, 109);
 
       cv.setTextDatum(top_right);
       cv.setTextColor(0x07FF, 0x0821);
-      cv.drawString("[RET=LOCK]", SW - 8, 109);
+      cv.drawString("[ENTR=VERROU]", SW - 8, 109);
     } else {
       cv.setTextColor(0x8410, 0x0821);
-      cv.drawString("PEAK: NO ACTIVE SIGNAL", 8, 109);
+      cv.drawString("PIC : AUCUN SIGNAL", 8, 109);
 
       cv.setTextDatum(top_right);
       cv.setTextColor(0x4208, 0x0821);
-      cv.drawString("[IDLE]", SW - 8, 109);
+      cv.drawString("[INACTIF]", SW - 8, 109);
     }
 
     cv.setTextDatum(top_left);
     cv.setTextColor(0x8410, 0x0821);
-    cv.drawString("BAND: ISM", 8, 119);
+    cv.drawString("BANDE : ISM", 8, 119);
 
     cv.setTextDatum(top_right);
     cv.setTextColor(0x8410, 0x0821);
@@ -1217,13 +1222,13 @@ static void drawListenView() {
   // Pod 0: PRESET
   cv.fillRoundRect(4, 19, 55, 22, 2, 0x0821); cv.drawRoundRect(4, 19, 55, 22, 2, 0x18C3);
   cv.setTextDatum(top_left); cv.setTextSize(1);
-  cv.setTextColor(0x8410, 0x0821); cv.drawString("PRESET", 7, 21);
+  cv.setTextColor(0x8410, 0x0821); cv.drawString("PROFIL", 7, 21);
   cv.setTextColor(0x07FF, 0x0821); cv.drawString(trunc(PRESETS[presetIdx].name, 7), 7, 31);
 
   // Pod 1: FREQ
   bool freqLocked = fabsf(curFreq - PRESETS[presetIdx].freq) > 0.01f;
   cv.fillRoundRect(62, 19, 55, 22, 2, 0x0821); cv.drawRoundRect(62, 19, 55, 22, 2, 0x18C3);
-  cv.setTextColor(0x8410, 0x0821); cv.drawString(freqLocked ? "LOCKED" : "FREQ", 65, 21);
+  cv.setTextColor(0x8410, 0x0821); cv.drawString(freqLocked ? "VERROUILLE" : "FREQ", 65, 21);
   char fstr[16]; snprintf(fstr, sizeof(fstr), "%.1fM%s", curFreq, freqLocked ? "*" : "");
   cv.setTextColor(0xFDA0, 0x0821); cv.drawString(fstr, 65, 31);
 
@@ -1235,7 +1240,7 @@ static void drawListenView() {
 
   // Pod 3: PACKETS
   cv.fillRoundRect(178, 19, 58, 22, 2, 0x0821); cv.drawRoundRect(178, 19, 58, 22, 2, 0x18C3);
-  cv.setTextColor(0x8410, 0x0821); cv.drawString("PACKETS", 181, 21);
+  cv.setTextColor(0x8410, 0x0821); cv.drawString("PAQUETS", 181, 21);
   char pstr[16]; snprintf(pstr, sizeof(pstr), "%lu", (unsigned long)pktTotal);
   cv.setTextColor(0xFFFF, 0x0821); cv.drawString(pstr, 181, 31);
 
@@ -1244,13 +1249,13 @@ static void drawListenView() {
 
   // Card Header Banner
   cv.setTextDatum(top_left); cv.setTextColor(0x8410, 0x0821);
-  cv.drawString("MESHTASTIC / LORA FEED", 8, 47);
+  cv.drawString("TRAMES MESHTASTIC / LORA", 8, 47);
   cv.setTextDatum(top_right);
   if (pktCount > 0) {
-    char t[32]; snprintf(t, sizeof(t), "%lus ago", (unsigned long)((millis() - lastPktMs) / 1000));
+    char t[32]; snprintf(t, sizeof(t), "il y a %lus", (unsigned long)((millis() - lastPktMs) / 1000));
     cv.setTextColor(0x07E0, 0x0821); cv.drawString(t, SW - 8, 47);
   } else {
-    cv.setTextColor(0x4208, 0x0821); cv.drawString("STANDBY", SW - 8, 47);
+    cv.setTextColor(0x4208, 0x0821); cv.drawString("VEILLE", SW - 8, 47);
   }
   cv.drawFastHLine(8, 57, SW - 16, 0x18C3);
 
@@ -1264,11 +1269,11 @@ static void drawListenView() {
     cv.fillCircle(rcx + 7, rcy - 6, 2, 0x07FF);
 
     cv.setTextDatum(top_left);
-    cv.setTextColor(0x07FF, 0x0821); cv.drawString("RECEIVER LISTENING...", 66, 64);
-    char linfo[48]; snprintf(linfo, sizeof(linfo), "Target: %.1f MHz (%s)", curFreq, trunc(PRESETS[presetIdx].name, 7).c_str());
+    cv.setTextColor(0x07FF, 0x0821); cv.drawString("RECEPTEUR EN ECOUTE...", 66, 64);
+    char linfo[48]; snprintf(linfo, sizeof(linfo), "Cible : %.1f MHz (%s)", curFreq, trunc(PRESETS[presetIdx].name, 7).c_str());
     cv.setTextColor(0x8410, 0x0821); cv.drawString(linfo, 66, 76);
-    cv.setTextColor(0x4208, 0x0821); cv.drawString("Waiting for incoming frames", 66, 88);
-    cv.setTextColor(0x4208, 0x0821); cv.drawString("Auto-decodes node, hops, RSSI", 66, 100);
+    cv.setTextColor(0x4208, 0x0821); cv.drawString("En attente de trames", 66, 88);
+    cv.setTextColor(0x4208, 0x0821); cv.drawString("Decode noeud, sauts, RSSI", 66, 100);
   } else {
     int rows = min(pktCount, 3);
     int py = 60;
@@ -1299,7 +1304,7 @@ static void drawListenView() {
         cv.drawString(sig, SW - 10, py + 5);
       } else {
         char rawLine[64];
-        snprintf(rawLine, sizeof(rawLine), "RAW %dB %s%s", r.len, r.hex, r.crcBad ? " !CRC" : "");
+        snprintf(rawLine, sizeof(rawLine), "BRUT %dB %s%s", r.len, r.hex, r.crcBad ? " !CRC" : "");
         cv.setTextColor(r.crcBad ? 0xF800 : 0xFDA0, rowBg);
         cv.drawString(rawLine, 10, py + 5);
 
@@ -1315,7 +1320,7 @@ static void drawListenView() {
   // 3. Bottom Navigation Pill (y: 122..134)
   cv.fillRoundRect(4, 122, SW - 8, 12, 2, 0x0000);
   cv.setTextDatum(middle_center); cv.setTextColor(0x8410, 0x0000);
-  cv.drawString("[,/]PRESET  [A]AUTO  [C]CHAT  [;]SCAN", SW / 2, 128);
+  cv.drawString("[,/]PROFIL [A]AUTO [C]CHAT [;]SCAN", SW / 2, 128);
 }
 
 static void drawAutoView() {
@@ -1323,11 +1328,11 @@ static void drawAutoView() {
   cv.fillRoundRect(4, 19, SW - 8, 14, 2, 0x0821);
   cv.drawRoundRect(4, 19, SW - 8, 14, 2, 0x18C3);
 
-  char fbuf[32]; snprintf(fbuf, sizeof(fbuf), "SWEEP FREQ: %.3f MHz", curFreq);
+  char fbuf[32]; snprintf(fbuf, sizeof(fbuf), "FREQ. BALAYEE : %.3f MHz", curFreq);
   cv.setTextDatum(top_left); cv.setTextSize(1);
   cv.setTextColor(0x07FF, 0x0821); cv.drawString(fbuf, 8, 21);
 
-  char cbuf[24]; snprintf(cbuf, sizeof(cbuf), "COMB %02d/%02d", autoIdx + 1, MODEM_COUNT);
+  char cbuf[24]; snprintf(cbuf, sizeof(cbuf), "ESSAI %02d/%02d", autoIdx + 1, MODEM_COUNT);
   cv.setTextDatum(top_right); cv.setTextColor(0xFDA0, 0x0821); cv.drawString(cbuf, SW - 8, 21);
 
   // 2. Center Modem Card (y: 36..98, h = 63)
@@ -1341,24 +1346,24 @@ static void drawAutoView() {
   // 3 Parameter Pods (y: 51..78, h = 28)
   // Pod 0: BANDWIDTH
   cv.fillRoundRect(8, 51, 72, 28, 2, 0x10A2); cv.drawRoundRect(8, 51, 72, 28, 2, 0x2145);
-  cv.setTextDatum(top_left); cv.setTextColor(0x8410, 0x10A2); cv.drawString("BANDWIDTH", 12, 53);
+  cv.setTextDatum(top_left); cv.setTextColor(0x8410, 0x10A2); cv.drawString("BANDE PASSANTE", 12, 53);
   char bws[16]; snprintf(bws, sizeof(bws), "%.0f kHz", m.bw);
   cv.setTextColor(0x07FF, 0x10A2); cv.drawString(bws, 12, 65);
 
   // Pod 1: SPREAD FACTOR
   cv.fillRoundRect(84, 51, 72, 28, 2, 0x10A2); cv.drawRoundRect(84, 51, 72, 28, 2, 0x2145);
-  cv.setTextDatum(top_left); cv.setTextColor(0x8410, 0x10A2); cv.drawString("SPREAD FACT", 88, 53);
+  cv.setTextDatum(top_left); cv.setTextColor(0x8410, 0x10A2); cv.drawString("FACTEUR ETAL.", 88, 53);
   char sfs[16]; snprintf(sfs, sizeof(sfs), "SF %d", m.sf);
   cv.setTextColor(0xFDA0, 0x10A2); cv.drawString(sfs, 88, 65);
 
   // Pod 2: CODING RATE
   cv.fillRoundRect(160, 51, 72, 28, 2, 0x10A2); cv.drawRoundRect(160, 51, 72, 28, 2, 0x2145);
-  cv.setTextDatum(top_left); cv.setTextColor(0x8410, 0x10A2); cv.drawString("CODING RATE", 164, 53);
+  cv.setTextDatum(top_left); cv.setTextColor(0x8410, 0x10A2); cv.drawString("TAUX CODAGE", 164, 53);
   char crs[16]; snprintf(crs, sizeof(crs), "4/%d", m.cr);
   cv.setTextColor(0x07E0, 0x10A2); cv.drawString(crs, 164, 65);
 
   cv.setTextDatum(top_center); cv.setTextColor(0x4208, 0x0821);
-  cv.drawString("SYNC 0x2B (Meshtastic)  PREAMBLE 16", SW / 2, 85);
+  cv.drawString("SYNC 0x2B (Meshtastic)  PREAMBULE 16", SW / 2, 85);
 
   // 3. Segmented Dwell Progress Bar (y: 102..117, h = 15)
   cv.fillRoundRect(4, 102, SW - 8, 15, 2, 0x0821);
@@ -1383,7 +1388,7 @@ static void drawAutoView() {
   // 4. Bottom Navigation Hint (y: 122..134)
   cv.fillRoundRect(4, 122, SW - 8, 12, 2, 0x0000);
   cv.setTextDatum(middle_center); cv.setTextColor(0x8410, 0x0000);
-  cv.drawString("[A]HOLD  *LOCKS ON PKT*  [;]SCAN", SW / 2, 128);
+  cv.drawString("[A]PAUSE *VERROUILLE TRAME* [;]SCAN", SW / 2, 128);
 }
 
 static void drawLoraChatView() {
@@ -1391,14 +1396,14 @@ static void drawLoraChatView() {
   cv.fillRoundRect(4, 19, SW - 8, 14, 2, 0x0821);
   cv.drawRoundRect(4, 19, SW - 8, 14, 2, 0x18C3);
 
-  char nbuf[24]; snprintf(nbuf, sizeof(nbuf), "NODE: !%02X", chatNodeId);
+  char nbuf[24]; snprintf(nbuf, sizeof(nbuf), "NOEUD : !%02X", chatNodeId);
   cv.setTextDatum(top_left); cv.setTextSize(1);
   cv.setTextColor(0x07E0, 0x0821); cv.drawString(nbuf, 8, 21);
 
   char fbuf[24]; snprintf(fbuf, sizeof(fbuf), "%.3f MHz", curFreq);
   cv.setTextDatum(top_center); cv.setTextColor(0x07FF, 0x0821); cv.drawString(fbuf, SW / 2, 21);
 
-  cv.setTextDatum(top_right); cv.setTextColor(0x8410, 0x0821); cv.drawString("MAGIC: C5A1", SW - 8, 21);
+  cv.setTextDatum(top_right); cv.setTextColor(0x8410, 0x0821); cv.drawString("MAGIE : C5A1", SW - 8, 21);
 
   // 2. Message Feed Area (y: 35..104, h = 70)
   cv.fillRoundRect(4, 35, SW - 8, 70, 3, 0x0000);
@@ -1406,9 +1411,9 @@ static void drawLoraChatView() {
 
   if (chatCount == 0) {
     cv.setTextDatum(top_center);
-    cv.setTextColor(0x07FF, 0x0000); cv.drawString("SECURE P2P LORA TERMINAL", SW / 2, 50);
-    cv.setTextColor(0x8410, 0x0000); cv.drawString("No messages on current channel", SW / 2, 64);
-    cv.setTextColor(0x4208, 0x0000); cv.drawString("Type message below to broadcast", SW / 2, 78);
+    cv.setTextColor(0x07FF, 0x0000); cv.drawString("TERMINAL P2P LORA", SW / 2, 50);
+    cv.setTextColor(0x8410, 0x0000); cv.drawString("Aucun message sur ce canal", SW / 2, 64);
+    cv.setTextColor(0x4208, 0x0000); cv.drawString("Saisis un message pour l'envoyer", SW / 2, 78);
   } else {
     int showCount = min(chatCount, 4);
     int my = 39;
@@ -1449,11 +1454,11 @@ static void drawLoraChatView() {
   cv.fillRoundRect(4, 123, SW - 8, 11, 2, 0x0000);
   cv.setTextDatum(middle_center);
   if (sinceLast < CHAT_MIN_INTERVAL_MS) {
-    char cd[48]; snprintf(cd, sizeof(cd), "RATE LIMIT: WAIT %lus TO SEND",
+    char cd[48]; snprintf(cd, sizeof(cd), "ATTENDS %lus AVANT ENVOI",
                           (unsigned long)((CHAT_MIN_INTERVAL_MS - sinceLast) / 1000 + 1));
     cv.setTextColor(0xFDA0, 0x0000); cv.drawString(cd, SW / 2, 128);
   } else {
-    cv.setTextColor(0x8410, 0x0000); cv.drawString("[RET]SEND  [EMPTY]EXIT  [DEL]BACK", SW / 2, 128);
+    cv.setTextColor(0x8410, 0x0000); cv.drawString("[ENTR]ENVOI [VIDE]SORTIR [RET]EFFACER", SW / 2, 128);
   }
 }
 
@@ -1489,22 +1494,22 @@ void drawLora() {
 
     cv.setTextDatum(top_center); cv.setTextSize(1);
     cv.setTextColor(0xF800, 0x1800);
-    cv.drawString("[ SX1262 HARDWARE FAULT ]", SW / 2, 30);
+    cv.drawString("[ DEFAUT MATERIEL SX1262 ]", SW / 2, 30);
 
     char errStr[48];
-    snprintf(errStr, sizeof(errStr), "RadioLib Status Code: %d", loraErr);
+    snprintf(errStr, sizeof(errStr), "Code RadioLib : %d", loraErr);
     cv.setTextColor(0xFDA0, 0x1800);
     cv.drawString(errStr, SW / 2, 46);
 
     cv.setTextDatum(top_left);
     cv.setTextColor(0xFFFF, 0x1800);
-    cv.drawString("* Check Cap LoRa-1262 header seating", 16, 62);
-    cv.drawString("* Verify I2C 0x43 (P0 Antenna Switch)", 16, 74);
-    cv.drawString("* SPI Pin 5 (NSS) shared with SD Card", 16, 86);
+    cv.drawString("* Verifier connexion du Cap LoRa", 16, 62);
+    cv.drawString("* Verifier commutateur RF I2C 0x43", 16, 74);
+    cv.drawString("* SPI/NSS partage avec microSD", 16, 86);
 
     cv.setTextDatum(middle_center);
     cv.setTextColor(0x8410, 0x1800);
-    cv.drawString("Press 'R' to retry initialization", SW / 2, 108);
+    cv.drawString("Appuie sur R pour reinitialiser", SW / 2, 108);
     return;
   }
 
