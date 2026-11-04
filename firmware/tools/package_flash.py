@@ -104,6 +104,8 @@ def main() -> None:
         "Image: roza-cardputer-adv-8mb.bin\n"
         "Flash address: 0x0000 (single merged image)\n"
         "Included regions: bootloader 0x0000, partition table 0x8000, app 0x10000\n"
+        "NVS at 0x9000 is erased by this full merged image; ROZA preferences reset on each flash.\n"
+        "microSD contents are not modified.\n"
         f"App image: {len(app_data)} bytes / partition capacity: {app_capacity} bytes\n"
         f"Combined image: {len(image)} bytes\n"
         "Use only on M5Stack Cardputer ADV.\n",
