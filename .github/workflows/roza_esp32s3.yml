@@ -65,6 +65,22 @@ jobs:
           done
           ls -lh "$BUILD_DIR/firmware.bin" "$BUILD_DIR/firmware.elf" "$BUILD_DIR/bootloader.bin" "$BUILD_DIR/partitions.bin"
 
+      - name: Préparer l'image unique à flasher
+        run: |
+          python tools/package_flash.py \
+            --build-dir .pio/build/cardputer-adv \
+            --output-dir .pio/build/cardputer-adv/flash-package
+      - name: Publier le paquet prêt à flasher
+        uses: actions/upload-artifact@v4
+        with:
+          name: roza-cardputer-adv-flash-${{ github.sha }}
+          path: |
+            firmware/.pio/build/cardputer-adv/flash-package/roza-cardputer-adv-8mb.bin
+            firmware/.pio/build/cardputer-adv/flash-package/FLASH-INFO.txt
+            firmware/.pio/build/cardputer-adv/flash-package/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Publier les artefacts de compilation
         uses: actions/upload-artifact@v4
         with:
