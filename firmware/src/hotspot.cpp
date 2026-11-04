@@ -1,6 +1,7 @@
 #include "hotspot.h"
 #include <WiFi.h>
 #include <esp_wifi.h>
+#include <esp_system.h>
 #include "dhcpserver/dhcpserver.h"   // dhcp_search_ip_on_mac：按 MAC 查 DHCP 租约表拿到分配的 IP
 #include "ui_common.h"
 #include "config.h"
@@ -36,7 +37,22 @@ static bool apSuspended = false;
 String hotspotPwInput;
 
 static String loadPw() {
-  return loadString("hotspot", "pw", DEFAULT_PW);
+  String pw = loadString("hotspot", "pw", "");
+  if (pw.length() >= 8) return pw;
+
+  // Ne jamais livrer un point d'accès avec un mot de passe public connu.
+  // Une configuration locale explicite reste prioritaire ; sinon générer 64 bits
+  // aléatoires et les conserver dans NVS dès la première consultation.
+  if (DEFAULT_PW && strlen(DEFAULT_PW) >= 8) {
+    pw = DEFAULT_PW;
+  } else {
+    char generated[24];
+    snprintf(generated, sizeof(generated), "ROZA-%08lX%08lX",
+             (unsigned long)esp_random(), (unsigned long)esp_random());
+    pw = generated;
+  }
+  saveString("hotspot", "pw", pw);
+  return pw;
 }
 static void savePw(const String& pw) {
   saveString("hotspot", "pw", pw);
