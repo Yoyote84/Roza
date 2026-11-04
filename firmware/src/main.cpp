@@ -1062,9 +1062,19 @@ void setup() {
   // On les désactive ici pour respecter la politique "non négociable" de ROZA.
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
-  // M5Unified 0.2.20 ne fournit pas d’API M5.Bt. Le Bluetooth BLE
-  // n’est initialisé que par bt.cpp lors d’une action explicite de l’utilisateur ;
+  // M5Unified 0.2.20 ne fournit pas d'API M5.Bt. Le Bluetooth BLE
+  // n'est initialisé que par bt.cpp lors d'une action explicite de l'utilisateur ;
   // ne pas appeler BLEDevice::init() au démarrage.
+
+  // ⚠️ ROZA : synchronisation horaire GPS autonome possible au démarrage.
+  // Si le module GPS Cap a verrouillage (NMEA valide reçu), il est possible de
+  // synchroniser l'heure système sans avoir besoin du Wi-Fi au démarrage,
+  // respectant ainsi la politique "hors ligne" de ROZA.
+  // Mécanisme : lire la date/heure du GPS via M5.In_I2C et appeler
+  // configTzTime + settimeofday si les données sont valides.
+  // Sinon, on continue avec la méthode Wi-Fi/NTP classique plus tard.
+  // Cela n'engage aucun fonctionnement futur : si le GPS perd verrouillage,
+  // le système retombera sur ses pattes via NTP plus tard.
 
   // ⚠️ 这一枪必须打在 M5.begin() **之前**：它记的是"静态段都分配完了、动态的还一个没花"
   // 那个时刻的余量，也就是 README 里 94,876 -> 119,420 该拿来对比的那个数。
