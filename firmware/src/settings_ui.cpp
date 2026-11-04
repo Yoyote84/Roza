@@ -1,5 +1,7 @@
 #include "settings_ui.h"
 #include <WiFi.h>
+#include <ctime>
+#include <sys/time.h>
 #include "icons.h"
 #include "sd_files.h"
 #include "led.h"
@@ -271,11 +273,70 @@ void drawSleep() {
 
   cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
   cv.setTextDatum(bottom_center); cv.setTextSize(1);
-  cv.drawString("; . prec./suiv.    ` retour", SW / 2, SH - 2);
+  cv.drawString("; . fuseau   m: heure/date   ` retour", SW / 2, SH - 2);
 }
 
+static bool manualTimeEditing = false;
+static struct tm manualTimeValue{};
+static int manualTimeField = 0;
+static int manualDaysInMonth(int y, int m) {
+  static const int d[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+  if (m == 2 && ((y % 4 == 0 && y % 100 != 0) || y % 400 == 0)) return 29;
+  return d[m - 1];
+}
+void manualTimeBegin() {
+  time_t now = time(nullptr);
+  if (now >= 1735689600) localtime_r(&now, &manualTimeValue);
+  else { memset(&manualTimeValue, 0, sizeof(manualTimeValue)); manualTimeValue.tm_year=126; manualTimeValue.tm_mday=1; manualTimeValue.tm_hour=12; }
+  manualTimeField=0; manualTimeEditing=true; dirty=true;
+}
+bool manualTimeEditingNow() { return manualTimeEditing; }
+void manualTimeKey(char k) {
+  if (!manualTimeEditing) return;
+  if ((uint8_t)k == 96) { manualTimeEditing=false; dirty=true; return; }
+  if (k==',') manualTimeField=(manualTimeField+4)%5;
+  else if (k=='/') manualTimeField=(manualTimeField+1)%5;
+  else if (k=='-' || k=='_') {
+    if(manualTimeField==0) manualTimeValue.tm_year=max(126,manualTimeValue.tm_year-1);
+    else if(manualTimeField==1) manualTimeValue.tm_mon=(manualTimeValue.tm_mon+11)%12;
+    else if(manualTimeField==2) manualTimeValue.tm_mday=manualTimeValue.tm_mday>1?manualTimeValue.tm_mday-1:manualDaysInMonth(manualTimeValue.tm_year+1900,manualTimeValue.tm_mon+1);
+    else if(manualTimeField==3) manualTimeValue.tm_hour=(manualTimeValue.tm_hour+23)%24;
+    else manualTimeValue.tm_min=(manualTimeValue.tm_min+59)%60;
+  } else if(k=='+' || k=='=') {
+    if(manualTimeField==0) manualTimeValue.tm_year=min(250,manualTimeValue.tm_year+1);
+    else if(manualTimeField==1) manualTimeValue.tm_mon=(manualTimeValue.tm_mon+1)%12;
+    else if(manualTimeField==2) manualTimeValue.tm_mday=manualTimeValue.tm_mday<manualDaysInMonth(manualTimeValue.tm_year+1900,manualTimeValue.tm_mon+1)?manualTimeValue.tm_mday+1:1;
+    else if(manualTimeField==3) manualTimeValue.tm_hour=(manualTimeValue.tm_hour+1)%24;
+    else manualTimeValue.tm_min=(manualTimeValue.tm_min+1)%60;
+  } else if(k==10) {
+    manualTimeValue.tm_sec=0; manualTimeValue.tm_isdst=-1;
+    time_t epoch=mktime(&manualTimeValue);
+    if(epoch>=1735689600) { struct timeval tv={epoch,0}; if(settimeofday(&tv,nullptr)==0) { saveUInt("clock","manual_epoch",(uint32_t)epoch); timeSynced=true; timeFromGps=false; } }
+    manualTimeEditing=false;
+  }
+  int md=manualDaysInMonth(manualTimeValue.tm_year+1900,manualTimeValue.tm_mon+1);
+  if(manualTimeValue.tm_mday>md) manualTimeValue.tm_mday=md;
+  dirty=true;
+}
 void drawTz() {
   cv.fillScreen(TFT_BLACK);
+  if(manualTimeEditing) {
+    drawPageHeader("Reglage manuel","DATE / HEURE",ACCENT);
+    const char* names[]={"ANNEE","MOIS","JOUR","HEURE","MIN"};
+    char dateBuf[24],timeBuf[16],dayBuf[24];
+    snprintf(dateBuf,sizeof(dateBuf),"%04d-%02d-%02d",manualTimeValue.tm_year+1900,manualTimeValue.tm_mon+1,manualTimeValue.tm_mday);
+    snprintf(timeBuf,sizeof(timeBuf),"%02d:%02d",manualTimeValue.tm_hour,manualTimeValue.tm_min);
+    struct tm p=manualTimeValue; p.tm_isdst=-1; time_t ep=mktime(&p); struct tm wd{}; localtime_r(&ep,&wd);
+    static const char* days[]={"Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"};
+    snprintf(dayBuf,sizeof(dayBuf),"%s",days[wd.tm_wday]);
+    cv.fillRoundRect(8,20,SW-16,82,4,ROZA_INK); cv.drawRoundRect(8,20,SW-16,82,4,ROZA_OLIVE_DARK);
+    cv.setTextDatum(middle_center); cv.setTextSize(2); cv.setTextColor(ROZA_PAPER,ROZA_INK); cv.drawString(dateBuf,SW/2,43);
+    cv.setTextSize(3); cv.setTextColor(ACCENT,ROZA_INK); cv.drawString(timeBuf,SW/2,72);
+    cv.setTextSize(1); cv.setTextColor(ROZA_OLIVE_LIGHT,ROZA_INK); cv.drawString(dayBuf,SW/2,91);
+    cv.setTextColor(TFT_YELLOW,TFT_BLACK); cv.setTextDatum(bottom_center); cv.drawString(names[manualTimeField],SW/2,115);
+    cv.setTextColor(TFT_DARKGREY,TFT_BLACK); cv.drawString(", / champ  - / = valeur  Entree sauver  retour",SW/2,SH-2);
+    return;
+  }
 
   char pageBuf[16];
   snprintf(pageBuf, sizeof(pageBuf), "%d/%d", tzOptIdx + 1, TZ_OPT_COUNT);

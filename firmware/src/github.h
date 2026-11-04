@@ -8,4 +8,5 @@
 void githubEnter();
 void githubUpdate();
 void githubKey(char k);
+bool githubIsEditing();
 void drawGithub();

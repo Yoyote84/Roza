@@ -14,6 +14,9 @@
 
 // 接口最多回一年多一点（实测 369 天），留点余量
 static const int MAX_DAYS = 380;
+static String githubUser;
+static String githubUserInput;
+static bool githubEditing = false;
 static const uint32_t STALE_MS = 30 * 60 * 1000;   // 半小时之内不重复拉
 
 static uint8_t  dayLevel[MAX_DAYS];   // 0~4，GitHub 自己分好的档
@@ -69,14 +72,14 @@ static void fetchContrib() {
   errMsg.reserve(96);
   errMsg = "";
 
-  if (strlen(GITHUB_USER) == 0) { errMsg = "no GITHUB_USER in secrets.h"; dirty = true; return; }
+  if (githubUser.length() == 0) { errMsg = "press u to set GitHub user"; dirty = true; return; }
   if (!wifiEnsureConnected()) { errMsg = "wifi not connected"; dirty = true; return; }
   // 证书校验要比有效期，时钟没对上必然失败——分开报，别混成网络错
   if (!tlsClockReady()) { errMsg = "waiting for clock (NTP)"; dirty = true; return; }
 
   char url[128];
   snprintf(url, sizeof(url),
-           "https://github-contributions-api.jogruber.de/v4/%s?y=last", GITHUB_USER);
+           "https://github-contributions-api.jogruber.de/v4/%s?y=last", githubUser.c_str());
 
   // TLS 握手要两块 ~16.7KB 缓冲外加证书链，流式抓取期间把画布借出去，出作用域自动还。
   // client 和证书包在 lease 之前建好；lease 声明在流式抓取之前。
@@ -125,6 +128,8 @@ static void fetchContrib() {
 }
 
 void githubEnter() {
+  githubUser = loadString("github", "user", GITHUB_USER);
+  githubEditing = false;
   if (!haveData || millis() - fetchedAtMs > STALE_MS) job.request();
   dirty = true;
 }
@@ -133,16 +138,33 @@ void githubUpdate() {
   if (job.due()) bgFetchRun(fetchContrib);   // 交给后台工人（bg_fetch.h）
 }
 
+bool githubIsEditing() { return githubEditing; }
 void githubKey(char k) {
-  if (k == 'r' || k == 'R') job.request();   // 走同一条延后路径，别在按键回调里同步拉
-  dirty = true;
+  if (githubEditing) {
+    if ((uint8_t)k==96) githubEditing=false;
+    else if ((uint8_t)k==8) { if(githubUserInput.length()) githubUserInput.remove(githubUserInput.length()-1); }
+    else if ((uint8_t)k==10) {
+      githubUserInput.trim();
+      bool valid=githubUserInput.length()>0 && githubUserInput.length()<=39;
+      for(size_t i=0;i<githubUserInput.length();++i) { char c=githubUserInput[i]; if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c=='-')) valid=false; }
+      if(valid) { githubUser=githubUserInput; saveString("github","user",githubUser); haveData=false; job.request(); }
+      githubEditing=false;
+    } else if (((k>='a'&&k<='z')||(k>='A'&&k<='Z')||(k>='0'&&k<='9')||k=='-') && githubUserInput.length()<39) githubUserInput+=k;
+  } else if(k=='u'||k=='U') { githubUserInput=githubUser; githubEditing=true; }
+  else if(k=='r'||k=='R') job.request();
+  dirty=true;
 }
 
 void drawGithub() {
   job.markShown();   // ⚠️ 必须在最前面，下面的空状态会提前 return（见 net_job.h）
   cv.fillScreen(TFT_BLACK);
-  drawPageHeader("GitHub", GITHUB_USER, ICON_DIM);
-
+  drawPageHeader("GitHub", githubUser.length() ? githubUser.c_str() : "Profil non configure", ICON_DIM);
+  if (githubEditing) {
+    cv.fillRoundRect(12,34,SW-24,62,4,GH_CARD_BG); cv.drawRoundRect(12,34,SW-24,62,4,GH_BORDER);
+    cv.setTextDatum(middle_center); cv.setTextSize(1); cv.setTextColor(GH_GREEN_L4,GH_CARD_BG); cv.drawString("Nom utilisateur GitHub",SW/2,47);
+    cv.setTextColor(TFT_WHITE,GH_CARD_BG); cv.drawString(githubUserInput.c_str(),SW/2,66);
+    cv.setTextColor(GH_TEXT_MUTED,TFT_BLACK); cv.drawString("Pseudo puis Entree pour sauver",SW/2,108); return;
+  }
   if (!haveData) {
     cv.setTextDatum(middle_center); cv.setTextSize(1);
     if (errMsg.length()) {
@@ -151,7 +173,7 @@ void drawGithub() {
       cv.setTextColor(TFT_RED, GH_CARD_BG);
       cv.drawString(trunc(errMsg, 34), SW / 2, 58);
       cv.setTextColor(GH_TEXT_MUTED, GH_CARD_BG);
-      cv.drawString("press 'r' to retry", SW / 2, 78);
+      cv.drawString("u: profil   r: reessayer", SW / 2, 78);
     } else {
       cv.fillRoundRect(24, 46, SW - 48, 44, 4, GH_BG_DARK);
       cv.drawRoundRect(24, 46, SW - 48, 44, 4, GH_BORDER);

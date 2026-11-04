@@ -9,6 +9,9 @@ void drawSettings();
 void drawBar(const char* title, int pct, const char* hint);   // 亮度/音量共用：标题 + 进度条
 void drawSleep();
 void drawTz();
+void manualTimeBegin();
+void manualTimeKey(char k);
+bool manualTimeEditingNow();
 void drawBatteryDetail();
 void drawFormat();
 

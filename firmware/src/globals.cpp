@@ -4,6 +4,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <ctime>
+#include <sys/time.h>
 
 Preferences prefs;
 
@@ -406,6 +407,13 @@ void tzInit() {
   TZ_INFO = TZ_OPTS[tzOptIdx].posix;
   setenv("TZ", TZ_INFO, 1);
   tzset();
+  uint32_t savedEpoch = loadUInt("clock", "manual_epoch", 0);
+  if (savedEpoch >= 1735689600UL) {
+    struct timeval tv = { (time_t)savedEpoch, 0 };
+    settimeofday(&tv, nullptr);
+    timeSynced = true;
+    timeFromGps = false;
+  }
 }
 
 void tzSet(int idx) {

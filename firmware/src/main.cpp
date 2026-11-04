@@ -857,8 +857,8 @@ static void handleKeyAction(char k) {
       return;
 
     case SCREEN_GITHUB:
-      if (k == '`') { screen = SCREEN_MENU; dirty = true; }
-      else            githubKey(k);
+      if (k == '`' && !githubIsEditing()) { screen = SCREEN_MENU; dirty = true; }
+      else githubKey(k);
       return;
 
     case SCREEN_WIFI_CHAN:
@@ -968,7 +968,9 @@ static void handleKeyAction(char k) {
       return;
 
     case SCREEN_TZ:
-      if (k == '`') { screen = SCREEN_SETTINGS; dirty = true; }
+      if (manualTimeEditingNow()) manualTimeKey(k);
+      else if (k == '`') { screen = SCREEN_SETTINGS; dirty = true; }
+      else if (k == 'm' || k == 'M') manualTimeBegin();
       else if (k == ';') { tzSet((tzOptIdx - 1 + TZ_OPT_COUNT) % TZ_OPT_COUNT); dirty = true; }
       else if (k == '.') { tzSet((tzOptIdx + 1) % TZ_OPT_COUNT); dirty = true; }
       return;
