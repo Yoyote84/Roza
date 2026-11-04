@@ -163,7 +163,7 @@ void drawGithub() {
     cv.fillRoundRect(12,34,SW-24,62,4,GH_CARD_BG); cv.drawRoundRect(12,34,SW-24,62,4,GH_BORDER);
     cv.setTextDatum(middle_center); cv.setTextSize(1); cv.setTextColor(GH_GREEN_L4,GH_CARD_BG); cv.drawString("Nom utilisateur GitHub",SW/2,47);
     cv.setTextColor(TFT_WHITE,GH_CARD_BG); cv.drawString(githubUserInput.c_str(),SW/2,66);
-    cv.setTextColor(GH_TEXT_MUTED,TFT_BLACK); cv.drawString("Pseudo puis Entree pour sauver",SW/2,108); return;
+    cv.setTextColor(GH_TEXT_MUTED,TFT_BLACK); cv.drawString("Entree sauver  retour annuler",SW/2,108); return;
   }
   if (!haveData) {
     cv.setTextDatum(middle_center); cv.setTextSize(1);
@@ -335,5 +335,8 @@ void drawGithub() {
     cv.setTextSize(1);
     cv.setTextColor(TFT_RED, TFT_BLACK);
     cv.drawString(trunc(errMsg, 38), SW / 2, SH - 2);
+  } else {
+    cv.setTextDatum(bottom_center); cv.setTextSize(1); cv.setTextColor(GH_TEXT_MUTED, TFT_BLACK);
+    cv.drawString("u: profil   r: actualiser", SW / 2, SH - 2);
   }
 }

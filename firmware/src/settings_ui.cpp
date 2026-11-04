@@ -273,7 +273,7 @@ void drawSleep() {
 
   cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
   cv.setTextDatum(bottom_center); cv.setTextSize(1);
-  cv.drawString("; . fuseau   m: heure/date   ` retour", SW / 2, SH - 2);
+  cv.drawString("; . prec./suiv.    ` retour", SW / 2, SH - 2);
 }
 
 static bool manualTimeEditing = false;
@@ -358,7 +358,7 @@ void drawTz() {
 
   cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
   cv.setTextDatum(bottom_center); cv.setTextSize(1);
-  cv.drawString("; . prec./suiv.    ` retour", SW / 2, SH - 2);
+  cv.drawString("; . fuseau   m: heure/date   ` retour", SW / 2, SH - 2);
 }
 
 // 电池与电源仪表盘：双联硬件卡片
