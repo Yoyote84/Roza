@@ -148,13 +148,13 @@ bool nowHM(int& h, int& m, int& s) {
 void drawTopBar() {
   int h, m, s; nowHM(h, m, s);
   char t[8]; snprintf(t, sizeof(t), "%02d:%02d", h, m);
-  cv.setTextColor(TFT_CYAN, TFT_BLACK);
+  cv.setTextColor(ROZA_PAPER, TFT_BLACK);
   cv.setTextDatum(top_left); cv.setTextSize(1);
   cv.drawString(t, 6, 5);
 
   int rightX = SW - 34;
   if (sdMounted) {
-    cv.setTextColor(0x07E0, TFT_BLACK);
+    cv.setTextColor(ROZA_OLIVE_LIGHT, TFT_BLACK);
     cv.setTextDatum(top_right); cv.setTextSize(1);
     cv.drawString("[SD]", rightX, 5);
     rightX -= 26;
@@ -164,7 +164,7 @@ void drawTopBar() {
     rightX -= 18;
   }
   if (gnssCapConnected()) {
-    cv.setTextColor(0xFD02, TFT_BLACK);
+    cv.setTextColor(ROZA_OLIVE_LIGHT, TFT_BLACK);
     cv.setTextDatum(top_right); cv.setTextSize(1);
     cv.drawString("[CAP]", rightX, 5);
     rightX -= 32;
@@ -355,7 +355,7 @@ void drawMenu() {
     if (getLocalTime(&ti, 0)) {
       char d[16];
       snprintf(d, sizeof(d), "%s %02d-%02d", WEEKDAYS[ti.tm_wday % 7], ti.tm_mon + 1, ti.tm_mday);
-      cv.setTextColor(0xCE79, TFT_BLACK);
+      cv.setTextColor(ROZA_PAPER_DIM, TFT_BLACK);
       cv.setTextDatum(top_left); cv.setTextSize(1);
       cv.drawString(d, 42, 5);
     }
