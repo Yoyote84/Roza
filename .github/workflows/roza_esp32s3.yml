@@ -33,7 +33,7 @@ jobs:
   build:
     name: Compilation PlatformIO (Cardputer ADV)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     defaults:
       run:
         shell: bash
@@ -42,38 +42,34 @@ jobs:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
 
-      - name: Installer PlatformIO
+      - name: Installer PlatformIO via pip
         run: |
-          curl -fsSL https://platformio.org/install.sh | bash
-          export PATH="$HOME/.platformio/bin:$PATH"
-          platformio version
+          python -m pip install --upgrade pip
+          pip install platformio==${{ env.PLATFORMIO_VERSION }}
 
       - name: Compiler le firmware avec PlatformIO
         run: |
-          export PATH="$HOME/.platformio/bin:$PATH"
           platformio run -e cardputer-adv
 
       - name: Vérifier la génération des binaires
         run: |
-          export PATH="$HOME/.platformio/bin:$PATH"
-          ls -la firmware/.pioenvs/cardputer-adv/
+          ls -la .pioenvs/cardputer-adv/
 
       - name: Publier les artefacts de compilation
         uses: actions/upload-artifact@v4
         with:
           name: roza-cardputer-adv-${{ github.sha }}
           path: |
-            firmware/.pioenvs/cardputer-adv/firmware.elf
-            firmware/.pioenvs/cardputer-adv/firmware.bin
-            firmware/.pioenvs/cardputer-adv/bootloader.elf
-            firmware/.pioenvs/cardputer-adv/bootloader.bin
-            firmware/.pioenvs/cardputer-adv/partition_table.elf
-            firmware/.pioenvs/cardputer-adv/partition_table.bin
+            .pioenvs/cardputer-adv/firmware.elf
+            .pioenvs/cardputer-adv/firmware.bin
+            .pioenvs/cardputer-adv/bootloader.elf
+            .pioenvs/cardputer-adv/bootloader.bin
+            .pioenvs/cardputer-adv/partition_table.elf
+            .pioenvs/cardputer-adv/partition_table.bin
           if-no-files-found: error
           retention-days: 14
 
       - name: Publier la taille du binaire
         run: |
-          export PATH="$HOME/.platformio/bin:$PATH"
-          SIZE=$(platformio run -e cardputer-adv --dry-run 2>/dev/null | grep "Size" || echo "unknown")
-          echo "Binary size: $SIZE"
+          BINARY_SIZE=$(stat -c%s .pioenvs/cardputer-adv/firmware.bin 2>/dev/null || echo "unknown")
+          echo "Binary size: $BINARY_SIZE bytes"
