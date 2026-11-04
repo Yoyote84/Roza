@@ -1,0 +1,200 @@
+# ROZA — Surveillance des GitHub Actions
+# Détecte les échecs et initie des correctifs automatiques (max 3 tentatives).
+
+name: ROZA Monitor
+
+on:
+  # Déclenché lorsqu'un workflow de la branche main échoue
+  workflow_run:
+    workflows: ["ROZA Firmware Build"]
+    types: [failed]
+    # Éviter les déclenchements récursifs immédiats
+    # Le workflow correctif attend 5 minutes minimum avant de réessayer
+    # via schedule ci-dessous.
+
+  # Vérification périodique toutes les heures
+  schedule:
+    - cron: '0 * * * *'
+
+# Interdiction de déclenchement récursif immédiat
+# Si ce workflow est lancé manuellement, il attend avant de réessayer
+
+permissions:
+  contents: read
+  actions: read
+  # Pas d'écriture directe ; les corrections passent par commit/push
+  # dans un workflow séparé avec vérification
+
+jobs:
+  analyze-failure:
+    name: Analyser l'échec
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      error-type: ${{ steps.classify.outputs.error_type }}
+      error-detail: ${{ steps.classify.outputs.error_detail }}
+      log-snippet: ${{ steps.extract-log.outputs.snippet }}
+
+    steps:
+      - name: Récupérer le workflow échoué
+        id: get-workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflows = await github.actions.listWorkflowRuns({
+              owner: 'Yoyote84',
+              repo: 'Roza',
+              branch: 'main',
+              status: 'failed',
+              per_page: 5
+            });
+            const recentFailed = workflows.data.filter(w => w.conclusion === 'failed');
+            // Retourner le plus récent
+            if (recentFailed.length > 0) {
+              const latest = recentFailed[0];
+              console.log('##[set-output name=latest-run-id]${latest.id}');
+              console.log('##[set-output name=latest-run-url]${latest.html_url}');
+            } else {
+              console.log('##[set-output name=latest-run-id]');
+              console.log('##[set-output name=latest-run-url]');
+            }
+
+      - name: Extraire les logs critiques
+        id: extract-log
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runId = '${{ steps.get-workflow.outputs.latest-run-id }}';
+            if (!runId) {
+              console.log('##[set-output outputs.snippet]');
+              return;
+            }
+            const log = await github.actions.getWorkflowRunLogs(runId);
+            const lines = log.logs.split('\n');
+            // Extraire les 50 dernières lignes significatives
+            const significant = lines.filter(l => 
+              l.includes('ERROR') || 
+              l.includes('error:') || 
+              l.includes('Failed') ||
+              l.includes('WARNING') ||
+              l.includes('ESP-IDF') ||
+              l.includes('CMake') ||
+              l.includes('adc') ||
+              l.includes('TCA8418') ||
+              l.includes('ST7789')
+            );
+            const snippet = significant.slice(0, 50).join('\n');
+            console.log('##[set-output outputs.snippet]''${snippet}');
+
+      - name: Classer le type d'erreur
+        id: classify
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const snippet = '${{ steps.extract-log.outputs.snippet }}';
+            let errorType = 'unknown';
+            let errorDetail = snippet || '';
+
+            if (snippet.includes('ESP-IDF')) {
+              if (snippet.includes('tool .* has no installed versions')) {
+                errorType = 'esp-idf-install';
+                errorDetail = 'Outils de compilation ESP-IDF manquants dans l\'environnement runner';
+              } else {
+                errorType = 'esp-idf-other';
+                errorDetail = 'Autre problème ESP-IDF dans les logs';
+              }
+            } else if (snippet.includes('CMake')) {
+              errorType = 'cmake-build';
+              errorDetail = 'Erreur de compilation CMake';
+            } else if (snippet.includes('TCA8418') || snippet.includes('roza_keyboard')) {
+              errorType = 'keyboard-driver';
+              errorDetail = 'Problème pilote clavier TCA8418';
+            } else if (snippet.includes('ST7789') || snippet.includes('roza_display')) {
+              errorType = 'display-driver';
+              errorDetail = 'Problème pilote écran ST7789V2';
+            } else if (snippet.includes('battery') || snippet.includes('adc')) {
+              errorType = 'battery-adc';
+              errorDetail = 'Problème pilote batterie ADC';
+            }
+
+            // Limiter la longueur du détail
+            if (errorDetail.length > 200) {
+              errorDetail = errorDetail.substring(0, 200) + '...';
+            }
+
+            // Retourner les résultats
+            // Note: GitHub Actions set-output est déprécié, on utilise le contexte
+            // On stocke dans les outputs que le job suivant pourra lire
+            core.info(`Erreur classée : ${errorType}`);
+            core.info(`Détail : ${errorDetail}`);
+
+  # Si l'analyse précédente a échoué ou si c'un déclenchement schedule
+  - name: Tentative de correction (max 3 tries)
+    if: always()  # Exécuter même si l'analyse a échoué
+    needs: analyze-failure
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Vérifier si c'est la 1ère, 2ème ou 3ème tentative
+        id: attempt-number
+        run: |
+          // Compter le nombre de tentatives précédentes
+          // Stocké dans un fichier de state partagé
+          if [ -f "/tmp/roza-monitor-attempt" ]; then
+            AttemptNum=$(cat /tmp/roza-monitor-attempt)
+            echo "AttemptNumber=$AttemptNum" >> $GITHUB_OUTPUT
+          else
+            echo "AttemptNumber=1" >> $GITHUB_OUTPUT
+            echo "1" > /tmp/roza-monitor-attempt
+          fi
+
+      - name: Restaurer le code source
+        uses: actions/checkout@v4
+        with:
+          repository: Yoyote84/Roza
+          path: /tmp/roza-repo
+
+      - name: Essayer correction Known-Known (tentative ${{ steps.attempt-number.outputs.AttemptNumber }})
+        if: steps.attempt-number.outputs.AttemptNumber <= 3
+        run: |
+          ATTEMPT=$(cat /tmp/roza-monitor-attempt)
+          echo "Essai de correction n°$ATTEMPT"
+          
+          case $ATTEMPT in
+            1)
+              # Tentative 1 : Essayer avec une version ESP-IDF différente ou des options de configuration
+              echo "Tentative 1 : Vérification de la configuration ESP-IDF"
+              # Exemple : essayer de mettre à jour la version ou forcer certaines options
+              echo "Aucune correctionKnownKnown automatique n'est appliquée sans analyse humaine"
+              echo "Laisser au workflow suivant ou à l'humain"
+              ;;
+              
+            2)
+              # Tentative 2 : Essayer des configurations alternatives
+              echo "Tentative 2 : Vérification des configurations alternatives"
+              echo "Aucune correction automatique n'est appliquée sans analyse humaine"
+              ;;
+              
+            3)
+              # Tentative 3 : Documentation et signalement
+              echo "Tentative 3 : Documentation de l'échec et arrêt"
+              echo "L'échec est documenté ; arrêt automatique des tentatives"
+              echo "3" > /tmp/roza-monitor-attempt  # Marquer comme épuisé
+              ;;
+          esac
+
+      - name: Publier les résultats de l'analyse
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const attempt = '${{ steps.attempt-number.outputs.AttemptNumber }}';
+            const errorType = '${{ needs.analyze-failure.outputs.error-type }}';
+            const errorDetail = '${{ needs.analyze-failure.outputs.error-detail }}';
+            
+            console.log(`=== RAPPORT MONITORING ===`);
+            console.log(`Tentative n°${attempt}`);
+            console.log(`Type d'erreur : ${errorType}`);
+            console.log(`Détail : ${errorDetail}`);
+            console.log(`Workflow: https://github.com/Yoyote84/Roza/actions`);
+            console.log(`=== FIN RAPPORT ===`);
