@@ -1,4 +1,4 @@
-# РОЗА — firmware autonome pour M5Stack Cardputer ADV
+# РO3A — firmware autonome pour M5Stack Cardputer ADV
 
 **Cible :** M5Stack Cardputer ADV — ESP32-S3FN8, 8 Mo Flash, sans PSRAM  
 **Extension :** M5Stack Cap LoRa-1262 — SX1262 + GNSS ATGM336H-6N / AT6668  
