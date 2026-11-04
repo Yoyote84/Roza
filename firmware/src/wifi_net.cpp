@@ -88,6 +88,7 @@ bool connectWith(const char* ssid, const char* pass, bool needNtp) {
   termLogLine("ok"); termLogDraw(false); delay(600);
   geoInvalidate(); // 连接新网络后失效旧的定位缓存
   kbd::flushEvents();  // 连接期间（最长 15s）积压的按键全部丢弃
+  wifiKeeperResume();  // Une connexion choisie explicitement autorise les reconnexions suivantes.
   return true;
 }
 // 开机后台连网+对时：连上就对时，区别于 connectWith() 的是拆成了非阻塞状态机，每帧推进
@@ -352,7 +353,7 @@ void drawWifiPw() {
 // wardrive/lanscan 退出时会 WIFI_OFF）。那些 app 一退出，这里负责把 STA 拉回来。
 // allowed=false 时什么都不做——由 main.cpp 判断"当前页面是不是正拿着射频"，
 // 免得在嗅探/热点跑着的时候去抢模式。
-static bool keeperEnabled = true;
+static bool keeperEnabled = false;  // ROZA: aucune reconnexion avant activation volontaire du Wi-Fi
 
 // 给串口的 WIFIOFF 指令用：常开策略下看门狗会在下一帧就把 radio 拉回来
 // （lastKickMs 初值 0，所以第一次判断 millis()-0 > 10000 直接成立），
