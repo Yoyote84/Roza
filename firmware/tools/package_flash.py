@@ -10,6 +10,7 @@ from pathlib import Path
 FLASH_SIZE = 8 * 1024 * 1024
 BOOTLOADER_OFFSET = 0x0000
 PARTITION_TABLE_OFFSET = 0x8000
+PARTITION_TABLE_SIZE = 0x1000
 APP_OFFSET = 0x10000
 
 
@@ -63,7 +64,14 @@ def main() -> None:
         if not path.is_file() or path.stat().st_size == 0:
             raise SystemExit(f"Missing or empty {name}: {path}")
 
+    boot_data = files["bootloader"].read_bytes()
     partition_data = files["partitions"].read_bytes()
+    if len(boot_data) > PARTITION_TABLE_OFFSET:
+        raise SystemExit("Bootloader overlaps the partition-table region")
+    if len(partition_data) > PARTITION_TABLE_SIZE:
+        raise SystemExit("Partition table exceeds its reserved 4 KiB region")
+    if PARTITION_TABLE_OFFSET + len(partition_data) > APP_OFFSET:
+        raise SystemExit("Partition table overlaps the factory application")
     app_capacity = check_partition_table(partition_data)
     app_data = files["firmware"].read_bytes()
     if len(app_data) > app_capacity:
@@ -75,7 +83,6 @@ def main() -> None:
 
     output.mkdir(parents=True, exist_ok=True)
     image_path = output / "roza-cardputer-adv-8mb.bin"
-    boot_data = files["bootloader"].read_bytes()
     image_end = max(
         BOOTLOADER_OFFSET + len(boot_data),
         PARTITION_TABLE_OFFSET + len(partition_data),
