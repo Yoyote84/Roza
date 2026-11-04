@@ -1,4 +1,5 @@
 #include "ui_common.h"
+#include "roza_theme.h"
 #include "busy_pill.h"
 #include "pages.h"
 #include <WiFi.h>
@@ -258,21 +259,16 @@ void menuMove(int dx, int dy) {
 
 // 7 大分组的专属科技感主题配色定义
 // [primary, cardBg, innerRing, pillBg, pillBorder]
+// ROZA : une seule identité visuelle pour tous les groupes.
+// La catégorie reste indiquée par son libellé ; la couleur ne change plus d'une page à l'autre.
 static const GroupTheme GROUP_THEMES[7] = {
-  // 0. TOOLS: 霓虹矩阵绿 (Hardware & Utilities)
-  { 0x07E0, 0x0922, 0x0408, 0x08E2, 0x1204 },
-  // 1. SCAN: 警戒雷达橙 (Passive RF Sniffing / Radar / Drone)
-  { 0xFD02, 0x28C0, 0x9240, 0x2080, 0x5140 },
-  // 2. NET: 电光深海青 (Active Network / TCP / DNS / Hotspot)
-  { 0x073F, 0x00E5, 0x0330, 0x00C4, 0x020A },
-  // 3. HID: 赛博渗透紫 (Bluetooth / USB Keystroke Injection)
-  { 0xE21F, 0x2045, 0x7911, 0x1844, 0x48AB },
-  // 4. SIG: 深空珊瑚粉 (LoRa / GNSS / Sub-GHz / Infrared)
-  { 0xFB28, 0x2861, 0x8984, 0x2061, 0x50E3 },
-  // 5. SKY: 天穹极光冰蓝 (Atmosphere / Weather / Satellite Passes / Flight Radar)
-  { 0x3DFF, 0x08C5, 0x1AD0, 0x00A4, 0x11EB },
-  // 6. MORE: 钛金极客银白 (Personal Services / APIs / Settings)
-  { 0xD71D, 0x18E4, 0x4A8B, 0x10A3, 0x31A7 },
+  { ROZA_OLIVE_LIGHT, ROZA_CARD, ROZA_OLIVE, ROZA_CARD, ROZA_OLIVE },
+  { ROZA_OLIVE_LIGHT, ROZA_CARD, ROZA_OLIVE, ROZA_CARD, ROZA_OLIVE },
+  { ROZA_OLIVE_LIGHT, ROZA_CARD, ROZA_OLIVE, ROZA_CARD, ROZA_OLIVE },
+  { ROZA_OLIVE_LIGHT, ROZA_CARD, ROZA_OLIVE, ROZA_CARD, ROZA_OLIVE },
+  { ROZA_OLIVE_LIGHT, ROZA_CARD, ROZA_OLIVE, ROZA_CARD, ROZA_OLIVE },
+  { ROZA_OLIVE_LIGHT, ROZA_CARD, ROZA_OLIVE, ROZA_CARD, ROZA_OLIVE },
+  { ROZA_OLIVE_LIGHT, ROZA_CARD, ROZA_OLIVE, ROZA_CARD, ROZA_OLIVE },
 };
 
 const GroupTheme& getGroupTheme(int groupIdx) {
@@ -297,7 +293,7 @@ static void drawGroupTabs() {
       cv.drawString(GROUPS[g].name, cx, 20);
       cv.fillRect(cx - nw / 2 - 1, 29, nw + 2, 2, thm.primary);
     } else {
-      cv.setTextColor(0x7BEF, TFT_BLACK);
+      cv.setTextColor(ROZA_PAPER_DIM, TFT_BLACK);
       cv.drawString(GROUPS[g].name, cx, 20);
     }
   }
@@ -381,19 +377,19 @@ void drawMenu() {
     int top = MENU_TOP + (p / MENU_COLS) * MENU_ROW_H;
     int kx = cx - MENU_CARD_W / 2;
     if (p < grp.count) {
-      cv.fillRoundRect(kx, top, MENU_CARD_W, MENU_CARD_H, 4, 0x0821);
-      cv.drawRoundRect(kx, top, MENU_CARD_W, MENU_CARD_H, 4, 0x1062);
+      cv.fillRoundRect(kx, top, MENU_CARD_W, MENU_CARD_H, 2, ROZA_CARD);
+      cv.drawRoundRect(kx, top, MENU_CARD_W, MENU_CARD_H, 2, ROZA_OLIVE_DARK);
     } else {
       // 空槽虚化轮廓
-      cv.drawRoundRect(kx, top, MENU_CARD_W, MENU_CARD_H, 4, 0x0821);
+      cv.drawRoundRect(kx, top, MENU_CARD_W, MENU_CARD_H, 2, ROZA_CARD);
     }
   }
 
   // 2. 动画高亮选中框 (插值平滑滑动，采用当前大类的专属发光色彩):
   int hx = (int)(menuSelX + 0.5f) - MENU_CARD_W / 2, hy = (int)(menuSelY + 0.5f);
-  cv.fillRoundRect(hx, hy, MENU_CARD_W, MENU_CARD_H, 4, curThm.cardBg);
-  cv.drawRoundRect(hx, hy, MENU_CARD_W, MENU_CARD_H, 4, curThm.primary);
-  cv.drawRoundRect(hx + 1, hy + 1, MENU_CARD_W - 2, MENU_CARD_H - 2, 3, curThm.innerRing);
+  cv.fillRoundRect(hx, hy, MENU_CARD_W, MENU_CARD_H, 2, curThm.cardBg);
+  cv.drawRoundRect(hx, hy, MENU_CARD_W, MENU_CARD_H, 2, ROZA_PAPER);
+  cv.drawRoundRect(hx + 1, hy + 1, MENU_CARD_W - 2, MENU_CARD_H - 2, 1, curThm.innerRing);
 
   // 3. 绘制应用图标与文字标签
   for (int p = 0; p < grp.count; p++) {
@@ -401,8 +397,8 @@ void drawMenu() {
     int cx = (p % MENU_COLS) * cw + cw / 2;
     int top = MENU_TOP + (p / MENU_COLS) * MENU_ROW_H;
     bool sel = (i == menuIndex);
-    drawAppIcon(cx, top + MENU_ICON_DY, sel ? 16 : 14, sel ? curThm.primary : 0x52AA, APPS[i].id);
-    cv.setTextColor(sel ? TFT_WHITE : 0x9CD3);
+    drawAppIcon(cx, top + MENU_ICON_DY, sel ? 16 : 14, sel ? ROZA_PAPER : ROZA_OLIVE, APPS[i].id);
+    cv.setTextColor(sel ? ROZA_PAPER : ROZA_PAPER_DIM);
     cv.setTextDatum(top_center); cv.setTextSize(1);
     cv.drawString(trunc(APPS[i].name, 9), cx, top + MENU_LABEL_DY);
   }
@@ -410,7 +406,7 @@ void drawMenu() {
   // 4. 底部动态功能导览条 (y = 124..134，采用大类专属色，醒目呼应)
   if (!debugOn) {
     cv.setTextDatum(middle_center); cv.setTextSize(1);
-    cv.setTextColor(curThm.primary, TFT_BLACK);
+    cv.setTextColor(ROZA_PAPER_DIM, TFT_BLACK);
     cv.drawString(appDesc(APPS[menuIndex].id), SW / 2, 128);
   }
 }
@@ -567,229 +563,64 @@ void termLogDraw(bool cursor) {
 
 // 绘制开机动画单帧：支持精确时间回溯与实时渲染
 void drawBootFrame(uint32_t t) {
-  cv.fillScreen(TFT_BLACK);
-  const int cx = SW / 2; // 120
+  // Écran de réveil ROZA : plaque d'identification d'un instrument de terrain,
+  // sans grille numérique, laser ni effet de décryptage.
+  cv.fillScreen(ROZA_INK);
+  const int cx = SW / 2;
+  const uint16_t line = ROZA_OLIVE_DARK;
 
-  // 1. 赛博矩阵微光网格背景 (Micro Grid Matrix)
-  for (int x = 12; x < SW; x += 24) {
-    for (int y = 10; y < SH; y += 20) {
-      cv.drawPixel(x, y, 0x0922);
-    }
-  }
+  // Filet périphérique et repères gravés, comme sur une plaque métallique.
+  cv.drawRect(4, 4, SW - 8, SH - 8, line);
+  cv.drawFastHLine(10, 18, SW - 20, line);
+  cv.drawFastHLine(10, SH - 18, SW - 20, line);
+  cv.drawFastVLine(10, 8, 7, ROZA_OLIVE);
+  cv.drawFastVLine(SW - 11, 8, 7, ROZA_OLIVE);
+  cv.drawFastVLine(10, SH - 15, 7, ROZA_OLIVE);
+  cv.drawFastVLine(SW - 11, SH - 15, 7, ROZA_OLIVE);
 
-  // 2. 四角战术 HUD 取景标尺 (Tactical Viewfinder Corner Brackets)
-  const int CORNER_LEN = 10;
-  // 左上
-  cv.drawFastHLine(5, 5, CORNER_LEN, ACCENT);
-  cv.drawFastVLine(5, 5, CORNER_LEN, ACCENT);
-  cv.drawPixel(5, 5, TFT_WHITE);
-  // 右上
-  cv.drawFastHLine(SW - 5 - CORNER_LEN, 5, CORNER_LEN, ACCENT);
-  cv.drawFastVLine(SW - 6, 5, CORNER_LEN, ACCENT);
-  cv.drawPixel(SW - 6, 5, TFT_WHITE);
-  // 左下
-  cv.drawFastHLine(5, SH - 6, CORNER_LEN, ACCENT);
-  cv.drawFastVLine(5, SH - 5 - CORNER_LEN, CORNER_LEN, ACCENT);
-  cv.drawPixel(5, SH - 6, TFT_WHITE);
-  // 右下
-  cv.drawFastHLine(SW - 5 - CORNER_LEN, SH - 6, CORNER_LEN, ACCENT);
-  cv.drawFastVLine(SW - 6, SH - 5 - CORNER_LEN, CORNER_LEN, ACCENT);
-  cv.drawPixel(SW - 6, SH - 6, TFT_WHITE);
-
-  // 3. 顶部微型状态条 (Top HUD Ribbon)
-  cv.setTextDatum(top_left);
   cv.setTextFont(0);
   cv.setTextSize(1);
-  if ((t / 300) % 2 == 0 || t >= 1000) {
-    cv.fillRect(18, 7, 5, 5, ACCENT);
-  } else {
-    cv.drawRect(18, 7, 5, 5, 0x07FF);
-  }
-  cv.setTextColor(0x9CD3, TFT_BLACK);
-  cv.drawString("ADV-OS v2.5", 27, 6);
-
-  // 右侧核心平台标签
-  cv.drawRoundRect(SW - 68, 4, 52, 11, 2, 0x18C3);
-  cv.fillRoundRect(SW - 67, 5, 50, 9, 2, 0x0821);
-  cv.setTextColor(0x07FF, 0x0821);
-  cv.setTextDatum(middle_center);
-  cv.drawString("ESP32-S3", SW - 42, 10);
-
-  // 4. 水平光能唤醒束 (0 ~ 350ms)
-  if (t < 350) {
-    int bw = (int)t * SW / 350;
-    if (bw > SW) bw = SW;
-    cv.drawFastHLine(cx - bw / 2, 60, bw, ACCENT);
-    cv.drawFastHLine(cx - bw / 4, 59, bw / 2, 0x07FF);
-    cv.drawFastHLine(cx - bw / 4, 61, bw / 2, 0x07FF);
-    return; // 初始光束阶段
-  }
-
-  // 5. 核心勋章与总线导轨 (Hero Core Node & Circuit Bus Rails)
-  const int NODE_Y = 28;
-  cv.drawFastHLine(20, NODE_Y, 84, 0x18C3);
-  cv.drawFastHLine(136, NODE_Y, 84, 0x18C3);
-  cv.fillCircle(54, NODE_Y, 2, 0x07FF);
-  cv.fillCircle(186, NODE_Y, 2, 0x07FF);
-  cv.drawPixel(54, NODE_Y, TFT_WHITE);
-  cv.drawPixel(186, NODE_Y, TFT_WHITE);
-
-  // 脉冲信号沿导轨移动
-  int pulseX1 = 20 + ((t * 80 / 500) % 84);
-  int pulseX2 = 220 - ((t * 80 / 500) % 84);
-  cv.drawPixel(pulseX1, NODE_Y, 0x07E0);
-  cv.drawPixel(pulseX2, NODE_Y, 0x07E0);
-
-  // 六边形科技核心 (Hexagonal Node Core)
-  const int HR = 9;
-  for (int a = 0; a < 6; a++) {
-    float r1 = a * 60.0f * 0.0174533f;
-    float r2 = (a + 1) * 60.0f * 0.0174533f;
-    int x1 = cx + (int)(cosf(r1) * HR);
-    int y1 = NODE_Y + (int)(sinf(r1) * HR);
-    int x2 = cx + (int)(cosf(r2) * HR);
-    int y2 = NODE_Y + (int)(sinf(r2) * HR);
-    cv.drawLine(x1, y1, x2, y2, ACCENT);
-  }
-  cv.fillCircle(cx, NODE_Y, 3, 0x07FF);
-  cv.drawPixel(cx, NODE_Y, TFT_WHITE);
-
-  // 6. "CARDPUTER" 赛博矩阵解密字形 (Decryption Typography)
-  const char* TARGET_WORD = "CARDPUTER";
-  const int CHAR_W = 16;
-  const int WORD_X0 = cx - (9 * CHAR_W) / 2 + 2; // ~50
-  const int WORD_Y = 44;
-  const char* CIPHER_CHARS = "018$#%&*<>[]/X";
-  const int NUM_CIPHERS = 14;
-
-  cv.setTextFont(0);
-  cv.setTextSize(2); // 12x16 像素
   cv.setTextDatum(top_left);
-
-  for (int i = 0; i < 9; i++) {
-    int charX = WORD_X0 + i * CHAR_W;
-    uint32_t lockTime = 320 + i * 45; // 320ms ~ 680ms 逐字锁定
-    if (t < lockTime - 120) {
-      cv.drawFastHLine(charX + 4, WORD_Y + 7, 5, 0x18C3);
-      cv.drawFastVLine(charX + 6, WORD_Y + 5, 5, 0x18C3);
-    } else if (t < lockTime) {
-      char fakeChar[2] = { CIPHER_CHARS[(t / 25 + i * 3) % NUM_CIPHERS], '\0' };
-      cv.setTextColor(((i + t / 40) % 2 == 0) ? 0x07FF : 0x07E0, TFT_BLACK);
-      cv.drawString(fakeChar, charX, WORD_Y);
-    } else {
-      char realChar[2] = { TARGET_WORD[i], '\0' };
-      if (t < lockTime + 80) {
-        cv.setTextColor(0x07FF, TFT_BLACK);
-      } else {
-        cv.setTextColor(TFT_WHITE, TFT_BLACK);
-      }
-      cv.drawString(realChar, charX, WORD_Y);
-    }
-  }
-
-  // 7. "ADV" 科技胶囊徽标与激光翼轨 (y = 66..80)
-  if (t >= 600) {
-    int pillW = (t < 750) ? (int)((t - 600) * 56 / 150) : 56;
-    if (pillW < 4) pillW = 4;
-    int pillH = 15;
-    int pillY = 66;
-    cv.fillRoundRect(cx - pillW / 2, pillY, pillW, pillH, 3, ACCENT);
-
-    if (t >= 750) {
-      int wingL = 18;
-      int wingR = SW - 18;
-      int leftEdge = cx - pillW / 2 - 4;
-      int rightEdge = cx + pillW / 2 + 4;
-      if (leftEdge > wingL) {
-        cv.drawFastHLine(wingL, pillY + pillH / 2, leftEdge - wingL, 0x18C3);
-        cv.drawFastHLine(leftEdge - 15, pillY + pillH / 2, 15, ACCENT);
-        cv.fillCircle(wingL, pillY + pillH / 2, 2, ACCENT);
-      }
-      if (rightEdge < wingR) {
-        cv.drawFastHLine(rightEdge, pillY + pillH / 2, wingR - rightEdge, 0x18C3);
-        cv.drawFastHLine(rightEdge, pillY + pillH / 2, 15, ACCENT);
-        cv.fillCircle(wingR, pillY + pillH / 2, 2, ACCENT);
-      }
-      cv.setTextDatum(middle_center);
-      cv.setTextColor(TFT_BLACK, ACCENT);
-      cv.setTextSize(1);
-      cv.setTextFont(0);
-      cv.drawString("<< ADV >>", cx, pillY + pillH / 2);
-    }
-  }
-
-  // 8. 实时系统加载阶段文字与能量轨道 (y = 86..120)
-  int pct = 0;
-  if (t >= 750) {
-    if (t >= 1450) pct = 100;
-    else pct = (int)((t - 750) * 100 / 700);
-  }
-
-  // 状态诊断文字 (y = 87)
-  cv.setTextDatum(top_left);
-  cv.setTextFont(0);
-  cv.setTextSize(1);
-  char statStr[40];
-  if (pct < 25) {
-    snprintf(statStr, sizeof(statStr), ">> CORE INTEGRITY CHECK: OK");
-  } else if (pct < 55) {
-    snprintf(statStr, sizeof(statStr), ">> BUS INIT: SPI / I2C / I2S DMA");
-  } else if (pct < 85) {
-    snprintf(statStr, sizeof(statStr), ">> RF STACK: 2.4GHz AIRSPACE READY");
-  } else if (pct < 100) {
-    snprintf(statStr, sizeof(statStr), ">> SYNCHRONIZING TACTICAL HUD...");
-  } else {
-    snprintf(statStr, sizeof(statStr), ">> ALL SUBSYSTEMS NOMINAL // READY");
-  }
-  cv.setTextColor(pct >= 100 ? 0x07E0 : 0x9CD3, TFT_BLACK);
-  cv.drawString(statStr, 22, 87);
-
-  // 能量充电导轨外框 (y = 100..110)
-  const int RAIL_X = 20;
-  const int RAIL_W = 200;
-  const int RAIL_Y = 100;
-  const int RAIL_H = 10;
-  cv.drawRoundRect(RAIL_X, RAIL_Y, RAIL_W, RAIL_H, 2, 0x18C3);
-
-  // 16 节等宽能量 LED 柱 (每节宽 10, 高 6, 间隙 2)
-  const int NUM_SEGS = 16;
-  int activeSegs = (pct * NUM_SEGS) / 100;
-  for (int s = 0; s < NUM_SEGS; s++) {
-    int sx = RAIL_X + 5 + s * 12;
-    int sy = RAIL_Y + 2;
-    if (s < activeSegs) {
-      uint16_t segCol = ACCENT;
-      if (s >= 14) segCol = TFT_WHITE;
-      else if (s >= 11) segCol = 0x07FF;
-      cv.fillRect(sx, sy, 10, 6, segCol);
-    } else {
-      cv.fillRect(sx, sy, 10, 6, 0x0821);
-      cv.drawRect(sx, sy, 10, 6, 0x1082);
-    }
-  }
-
-  // 底部百分比与系统状态 (y = 114)
-  cv.setTextDatum(top_left);
-  cv.setTextColor(pct >= 100 ? 0x07E0 : 0x7BEF, TFT_BLACK);
-  cv.drawString(pct >= 100 ? "TACTICAL OS READY" : "INITIALIZING...", 22, 115);
-
-  char pctStr[12];
-  snprintf(pctStr, sizeof(pctStr), "[%3d%%]", pct);
+  cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
+  cv.drawString("CARNET DE TERRAIN", 16, 8);
   cv.setTextDatum(top_right);
-  cv.setTextColor(pct >= 100 ? 0x07E0 : 0x07FF, TFT_BLACK);
-  cv.drawString(pctStr, SW - 22, 115);
+  cv.drawString("ADV / 01", SW - 16, 8);
 
-  // 9. 激光辉光扫描扫掠效果 (Laser Shimmer Specular Sweep, 1100ms ~ 1550ms)
-  if (t >= 1100 && t < 1550) {
-    int sweepX = 24 + (int)((t - 1100) * (SW - 48) / 450);
-    cv.drawFastVLine(sweepX, 40, 42, TFT_WHITE);
-    if (sweepX > 0) cv.drawFastVLine(sweepX - 1, 42, 38, 0x07FF);
-    if (sweepX < SW - 1) cv.drawFastVLine(sweepX + 1, 42, 38, 0x07FF);
-    if (sweepX > 1) cv.drawFastVLine(sweepX - 2, 45, 32, 0x001F);
-    if (sweepX < SW - 2) cv.drawFastVLine(sweepX + 2, 45, 32, 0x001F);
-  }
+  // Rose des vents simplifiée : repère de navigation, pas un HUD futuriste.
+  const int cy = 47;
+  cv.drawCircle(cx, cy, 13, ROZA_OLIVE);
+  cv.drawCircle(cx, cy, 2, ROZA_PAPER);
+  cv.drawLine(cx, cy - 10, cx, cy - 4, ROZA_PAPER);
+  cv.drawLine(cx, cy + 4, cx, cy + 10, ROZA_OLIVE);
+  cv.drawLine(cx - 10, cy, cx - 4, cy, ROZA_OLIVE);
+  cv.drawLine(cx + 4, cy, cx + 10, cy, ROZA_OLIVE);
+  cv.fillTriangle(cx, cy - 9, cx - 2, cy - 3, cx + 2, cy - 3, ROZA_PAPER);
+
+  cv.setTextDatum(middle_center);
+  cv.setTextSize(2);
+  cv.setTextColor(ROZA_PAPER, ROZA_INK);
+  cv.drawString("ROZA", cx, 72);
+  cv.setTextSize(1);
+  cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
+  cv.drawString("INSTRUMENT PERSONNEL", cx, 88);
+
+  // Progression sobre, comme une jauge gravée.
+  const int bx = 22, by = 101, bw = SW - 44, bh = 7;
+  cv.drawRect(bx, by, bw, bh, ROZA_OLIVE);
+  int pct = t >= 1500 ? 100 : (int)(t * 100 / 1500);
+  if (pct < 0) pct = 0;
+  if (pct > 100) pct = 100;
+  int fill = (bw - 2) * pct / 100;
+  if (fill > 0) cv.fillRect(bx + 1, by + 1, fill, bh - 2, ROZA_OLIVE_LIGHT);
+
+  cv.setTextDatum(middle_left);
+  cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
+  cv.drawString(pct >= 100 ? "PRET" : "INITIALISATION", bx, 119);
+  char p[8];
+  snprintf(p, sizeof(p), "%3d%%", pct);
+  cv.setTextDatum(middle_right);
+  cv.drawString(p, SW - bx, 119);
 }
-
 // 开机动画：赛博战术终端唤醒序列 + 矩阵解密 + 能量轨道 + 合成音效。约 1.8s。
 void bootAnim() {
   uint32_t t0 = millis();
