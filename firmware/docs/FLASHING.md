@@ -18,6 +18,18 @@ L'image fusionne les régions réellement compilées :
 
 Le paquetage vérifie que la partition factory existe et que le binaire applicatif tient dedans. Il ne modifie aucun fichier de l'interface.
 
+## Données réinitialisées par cette image
+
+L'image fusionnée est écrite en une seule fois depuis l'adresse `0x0000`. Les espaces
+entre le bootloader, la table de partitions et l'application sont remplis avec `0xFF`.
+Cela inclut la partition NVS (`0x9000`), qui contient les préférences et identifiants
+enregistrés par le firmware. **Chaque flash de cette image réinitialise donc les réglages
+ROZA** (fuseau horaire, luminosité, réseaux Wi-Fi mémorisés, mot de passe du hotspot, etc.).
+
+La microSD est une mémoire séparée : cette image ne l'efface pas et ne la formate pas.
+La table actuelle ne prévoit pas de mise à jour OTA : les futures mises à jour se feront
+par USB avec cette procédure, sauf évolution ultérieure du système de mise à jour.
+
 ## Entrer en mode téléchargement
 
 1. Débrancher le câble USB.
