@@ -9,6 +9,9 @@ on:
     paths:
       - "firmware/**"
       - "README.md"
+      - "AGENTS.md"
+      - "docs/**"
+      - "firmware/docs/**"
       - ".github/workflows/roza_esp32s3.yml"
   pull_request:
     branches: [main]
