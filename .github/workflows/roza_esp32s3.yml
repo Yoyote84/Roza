@@ -53,23 +53,28 @@ jobs:
 
       - name: Vérifier la génération des binaires
         run: |
-          ls -la .pioenvs/cardputer-adv/
+          BUILD_DIR=".pio/build/cardputer-adv"
+          for file in firmware.bin firmware.elf bootloader.bin partitions.bin; do
+            if [ ! -s "$BUILD_DIR/$file" ]; then
+              echo "::error::Fichier de compilation absent ou vide : $BUILD_DIR/$file"
+              exit 1
+            fi
+          done
+          ls -lh "$BUILD_DIR/firmware.bin" "$BUILD_DIR/firmware.elf" "$BUILD_DIR/bootloader.bin" "$BUILD_DIR/partitions.bin"
 
       - name: Publier les artefacts de compilation
         uses: actions/upload-artifact@v4
         with:
           name: roza-cardputer-adv-${{ github.sha }}
           path: |
-            .pioenvs/cardputer-adv/firmware.elf
-            .pioenvs/cardputer-adv/firmware.bin
-            .pioenvs/cardputer-adv/bootloader.elf
-            .pioenvs/cardputer-adv/bootloader.bin
-            .pioenvs/cardputer-adv/partition_table.elf
-            .pioenvs/cardputer-adv/partition_table.bin
+            firmware/.pio/build/cardputer-adv/firmware.elf
+            firmware/.pio/build/cardputer-adv/firmware.bin
+            firmware/.pio/build/cardputer-adv/bootloader.bin
+            firmware/.pio/build/cardputer-adv/partitions.bin
           if-no-files-found: error
           retention-days: 14
 
       - name: Publier la taille du binaire
         run: |
-          BINARY_SIZE=$(stat -c%s .pioenvs/cardputer-adv/firmware.bin 2>/dev/null || echo "unknown")
+          BINARY_SIZE=$(stat -c%s .pio/build/cardputer-adv/firmware.bin)
           echo "Binary size: $BINARY_SIZE bytes"
