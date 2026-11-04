@@ -76,7 +76,7 @@ SKIP_DEFAULT = {
     # 行为、项目里有意接受的（见 src/bt.cpp btReleaseForOtherApps 的注释）。
     # 混在一起量会把整轮的基线带跑偏。
     "BT Keys", "BT Media", "BLE Scan",
-    # Ducky 走 USB HID，会把自己注册成键盘；扫的时候插着电脑，别乱敲。
+    # Ducky 走 BLE HID，会向已配对主机发送按键；自动巡检时别连接到电脑。
     "Ducky",
     # Hotspot 的 AP 是**故意**退出后继续开着的，堆当然回不来。
     "Hotspot",
