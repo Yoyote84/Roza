@@ -1,6 +1,6 @@
 # Dossier de reprise technique ROZA
 
-Audit documentaire basé sur `main` au commit `3bfaa0bf3eb80b354d8046ce31f1b2b4f08a4bf4`. Ce document prépare les prochains lots ; il ne vaut ni compilation ni essai matériel.
+Audit documentaire actualisé sur `main` après le commit `c83499428c564ada2c969ce48c06bd0e7c498a34`. Ce document prépare les prochains lots ; il ne vaut ni compilation ni essai matériel.
 
 ## Références impératives
 
@@ -26,13 +26,16 @@ Audit documentaire basé sur `main` au commit `3bfaa0bf3eb80b354d8046ce31f1b2b4f
 - Écran/rétroéclairage : intégration via le BSP M5Unified/M5GFX, initialisé depuis `firmware/src/main.cpp`. Aucun motif démontré de réécrire ce pilote.
 - Clavier ADV : pilote existant `firmware/src/keyboard_adv.cpp/.h`, TCA8418 à l'adresse I²C `0x34`, bus interne M5Unified, 100 kHz. Le code gère FIFO, mapping, Fn, modificateurs et répétition.
 - IMU : `firmware/src/imu.cpp` utilise `M5.Imu.update()`, `getAccel()` et `getGyro()`. Le flux série et l'UI partagent un cache pour éviter deux lectures concurrentes.
+- Les deux vues IMU vérifient maintenant `M5.Imu.isEnabled()` avant d'afficher les mesures ; si le BMI270 n'est pas activé/détecté, elles affichent un état indisponible au lieu de présenter les valeurs initiales du cache (0, 0, 1) comme des mesures réelles. Correction publiée dans `c834994`.
 - Ces éléments prouvent une intégration logicielle, pas le fonctionnement physique. Vérifier détection, touches, modificateurs, orientation, luminosité, veille/réveil et stabilité des mesures sur la vraie carte.
 
 ### G2 — batterie, SD, SPI
 - Batterie : fonctions existantes dans `firmware/src/power_util.*` et écrans/logs associés. Une estimation reste une estimation tant qu'elle n'est pas calibrée sur plusieurs cycles.
-- SD : `firmware/src/sd_files.cpp` appelle `SPI.begin(40, 39, 14, 12)`, puis `SD.begin(12, SPI, 20000000)`. Ce montage n'est pas explicitement en lecture seule.
+- SD : `firmware/src/sd_files.cpp` appelle `SPI.begin(40, 39, 14, 12)`, puis `SD.begin(12, SPI, 20000000)`. Ce montage n'est pas en lecture seule.
+- Vérification de la bibliothèque réellement épinglée : Arduino-ESP32 2.0.17 expose `SD.begin(..., bool format_if_empty=false)`, mais aucun paramètre de montage lecture seule. `format_if_empty=false` évite le formatage automatique à l'échec du montage ; cela ne protège pas contre les écritures ultérieures. La pile FatFs utilisée est construite en mode écriture. Il serait donc trompeur de qualifier le montage actuel de lecture seule.
+- `sdInit()` est appelé au démarrage. `formatSD()` n'est pas appelé au démarrage : l'interface Paramètres exige deux confirmations successives (`formatStep` 0 puis 1) avant l'effacement récursif. La fonction reste destructive et doit rester explicitement protégée.
 - Le même fichier expose `formatSD()`, qui supprime récursivement fichiers et dossiers de la racine. C'est destructif même si aucun formatage bas niveau n'est effectué. Ne jamais l'appeler pendant une détection ou un test.
-- Avant toute évolution SD : rechercher tous les callsites de `sdInit()`, `formatSD()`, `SD.begin()`, `SD.open()` et les accès SPI ; identifier le bus SX1262 et le système de fichiers réellement présent. Si la bibliothèque ne garantit pas un montage lecture seule, ne pas prétendre le contraire.
+- Décision de sécurité : ne pas prétendre qu'un montage lecture seule existe et ne pas remplacer arbitrairement la bibliothèque. Avant d'activer le critère G2, concevoir un audit brut non destructif des secteurs (MBR/partition/boot sector) avant le montage FAT, ou une solution de montage réellement protégée, puis vérifier le partage SPI avec le SX1262. Ne pas effectuer de test d'écriture.
 
 ### G4 — GNSS et LoRa
 - GNSS existant dans `firmware/src/gnss.cpp` : TinyGPSPlus, UART1 RX GPIO15/TX GPIO13, expandeur I²C `0x43` via `M5.In_I2C`.
