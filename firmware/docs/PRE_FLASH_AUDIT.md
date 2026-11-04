@@ -63,6 +63,7 @@ Aucun fichier de dessin, de rendu, de thème ou de disposition de l'interface n'
 - Le démarrage de l'application LoRa sélectionne la réception ; aucune émission automatique n'est déclenchée.
 - L'application permet toutefois une émission manuelle. Les préréglages contiennent aussi US915 et CN470, et le code n'impose pas encore de garde régionale ni de budget de duty-cycle.
 - Le chat LoRa ROZA est un protocole privé simple, non chiffré et non compatible Meshtastic. Ne pas y transmettre de données privées.
+- Le mode AIS VHF de LoRa ne décode pas les trames AIS : il mesure uniquement l'énergie/RSSI sur les canaux AIS et journalise des mesures. L'antenne LoRa 868 MHz n'est pas une antenne VHF AIS adaptée.
 - Ne pas tester l'émission en France avant une validation réglementaire et matérielle. Les premiers essais radio doivent rester en réception uniquement, antenne installée.
 
 ### GNSS et cartographie
@@ -85,6 +86,7 @@ Aucun fichier de dessin, de rendu, de thème ou de disposition de l'interface n'
 
 - Wi-Fi et Bluetooth sont arrêtés au démarrage et doivent être activés volontairement.
 - Les clés API et paramètres privés sont vides par défaut. ChatGPT, N2YO/Sats et Router/Clash nécessitent une configuration valide ; leur présence dans le menu ne signifie pas qu'ils sont prêts sans compte/serveur.
+- Planes/ADS-B récupère des données via un service Internet (ADSB.lol) : ce n'est pas un récepteur ADS-B radio intégré. Sats dépend de l'API N2YO et de sa clé.
 - La cible VPN NetProbe par défaut est une adresse de documentation non routable : elle doit être remplacée par l'utilisateur.
 - Les applications dépendant d'Internet ne fonctionneront pas hors réseau ; les fonctions locales restent indépendantes.
 
