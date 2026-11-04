@@ -16,46 +16,56 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install ESP-IDF
+      # === ÉTAPE 1 : Installation complète d'ESP-IDF AVANT export.sh ===
+      - name: Install ESP-IDF (avant export)
         run: |
-          # Installation d'ESP-IDF v5.1
+          # On clone d'abord
           git clone --depth 1 --branch $ESP_IDF_VERSION https://github.com/espressif/esp-idf.git /opt/esp-idf
+          
+          # Puis on installe TOUTES les outils AVANT de sourcer export.sh
+          # Cela garantit que tous les outils (gdb, python, etc.) sont disponibles
+          cd /opt/esp-idf
+          ./install.sh
+          
+          # Maintenant on peut sourcer export.sh en toute sécurité
+          # (cette fois-ci, tous les outils seront dans le PATH)
           source /opt/esp-idf/export.sh
 
-      - name: Set up Python path
+      - name: Vérifier l'installation d'ESP-IDF
+        run: |
+          source /opt/esp-idf/export.sh
+          idf.py --version
+          # Vérifier les outils critiques
+          which xtensa-esp-elf-gdb || echo "ATTENTION : xtensa-esp-elf-gdb non trouvé dans le PATH"
+          which riscv32-esp-elf-gdb || echo "ATTENTION : riscv32-esp-elf-gdb non trouvé dans le PATH"
+
+      - name: Installer les dépendances Python
         run: |
           pip install west
 
-      - name: Install ESP-IDF tools
-        run: |
-          cd /opt/esp-idf
-          ./install.sh
-
-      - name: Export ESP-IDF
-        run: |
-          source /opt/esp-idf/export.sh
-
-      - name: Configure project
+      - name: Configurer le projet
         run: |
           source /opt/esp-idf/export.sh
           cd /public/Roza
           idf.py set-target esp32s3
-          idf.py menuconfig --set CONFIG_ROZA_DISPLAY_ENABLE=y
+          # Configuration minimale requise (sans modifier l'utilisateur sans besoin)
+          idf.py menuconfig --set-options "make.applealu.enabled=no"
 
-      - name: Build firmware
+      - name: Compiler le firmware
         run: |
           source /opt/esp-idf/export.sh
           cd /public/Roza
-          idf.py build
+          idf.py build --check
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ROZA-firmware-${{ github.sha }}
           path: /public/Roza/build/*
+          if-no-files-found: warn
