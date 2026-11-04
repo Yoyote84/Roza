@@ -13,6 +13,7 @@
 #include <cmath>
 
 #include "../../src/globals.h"
+#include "../../src/roza_theme.h"
 #include "../../src/ui_common.h"
 #include "../../src/busy_pill.h"
 #include "../../src/geoloc.h"
@@ -273,6 +274,8 @@ static void shoot(const char* path, void (*draw)(), Screen sc) {
   writePng(path, rgb.data(), SW, SH, 4);
 }
 
+static void drawBootPreview() { drawBootFrame(1600); }
+
 // ---------------- GNSS NMEA 辅助函数 ----------------
 static void feedNmea(const char* body) {
   uint8_t sum = 0;
@@ -322,14 +325,17 @@ int main() {
   crcInit();
   cv.setColorDepth(16);
   cv.createSprite(SW, SH);
-  ACCENT     = cv.color565(0, 230, 120);
-  CARD_BG    = cv.color565(10, 34, 22);
-  DIM_BORDER = cv.color565(30, 55, 44);
-  ICON_DIM   = cv.color565(0, 120, 66);
+  ACCENT     = ROZA_OLIVE_LIGHT;
+  CARD_BG    = ROZA_CARD;
+  DIM_BORDER = ROZA_OLIVE_DARK;
+  ICON_DIM   = ROZA_OLIVE;
   timeSynced = true;
   sdMounted  = true;
   sdSizeMB   = 16384;
   sdUsedMB   = 2048;
+
+  // Capture de référence de l’écran de démarrage ROZA (rendu réel de ui_common.cpp).
+  shoot("out/boot_roza.png", drawBootPreview, SCREEN_MENU);
 
   // 预置一份 Open-Meteo 的真实形状响应
   const String summerWeather =
