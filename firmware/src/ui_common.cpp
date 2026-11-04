@@ -599,7 +599,7 @@ void drawBootFrame(uint32_t t) {
   cv.setTextDatum(middle_center);
   cv.setTextSize(2);
   cv.setTextColor(ROZA_PAPER, ROZA_INK);
-  cv.drawString("ROZA", cx, 72);
+  cv.drawString("\xD0\xA0O3A", cx, 72);
   cv.setTextSize(1);
   cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
   cv.drawString("INSTRUMENT PERSONNEL", cx, 88);
