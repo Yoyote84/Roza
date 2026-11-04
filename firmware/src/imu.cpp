@@ -157,9 +157,23 @@ static void drawMeterBar(int x, int y, int w, int h, float val, float maxVal, ui
   }
 }
 
+/* Ne jamais présenter les valeurs initiales du cache comme des mesures réelles
+ * lorsque le BMI270 n'a pas été activé/détecté par M5Unified. */
+static bool drawImuUnavailable() {
+  if (M5.Imu.isEnabled()) return false;
+  drawPageHeader("IMU unavailable", "BMI270 not detected", TFT_RED);
+  cv.setTextDatum(middle_center);
+  cv.setTextSize(1);
+  cv.setTextColor(TFT_ORANGE, TFT_BLACK);
+  cv.drawString("Sensor data unavailable", SW / 2, SH / 2);
+  drawPageDots();
+  return true;
+}
+
 // 主界面：航空姿态与水平仪 (Primary Flight / Level HUD)
 void drawCompass() {
   cv.fillScreen(TFT_BLACK);
+  if (drawImuUnavailable()) return;
 
   float pitch = atan2f(-imuAx, sqrtf(imuAy * imuAy + imuAz * imuAz)) * 180.0f / (float)M_PI;
   float roll  = atan2f(imuAy, imuAz) * 180.0f / (float)M_PI;
@@ -317,6 +331,7 @@ void drawCompass() {
 // 详情页：六轴传感器遥测实验台 (Sensor Lab)
 void drawImuDetail() {
   cv.fillScreen(TFT_BLACK);
+  if (drawImuUnavailable()) return;
 
   float imuTemp = 0.0f;
   M5.Imu.getTemp(&imuTemp);
