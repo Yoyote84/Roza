@@ -54,6 +54,22 @@ jobs:
         run: |
           platformio run -e cardputer-adv
 
+      - name: Exécuter les tests logiciels hors matériel
+        run: |
+          set -euo pipefail
+          for suite in irtest loratest odidtest gnsstest jsontest oventest powertest ramtest astrotest calctest clocktest; do
+            echo "::group::Suite $suite"
+            bash "tools/$suite/build.sh"
+            echo "::endgroup::"
+          done
+          JSON_INC="-I .pio/libdeps/cardputer-adv/ArduinoJson/src"
+          for test in test alert_test hist_test hosts_test opid_test radar_test; do
+            echo "::group::Router/RID $test"
+            g++ -std=c++17 $JSON_INC "tools/routertest/$test.cpp" -o "/tmp/roza-$test"
+            "/tmp/roza-$test"
+            echo "::endgroup::"
+          done
+
       - name: Vérifier la génération des binaires
         run: |
           BUILD_DIR=".pio/build/cardputer-adv"
