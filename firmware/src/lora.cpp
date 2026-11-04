@@ -1228,7 +1228,7 @@ static void drawListenView() {
   // Pod 1: FREQ
   bool freqLocked = fabsf(curFreq - PRESETS[presetIdx].freq) > 0.01f;
   cv.fillRoundRect(62, 19, 55, 22, 2, 0x0821); cv.drawRoundRect(62, 19, 55, 22, 2, 0x18C3);
-  cv.setTextColor(0x8410, 0x0821); cv.drawString(freqLocked ? "VERROUILLE" : "FREQ", 65, 21);
+  cv.setTextColor(0x8410, 0x0821); cv.drawString(freqLocked ? "VERROU" : "FREQ", 65, 21);
   char fstr[16]; snprintf(fstr, sizeof(fstr), "%.1fM%s", curFreq, freqLocked ? "*" : "");
   cv.setTextColor(0xFDA0, 0x0821); cv.drawString(fstr, 65, 31);
 
@@ -1346,13 +1346,13 @@ static void drawAutoView() {
   // 3 Parameter Pods (y: 51..78, h = 28)
   // Pod 0: BANDWIDTH
   cv.fillRoundRect(8, 51, 72, 28, 2, 0x10A2); cv.drawRoundRect(8, 51, 72, 28, 2, 0x2145);
-  cv.setTextDatum(top_left); cv.setTextColor(0x8410, 0x10A2); cv.drawString("BANDE PASSANTE", 12, 53);
+  cv.setTextDatum(top_left); cv.setTextColor(0x8410, 0x10A2); cv.drawString("BANDE", 12, 53);
   char bws[16]; snprintf(bws, sizeof(bws), "%.0f kHz", m.bw);
   cv.setTextColor(0x07FF, 0x10A2); cv.drawString(bws, 12, 65);
 
   // Pod 1: SPREAD FACTOR
   cv.fillRoundRect(84, 51, 72, 28, 2, 0x10A2); cv.drawRoundRect(84, 51, 72, 28, 2, 0x2145);
-  cv.setTextDatum(top_left); cv.setTextColor(0x8410, 0x10A2); cv.drawString("FACTEUR ETAL.", 88, 53);
+  cv.setTextDatum(top_left); cv.setTextColor(0x8410, 0x10A2); cv.drawString("FACTEUR", 88, 53);
   char sfs[16]; snprintf(sfs, sizeof(sfs), "SF %d", m.sf);
   cv.setTextColor(0xFDA0, 0x10A2); cv.drawString(sfs, 88, 65);
 
@@ -1458,7 +1458,7 @@ static void drawLoraChatView() {
                           (unsigned long)((CHAT_MIN_INTERVAL_MS - sinceLast) / 1000 + 1));
     cv.setTextColor(0xFDA0, 0x0000); cv.drawString(cd, SW / 2, 128);
   } else {
-    cv.setTextColor(0x8410, 0x0000); cv.drawString("[ENTR]ENVOI [VIDE]SORTIR [RET]EFFACER", SW / 2, 128);
+    cv.setTextColor(0x8410, 0x0000); cv.drawString("[ENTR]ENVOI [VIDE]SORTIR [RET]EFF.", SW / 2, 128);
   }
 }
 
