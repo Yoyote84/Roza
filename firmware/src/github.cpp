@@ -9,7 +9,13 @@
 #include "ui_common.h"
 #include "net_job.h"
 #include "wifi_net.h"
-#include "secrets.h"
+// Configuration GitHub facultative : secrets.h reste local et ne doit jamais etre commite.
+#if __has_include("secrets.h")
+  #include "secrets.h"
+#endif
+#ifndef GITHUB_USER
+  #define GITHUB_USER ""
+#endif
 #include "http_json.h"
 
 // 接口最多回一年多一点（实测 369 天），留点余量
