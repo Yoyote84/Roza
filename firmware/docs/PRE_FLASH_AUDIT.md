@@ -53,6 +53,7 @@ Aucun fichier de dessin, de rendu, de thème ou de disposition de l'interface n'
 - `sdInit()` monte actuellement la carte en lecture/écriture ; aucun mode lecture seule n'est garanti.
 - Aucun formatage automatique n'est lancé au démarrage.
 - La fonction `formatSD()` ne fait pas un vrai formatage : elle supprime récursivement les fichiers et dossiers. L'action est déclenchée uniquement après deux confirmations, mais elle reste destructive.
+- Wardrive et certaines fonctions de journalisation peuvent écrire sur la microSD quand l'application est explicitement utilisée.
 - Une carte SDXC de 128 Go formatée en exFAT peut ne pas être reconnue par le pilote Arduino SD utilisé. Ne pas tester sur une carte contenant des données non sauvegardées.
 - Première validation recommandée : carte de test vide, format connu, aucune opération d'écriture ni de nettoyage.
 
@@ -73,6 +74,7 @@ Aucun fichier de dessin, de rendu, de thème ou de disposition de l'interface n'
 ### Autres périphériques
 
 - Infrarouge : émetteur uniquement, pas de récepteur ; apprentissage de télécommandes impossible sur le matériel intégré.
+- Ducky : exécute des scripts de frappe via BLE HID (et non USB HID). Ne lancer que des scripts connus et contrôlés : ils peuvent saisir des commandes sur l'appareil jumelé.
 - Batterie : estimation logicielle non calibrée sur plusieurs cycles de la carte réelle.
 - LED RGB : son alimentation partage la ligne du rétroéclairage ; quand la LED est active, le firmware force le rétroéclairage à pleine luminosité.
 - Audio, clavier ADV TCA8418, BMI270, écran, veille/réveil et USB natif compilent, mais nécessitent des essais physiques.
