@@ -83,7 +83,7 @@ Si le push échoue à cause d'un conflit, d'une authentification ou d'une restri
 
 ## Feuille de route
 
-1. G0 — Fondation ESP-IDF propre et compilation reproductible.
+1. G0 — Fondation PlatformIO + Arduino-ESP32 propre et compilation reproductible.
 2. G1 — Écran, clavier et IMU via le BSP existant.
 3. G2 — Batterie et stockage microSD, après vérification des formats et calibrations.
 4. G3 — Interface ROZA et navigation au clavier.
