@@ -27,6 +27,13 @@ enregistrés par le firmware. **Chaque flash de cette image réinitialise donc l
 ROZA** (fuseau horaire, luminosité, réseaux Wi-Fi mémorisés, mot de passe du hotspot, etc.).
 
 La microSD est une mémoire séparée : cette image ne l'efface pas et ne la formate pas.
+Attention : le pilote SD actuel monte la carte en lecture/écriture ; il ne garantit pas un
+montage matériellement protégé en lecture seule. La fonction appelée « Format SD » ne
+recrée pas le système de fichiers : elle supprime récursivement les fichiers et dossiers.
+Ne l'utiliser sous aucun prétexte pendant les premiers essais. Utiliser une carte de test
+vide ou une sauvegarde vérifiée. Le pilote Arduino SD courant ne garantit pas la prise
+en charge d'une carte SDXC exFAT de 128 Go ; vérifier le format avant de compter dessus.
+
 La table actuelle ne prévoit pas de mise à jour OTA : les futures mises à jour se feront
 par USB avec cette procédure, sauf évolution ultérieure du système de mise à jour.
 
@@ -62,7 +69,7 @@ Après un flash réussi, vérifier d'abord :
 1. démarrage et affichage ;
 2. clavier et navigation ;
 3. batterie et veille ;
-4. microSD (lecture seulement au premier essai) ;
+4. microSD : vérifier la détection et la lecture, sans suppression ni écriture ;
 5. modules radio/GNSS uniquement lorsqu'ils sont présents et activés volontairement.
 
 Ne pas formater la microSD. Ne pas activer d'émission LoRa automatique. Les essais physiques ne sont pas simulés par la CI.
