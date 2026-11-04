@@ -22,6 +22,14 @@
 
 **Important :** ce projet actif n'est pas un projet ESP-IDF natif. Ne pas utiliser `idf.py build` pour compiler ce firmware. Le workflow GitHub Actions doit appeler PlatformIO.
 
+- **Validation CI GitHub Actions #38** : compilation PlatformIO `pio run -e cardputer-adv` réussie le `2026-11-04` sur commit `3f1d5c59c115fb3d30357084df733ab073582d3b`.
+  - La compilation logicielle réussit dans l'environnement d'exécution cloud.
+  - Les tests logiciels disponibles (vérification de syntaxe, vérification des dépendances) passent.
+  - **Essais physiques sur Cardputer ADV réel** : non encore effectués. Cette compilation ne constitue pas une validation matérielle du fonctionnement du dispositif sur carte.
+  - Statut : CI SUCCESS, mais essais physiques en attente.
+
+- Outils de compilation et de vérification :
+
 ## Dépendances déclarées dans platformio.ini
 
 Les versions doivent rester épinglées et les mises à jour doivent être vérifiées par compilation et tests :

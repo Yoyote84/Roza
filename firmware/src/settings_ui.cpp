@@ -15,7 +15,7 @@
 String setValue(SetId id) {
   char b[24];
   switch (id) {
-    case SET_WIFI:    return String(WiFi.status() == WL_CONNECTED ? "ON" : "OFF");
+    case SET_WIFI:    return String(WiFi.status() == WL_CONNECTED ? "ALLUMÉ" : "ÉTEINT");
     case SET_GNSS:    return String();
     case SET_PCMODE:  return String("USB link for PC");
     case SET_BRIGHT:  snprintf(b, sizeof(b), "%d%%", brightPct); return String(b);
@@ -27,7 +27,7 @@ String setValue(SetId id) {
     case SET_THEME:   return String(themeName(themeMode));
     case SET_SLEEP: {
       int s = SLEEP_OPTS[sleepOptIdx];
-      if (s == 0) return String("Never");
+      if (s == 0) return String("Jamais");
       snprintf(b, sizeof(b), "%ds", s); return String(b);
     }
     case SET_TZ:      return String(TZ_OPTS[tzOptIdx].label);
@@ -38,8 +38,8 @@ String setValue(SetId id) {
       snprintf(b, sizeof(b), "%d%%", lvl); return String(b);
     }
     case SET_DEBUG:   return String(debugOn ? "ON" : "OFF");
-    case SET_FORMAT:  return String(sdMounted ? "Erase >" : "No SD");
-    case SET_ABOUT:   return String("Info >");
+    case SET_FORMAT:  return String(sdMounted ? "Effacer >" : "Pas de SD");
+    case SET_ABOUT:   return String("Infos >");
   }
   return String();
 }

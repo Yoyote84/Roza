@@ -231,7 +231,7 @@ static uint32_t pktTotal = 0;
 static uint32_t lastPktMs = 0;
 
 enum LoraMode { LORA_SCAN, LORA_LISTEN, LORA_AUTO, LORA_CHAT };
-static LoraMode mode = LORA_SCAN;
+static LoraMode mode = LORA_LISTEN;
 static bool loraReady = false;
 static int loraErr = 0;
 
@@ -369,7 +369,10 @@ void loraEnter() {
     chatHead = chatCount = 0; composeBuf = "";
     autoFound = false;
     vhfWatch = false; vhfLogClose();
-    mode = LORA_SCAN;
+    // ROZA : écoute réception par défaut même en l'absence du module Cap.
+    // Mode LORA_LISTen privilégie la possibilité de recevoir des paquets
+    // si l'utilisateur branche ultérieurement le module Cap LoRa.
+    mode = LORA_LISTEN;
     return;
   }
 
@@ -387,7 +390,11 @@ void loraEnter() {
   chatHead = chatCount = 0; composeBuf = "";
   autoFound = false;
   vhfWatch = false; vhfLogClose();
-  mode = LORA_SCAN;
+  // ROZA : écoute réception par défaut au démarrage.
+  // Mode LORA_LISTEN permet de recevoir des paquets (contrairement à LORA_SCAN
+  // qui ne fait qu'un balayage RSSI). L'émission n'a lieu que sur action
+  // explicite de l'utilisateur.
+  mode = LORA_LISTEN;
 }
 
 // 切换扫描频段：VHF 用 FSK + 窄接收带宽，ISM 回到当前 LoRa 预设。
