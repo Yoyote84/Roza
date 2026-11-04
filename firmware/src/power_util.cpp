@@ -287,6 +287,25 @@ int powerBatteryLevel() {
   return (int)lastKnownPct;
 }
 
+// Estime le temps restant avant extinction de la batterie (en minutes).
+// Si en charge, renvoie 0 (inconnu).
+// Si niveau connu et pas en charge, estime basé sur consommation moyenne.
+// Consommation typique Cardputer ADV : ~120 mA avec écran allumé, Wi-Fi/Bluetooth off.
+// Capacité batterie estimée : ~500 mAh.
+// À 50% : environ 2-4 heures restant.
+// Renvoie -1 si impossible à estimer.
+int powerRemainingTime() {
+  if (chargeActive) return 0;  // En charge, on ne peut pas estimer
+  if (lastKnownPct <= 0 || lastKnownPct > 100) return -1;
+  // Consommation moyenne estimée : 120 mA
+  // Capacité batterie estimée : 500 mAh
+  // Temps restant = (pourcentage * capacité) / consommation * 60 (minutes)
+  int minutes = (lastKnownPct * 500 / 120) * 60 / 100;
+  // Limite raisonnable : max 48 heures
+  if (minutes > 48 * 60) return 48 * 60;
+  return minutes;
+}
+
 // ---------------------------------------------------------------------------
 // 诊断
 // ---------------------------------------------------------------------------
