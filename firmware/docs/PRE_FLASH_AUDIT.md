@@ -78,6 +78,7 @@ Aucun fichier de dessin, de rendu, de thème ou de disposition de l'interface n'
 - Batterie : estimation logicielle non calibrée sur plusieurs cycles de la carte réelle.
 - LED RGB : son alimentation partage la ligne du rétroéclairage ; quand la LED est active, le firmware force le rétroéclairage à pleine luminosité.
 - Audio, clavier ADV TCA8418, BMI270, écran, veille/réveil et USB natif compilent, mais nécessitent des essais physiques.
+- Bluetooth : la pile BLE garde une part importante de la RAM et le firmware la suspend/libère selon les applications. L'initialisation BLE coupe le Wi-Fi ; le gestionnaire réseau attend la libération BLE avant de relancer une connexion. Le chemin de démontage manuel dans `bt.cpp` est complexe et les commentaires historiques décrivent des blocages possibles dans l'ancienne séquence de deinit. Il faut tester plusieurs cycles scan/HID → sortie → retour Wi-Fi sur la carte réelle.
 - Sans PSRAM, les fonctions lourdes (TLS/Chat, carte GNSS, BLE, audio et gros flux) peuvent manquer de mémoire contiguë. Les mécanismes de libération et de repli du code doivent être éprouvés en utilisation réelle.
 
 ### Réseau et services externes
