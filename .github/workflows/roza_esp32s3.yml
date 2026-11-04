@@ -45,7 +45,7 @@ jobs:
       - name: Installer PlatformIO via pip
         run: |
           python -m pip install --upgrade pip
-          pip install platformio
+          pip install "platformio==${PLATFORMIO_VERSION}"
 
       - name: Compiler le firmware avec PlatformIO
         run: |
