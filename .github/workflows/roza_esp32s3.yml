@@ -1,0 +1,61 @@
+# Github Actions Workflow for ROZA Firmware
+# Compile le firmware ROZA sur ESP-IDF stable pour ESP32-S3.
+
+name: ROZA Firmware Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  # Version explicite d'ESP-IDF à utiliser
+  ESP_IDF_VERSION: v5.1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install ESP-IDF
+        run: |
+          # Installation d'ESP-IDF v5.1
+          git clone --depth 1 --branch $ESP_IDF_VERSION https://github.com/espressif/esp-idf.git /opt/esp-idf
+          source /opt/esp-idf/export.sh
+
+      - name: Set up Python path
+        run: |
+          pip install west
+
+      - name: Install ESP-IDF tools
+        run: |
+          cd /opt/esp-idf
+          ./install.sh
+
+      - name: Export ESP-IDF
+        run: |
+          source /opt/esp-idf/export.sh
+
+      - name: Configure project
+        run: |
+          source /opt/esp-idf/export.sh
+          cd /public/Roza
+          idf.py set-target esp32s3
+          idf.py menuconfig --set CONFIG_ROZA_DISPLAY_ENABLE=y
+
+      - name: Build firmware
+        run: |
+          source /opt/esp-idf/export.sh
+          cd /public/Roza
+          idf.py build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ROZA-firmware-${{ github.sha }}
+          path: /public/Roza/build/*
