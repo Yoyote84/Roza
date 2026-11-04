@@ -1,6 +1,6 @@
 # Nom,     Type, Sous-type, Offset,   Taille
-nvs,       data, nvs,      0x9000,   0x6000
-phy_init,  data, phy,      0xf000,   0x1000
-factory,   app,  factory,  0x10000,  0x400000
+nvs,       data, nvs,      0xa000,   0x6000
+phy_init,  data, phy,      0x10000,  0x1000
+factory,   app,  factory,  0x20000,  0x400000
 # Le reste de la flash est volontairement non alloué tant que la stratégie
 # OTA et le système de fichiers interne n'ont pas été conçus et testés.
