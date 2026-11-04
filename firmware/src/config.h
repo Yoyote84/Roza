@@ -20,13 +20,13 @@
 
 // --- NTP 服务器（按顺序尝试）。默认偏向中国大陆可达；海外 utilisateurs peuvent change to pool.ntp.org system ---
 #ifndef CFG_NTP_1
-#define CFG_NTP_1 "ntp.aliyun.com"
+#define CFG_NTP_1 "fr.pool.ntp.org"
 #endif
 #ifndef CFG_NTP_2
-#define CFG_NTP_2 "cn.pool.ntp.org"
+#define CFG_NTP_2 "pool.ntp.org"
 #endif
 #ifndef CFG_NTP_3
-#define CFG_NTP_3 "pool.ntp.org"
+#define CFG_NTP_3 "time.cloudflare.com"
 #endif
 
 // --- 设备热点（Hotspot app）---
@@ -47,12 +47,12 @@
 #ifndef CFG_PROBE_VPN_PORT
 #define CFG_PROBE_VPN_PORT 443
 #endif
-// 国内基线（应当总是通）。海外用户可改成自己网络里稳定可达的 IP，如 9.9.9.9
+// Référence réseau générale ; à remplacer dans config_local.h si le réseau filtre ICMP.
 #ifndef CFG_PROBE_BASELINE_IP
-#define CFG_PROBE_BASELINE_IP "223.5.5.5"
+#define CFG_PROBE_BASELINE_IP "1.1.1.1"
 #endif
 #ifndef CFG_PROBE_BASELINE_NAME
-#define CFG_PROBE_BASELINE_NAME "aliyun"
+#define CFG_PROBE_BASELINE_NAME "cloudflare"
 #endif
 
 // --- 电台（Radio app）---
