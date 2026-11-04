@@ -195,9 +195,8 @@ const AppDef APPS[] = {
   //     而这四个的共同点是"隔空收发信号"（LoRa/BLE 收发、GNSS 只收、IR 只发）。
   //     Drone ID 曾经也塞在这一组，但它是靠 esp_wifi_set_promiscuous 蹭 Wi-Fi 扫的，
   //     跟这四个的收发硬件毫无关系，挪去 NETWORK 跟 Sniffer 归一类了 ---
-  // --- HID：把这台设备当键盘/遥控器去敲别人。三个出口原本散在两个组里
-  //     （BT Keys / BT Media 藏在 Bluetooth app 里，Ducky 在 MORE），但它们是同一件事，
-  //     只是一个走 BLE、一个走 USB ---
+  // --- HID：把这台设备当键盘/遥控器去敲别人。BT Keys、BT Media 和 Ducky
+  //     都通过 bt.cpp 的 BLE HID 实现；Ducky 是蓝牙脚本执行器，不是 USB HID ---
   {"BT Keys",   APP_BTKB},     {"BT Media", APP_BTMEDIA},  {"Ducky",    APP_DUCKY},
   // --- SIG：隔空收发信号 + 定位。⚠️ 名字从 SIGNAL 缩成 SIG 是被 tab 宽度逼的，
   //     7 组时每格只有 240/7 = 34px，而 "SIGNAL" 要 36px——下面有编译期检查兜着 ---
