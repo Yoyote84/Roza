@@ -159,8 +159,10 @@ static int clashCountConns() {
   RouterTypeStats nextTypes;
   RouterHostStats nextHosts;
   WiFiClient client;
-  String auth = String("Bearer ") + CLASH_SECRET;
-  HttpJsonOptions options(2500, 2500, nullptr, auth.c_str());
+  String auth;
+  if (CLASH_SECRET[0]) auth = String("Bearer ") + CLASH_SECRET;
+  const char* authHeader = CLASH_SECRET[0] ? auth.c_str() : nullptr;
+  HttpJsonOptions options(2500, 2500, nullptr, authHeader);
   JsonDocument filter;
   filter["metadata"]["sourceIP"] = true;
   filter["metadata"]["network"] = true;
