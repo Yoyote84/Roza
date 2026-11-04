@@ -15,7 +15,7 @@ au dépôt. Aucun secret fictif ou clé de remplacement n'est fourni.
 
 | Application | Configuration facultative | Comportement sans configuration |
 |---|---|---|
-| Chat | `CHAT_BASE_URL`, `CHAT_API_KEY` ; facultatifs : `CHAT_MODEL`, `CHAT_ROOT_CA`, `CHAT_ALLOW_INSECURE` | L'application compile et indique que l'URL ou la clé manque ; aucune requête n'est envoyée. |
+| Chat | `CHAT_BASE_URL`, `CHAT_API_KEY` ; facultatifs : `CHAT_MODEL`, `CHAT_ROOT_CA`, `CHAT_ALLOW_INSECURE` | L'application compile ; sans URL, elle n'envoie aucune requête. Sans clé, elle omet Authorization, ce qui permet les serveurs compatibles sans authentification. |
 | Satellite Radar | `N2YO_API_KEY` | Le radar compile ; sans clé, la récupération distante indique qu'une configuration est nécessaire et n'envoie aucune requête N2YO. |
 | Router / Clash | `CLASH_BASE`, `CLASH_PROXY_GROUP` ; `CLASH_SECRET` facultatif selon la configuration du serveur | L'application compile. Sans URL, elle indique que le serveur Clash n'est pas configuré. Sans jeton, aucun en-tête Authorization vide n'est envoyé. |
 | GitHub Contributions | `GITHUB_USER` (nom de compte, pas une clé API) | L'application compile et indique qu'un nom de compte doit être configuré. |
