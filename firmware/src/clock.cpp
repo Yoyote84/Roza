@@ -54,7 +54,7 @@ bool clockNeedsFastUpdate() {
   return false;
 }
 
-static const char* WEEKDAYS[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+static const char* WEEKDAYS[7] = {"Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"};
 
 static int daysInMonth(int y, int m) {   // m: 1-12
   static const int d[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -164,7 +164,7 @@ static void drawStyleHierarchic() {
     cv.drawString(d, SW / 2, 12);
   } else {
     cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    cv.drawString("WAITING FOR SYNC (NTP/GNSS)", SW / 2, 12);
+    cv.drawString("ATTENTE SYNC (NTP/GNSS)", SW / 2, 12);
   }
 
   // 时间主体
@@ -176,20 +176,20 @@ static void drawStyleHierarchic() {
     char v[12];
     float df = (ti.tm_hour * 60 + ti.tm_min) / 1440.0f;
     snprintf(v, sizeof(v), "%d%%", (int)(df * 100));
-    drawMiniBar(82, "DAY", df, ACCENT, v);
+    drawMiniBar(82, "JOUR", df, ACCENT, v);
 
     int dim = daysInMonth(year, ti.tm_mon + 1);
     snprintf(v, sizeof(v), "%d/%d", ti.tm_mday, dim);
-    drawMiniBar(99, "MONTH", (float)ti.tm_mday / dim, ROZA_OLIVE, v);
+    drawMiniBar(99, "MOIS", (float)ti.tm_mday / dim, ROZA_OLIVE, v);
 
     bool leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
     float yf = (ti.tm_yday + 1) / (leap ? 366.0f : 365.0f);
     snprintf(v, sizeof(v), "%d%%", (int)(yf * 100));
-    drawMiniBar(116, "YEAR", yf, ROZA_OLIVE_LIGHT, v);
+    drawMiniBar(116, "AN", yf, ROZA_OLIVE_LIGHT, v);
   } else {
-    drawMiniBar(82, "DAY",   0.0f, DIM_BORDER, "--%");
-    drawMiniBar(99, "MONTH", 0.0f, DIM_BORDER, "--/--");
-    drawMiniBar(116, "YEAR", 0.0f, DIM_BORDER, "--%");
+    drawMiniBar(82, "JOUR",   0.0f, DIM_BORDER, "--%");
+    drawMiniBar(99, "MOIS", 0.0f, DIM_BORDER, "--/--");
+    drawMiniBar(116, "AN", 0.0f, DIM_BORDER, "--%");
   }
 
   drawPageDots();
@@ -366,7 +366,7 @@ static void drawStyleDigital() {
     cv.drawString(dBuf, 14, 114);
   } else {
     cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    cv.drawString("----/--/--  NO SYNC", 14, 114);
+    cv.drawString("----/--/--  NON SYNCHRO", 14, 114);
   }
 
   // 电池电量与图标
@@ -522,7 +522,7 @@ static void drawStyleText() {
     cv.setTextDatum(top_center);
     cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
     // 放在最后一行词和页码点之间：顶部会压到第一行（Font2 16px 以 y=12 居中）
-    cv.drawString("WAITING FOR SYNC", SW / 2, SH - 22);
+    cv.drawString("ATTENTE SYNC", SW / 2, SH - 22);
   }
 
   drawPageDots();
