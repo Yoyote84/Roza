@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <esp_system.h>
+#include <bootloader_random.h>
 #include "dhcpserver/dhcpserver.h"   // dhcp_search_ip_on_mac：按 MAC 查 DHCP 租约表拿到分配的 IP
 #include "ui_common.h"
 #include "config.h"
@@ -46,9 +47,16 @@ static String loadPw() {
   if (DEFAULT_PW && strlen(DEFAULT_PW) >= 8) {
     pw = DEFAULT_PW;
   } else {
+    // Wi-Fi/BLE restent normalement arrêtés : activer brièvement la source
+    // d'entropie SAR du S3, sinon esp_random() seul peut être pseudo-aléatoire
+    // hors radio. Aucun autre accès ADC n'est effectué pendant cette courte fenêtre.
+    bootloader_random_enable();
+    const uint32_t r0 = esp_random();
+    const uint32_t r1 = esp_random();
+    bootloader_random_disable();
     char generated[24];
     snprintf(generated, sizeof(generated), "ROZA-%08lX%08lX",
-             (unsigned long)esp_random(), (unsigned long)esp_random());
+             (unsigned long)r0, (unsigned long)r1);
     pw = generated;
   }
   saveString("hotspot", "pw", pw);
