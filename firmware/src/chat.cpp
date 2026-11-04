@@ -29,7 +29,27 @@
 #include <ArduinoJson.h>
 #include "ui_common.h"
 #include "wifi_net.h"
-#include "secrets.h"
+
+// Configuration privée facultative : secrets.h reste local et ne doit jamais être commité.
+// Sans ce fichier, l'application Chat reste compilable mais signale qu'elle n'est pas configurée.
+#if __has_include("secrets.h")
+  #include "secrets.h"
+#endif
+#ifndef CHAT_BASE_URL
+  #define CHAT_BASE_URL ""
+#endif
+#ifndef CHAT_API_KEY
+  #define CHAT_API_KEY ""
+#endif
+#ifndef CHAT_MODEL
+  #define CHAT_MODEL "gpt-4o-mini"
+#endif
+#ifndef CHAT_ROOT_CA
+  #define CHAT_ROOT_CA ""
+#endif
+#ifndef CHAT_ALLOW_INSECURE
+  #define CHAT_ALLOW_INSECURE false
+#endif
 
 String chatInput;
 String chatError;
