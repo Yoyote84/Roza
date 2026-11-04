@@ -1,77 +1,61 @@
-# Provenance des composants — Import cardputer-adv-firmware
+# Provenance des composants — fondation firmware ROZA
 
-## Dépôt source
-- **Dépôt** : https://github.com/Lewis-Peter/cardputer-adv-firmware
-- **SHA d'importation** : `715c97c0dad22fa44a80a6e1e00053264f252c24` (référence au commit synchronisé sur origin/main de Yoyote84/Roza)
-- **Date d'importation** : 2026-11-04
+## Source principale
 
-## Composants réutilisés tels quels
+- Dépôt amont : https://github.com/Lewis-Peter/cardputer-adv-firmware
+- Commit amont exact importé : `3671c86f7850bd0342f39b5befad5b0c02d33f5b`
+- Date du commit amont : 2026-10-08
+- Date d'import dans ROZA : 2026-11-04
+- Répertoire importé : `src/`, `lib/`, `data/`, `tools/`, `docs/`, `platformio.ini`, ainsi que les fichiers de licence et de documentation associés.
+- Le SHA d'importation ROZA n'est pas le SHA du dépôt amont. Ne pas les intervertir.
 
-### BSP et bibliothèques M5Stack
-- **espp/m5stack-cardputer** version **1.3.11** (via idf_component.yml)
-  - Licence : MIT
-  - Fournit l'abstraction matérielle : ST7789V2/LVGL, TCA8418, BMI270, batterie, microSD, SX1262 et GNSS du Cap
-  - Dépendances transitives gérées par ESP Component Manager
-- **m5stack/M5Unified** @ 0.2.20
-  - Licence : MIT
-  - Abstraction matérielle unifiée pour M5Stack
-- **m5stack/M5GFX** @ 0.2.27
-  - Licence : MIT
-  - Pilote d'écran graphique
+## Système de compilation réel
 
-### Bibliothèques tierces (versions exactes)
-- **mikalhart/TinyGPSPlus** @ 1.1.0 — Licence MIT
-  - Parsing des sentences NMEA GPS/Glonass/Galileo/Béidou/QZSS
-  - Utilisée dans `src/gnss.cpp`
-- **bblanchon/ArduinoJson** @ 7.4.3 — Licence MIT
-  - Manipulation JSON pour config, météo, géolocalisation
-  - Utilisée dans de nombreux fichiers dont `config.http_json.h`, `geoloc.cpp`, `weather.cpp`, etc.
-- **jgromes/RadioLib** @ 7.7.1 — Licence BSD
-  - Pilote SX1262 LoRa dans `src/lora.cpp`
-- **fastled/FastLED** @ 3.10.3 — Licence MIT
-  - Pilotage LED RVB sur GPIO21
-- **earlephilhower/ESP8266Audio** (GitHub #1.9.9) — Licence MIT
-  - Décodeur MP3/I2S dans `src/radio.cpp`
-  - Requiert lien GitHub direct (non disponible sur PlatformIO Registry)
-- **ewpa/LibSSH-ESP32** @ 5.9.0 — Licence MIT
-  - SSH client pour les applications réseau
+- Outil : PlatformIO
+- Environnement : `cardputer-adv`
+- Framework : Arduino-ESP32
+- Plateforme : `espressif32@7.0.1`
+- Paquet framework épinglé : `framework-arduinoespressif32@3.20017.241212`
+- Carte PlatformIO : `esp32-s3-devkitc-1`, configurée pour 8 Mo de Flash
+- Table de partitions ROZA : `partitions_8MB.csv` (partition applicative unique ; pas de double slot OTA)
+- Commande de compilation : `pio run -e cardputer-adv`
 
-### Fichiers de configuration et de système
-- **platformio.ini** — Configuration PlatformIO avec dépendances épinglées
-  - Platform : espressif32@7.0.1
-  - Board : esp32-s3-devkitc-1
-  - Framework : arduino
-- **HARDWARE.md** — Référence de matériel Cardputer ADV avec caveats
-  - GPIO5 doit être HIGH au démarrage pour compatibilité carte SD
-  - Bus SPI partagé microSD/LoRa (NSS différent : GPIO12 vs GPIO5)
-  - GPS NMEA buffer : `setRxBufferSize(4096)` avant `begin()` obligatoire
-- **data/cert/x509_crt_bundle.bin** — Bundle de 121 certificats racines Mozilla
-  - Inscrit en dur pour vérification HTTPS authentique
-- **docs/** — Documentation technique (20 fichiers dont dependency-pins.md, feature-inventory.md, etc.)
+**Important :** ce projet actif n'est pas un projet ESP-IDF natif. Ne pas utiliser `idf.py build` pour compiler ce firmware. Le workflow GitHub Actions doit appeler PlatformIO.
 
-## Adaptations effectuées pour ROZA
+## Dépendances déclarées dans platformio.ini
 
-### Identité ROZA préservée
-- Nom du projet : **РОЗА** (ROZA)
-- Attribution : Lewis-Peter pour le firmware technique, ROZA pour l'identité visuelle et les contraintes non négociables
-- Style visuel : 1940-1950 (à personnaliser dans les ressources data/ui/)
+Les versions doivent rester épinglées et les mises à jour doivent être vérifiées par compilation et tests :
 
-### Contraintes non négociables ROZA
-1. **Wi-Fi / Bluetooth** : Désactivés par défaut au démarrage. Activables à la demande par l'utilisateur via l'interface.
-2. **LoRa** : Mode réception par défaut.émission seulement sur action explicive de l'utilisateur.
-3. **GPS** : Capable de fonctionner hors ligne. Les données de position sont disponibles sans connexion Internet.
-4. **microSD** : Aucune formatage automatique. La carte doit être reconnue et montée par l'utilisateur.
-5. **Interface** : Français (UI progressif). Toutes les nouvelles applications doivent respecter la langue française.
-6. **Aucune clé API** dans Git. Les utilisateurs créent leur propre `src/secrets.h` locale.
+- M5Stack M5Unified 0.2.20
+- M5Stack M5GFX 0.2.27
+- TinyGPSPlus 1.1.0
+- ArduinoJson 7.4.3
+- RadioLib 7.7.1
+- FastLED 3.10.3
+- ESP8266Audio 1.9.9 (référence Git)
+- LibSSH-ESP32 5.9.0
 
-### Fichiers NE JAMAIS importés (interdits)
-- `src/secrets.h` — Doit être créé par l'utilisateur localement avec ses propres clés API
-- `src/config_local.h` — Configuration locale utilisateur, non versionnée
-- Dépôt `.git` du projet source
-- Tout fichier contenant des clés API réelles ou des identifiants privés
+Les licences des dépendances et les avis de copyright contenus dans les fichiers tiers doivent être conservés. Ne pas déduire la licence de chaque fichier uniquement de la licence MIT du dépôt principal.
 
-### Prochainement à adapter (G2-G5)
-- G2 : Batterie et stockage microSD (vérification formats, pas de formatage auto)
-- G3 : Interface ROZA et navigation clavier
-- G4 : GNSS AT6668 et SX1262 (réception d'abord, émission validée)
-- G5 : Applications hors ligne : carnet, notes, journal, agenda, outils
+## Licence
+
+Le fichier `firmware/LICENSE` contient la licence MIT du dépôt amont et son avis de copyright. Le dépôt amont précise que certains fichiers sous `lib/` et `src/sha512_crypt.*` sont des composants tiers soumis à leurs licences d'origine. Conserver leurs en-têtes, notices et fichiers de licence.
+
+## Adaptations ROZA attendues
+
+1. Interface et documentation progressivement francisées, sans supprimer les applications fonctionnelles importées.
+2. Wi-Fi et Bluetooth arrêtés au démarrage ; activation uniquement sur demande explicite.
+3. LoRa en réception par défaut ; émission uniquement après action volontaire clairement visible.
+4. GPS utilisable hors ligne.
+5. Aucune commande de formatage automatique de la microSD ; identifier le système de fichiers avant de décider du montage et des écritures.
+6. Aucune clé API, aucun mot de passe ni identifiant privé dans Git.
+7. Respect des limites matérielles : ESP32-S3FN8, 8 Mo Flash, pas de PSRAM.
+8. Aucun test matériel ne doit être déclaré sans essai physique réel.
+
+## Vérifications encore nécessaires
+
+- Compiler réellement avec PlatformIO sur CI et examiner les erreurs jusqu'à obtenir une compilation propre.
+- Vérifier la taille du binaire et les marges de Flash/RAM ; ne pas confondre compilation réussie et validation matérielle.
+- Auditer tous les chemins de démarrage et toutes les applications pour confirmer que Wi-Fi/Bluetooth/LoRa ne s'activent pas automatiquement.
+- Identifier le format réel de la microSD 128 Go avant d'activer son montage/écriture sur l'appareil.
+- Vérifier les obligations réglementaires françaises/européennes avant de définir les paramètres d'émission LoRa.
