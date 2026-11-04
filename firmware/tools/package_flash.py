@@ -94,9 +94,31 @@ def main() -> None:
     image[APP_OFFSET:APP_OFFSET + len(app_data)] = app_data
     image_path.write_bytes(image)
 
+    # App-only update: exact payload for the factory slot. Flash at APP_OFFSET,
+    # without chip erase, and only over ROZA with this same partition layout.
+    update_path = output / "ROZA_UPDATE.bin"
+    update_path.write_bytes(app_data)
+
     checksum = sha256(image_path)
+    update_checksum = sha256(update_path)
+    partition_checksum = hashlib.sha256(partition_data).hexdigest()
     (output / "SHA256SUMS.txt").write_text(
-        f"{checksum}  {image_path.name}\n", encoding="utf-8"
+        f"{checksum}  {image_path.name}\\n"
+        f"{update_checksum}  {update_path.name}\\n", encoding="utf-8"
+    )
+    (output / "UPDATE-INFO.txt").write_text(
+        "ROZA — M5Stack Cardputer ADV application-only update\\n"
+        "Target: ESP32-S3FN8 / 8 MiB flash / no PSRAM\\n"
+        "File: ROZA_UPDATE.bin (application payload only)\\n"
+        "Flash address: 0x10000\\n"
+        "Operation: write application partition only; DO NOT erase the chip\\n"
+        "Required: existing ROZA installation with the same factory partition layout\\n"
+        f"Required partition table SHA-256: {partition_checksum}\\n"
+        f"Factory app partition: offset 0x{APP_OFFSET:05x}, size 0x{app_capacity:x} ({app_capacity} bytes)\\n"
+        "NVS/settings and microSD are outside this file and are not intentionally erased.\\n"
+        "Do not use on M5Launcher, another firmware, or a changed partition layout.\\n"
+        "If unsure, use the full image and expect settings to reset.\\n",
+        encoding="utf-8",
     )
     (output / "FLASH-INFO.txt").write_text(
         "РO3A — M5Stack Cardputer ADV\n"

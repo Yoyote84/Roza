@@ -34,8 +34,28 @@ Ne l'utiliser sous aucun prétexte pendant les premiers essais. Utiliser une car
 vide ou une sauvegarde vérifiée. Le pilote Arduino SD courant ne garantit pas la prise
 en charge d'une carte SDXC exFAT de 128 Go ; vérifier le format avant de compter dessus.
 
-La table actuelle ne prévoit pas de mise à jour OTA : les futures mises à jour se feront
-par USB avec cette procédure, sauf évolution ultérieure du système de mise à jour.
+## Mise à jour USB sans réinitialiser les réglages
+
+Pour une ROZA déjà installée avec la table de partitions actuelle, le workflow publie
+un artefact séparé `roza-cardputer-adv-update-<commit>`. Il contient `ROZA_UPDATE.bin`,
+qui est uniquement le binaire applicatif destiné à la partition factory.
+
+Conditions impératives :
+- Cardputer ADV ESP32-S3FN8, 8 Mio ;
+- firmware ROZA déjà installé ;
+- table de partitions inchangée (le SHA-256 attendu est indiqué dans `UPDATE-INFO.txt`) ;
+- écrire `ROZA_UPDATE.bin` à **`0x10000`** ;
+- désactiver toute option « Erase all / Erase flash / Chip erase » dans l'outil.
+
+Cette opération ne contient ni bootloader, ni table de partitions, ni NVS : elle ne
+réécrit donc pas ces zones. Les préférences et la microSD ne sont pas volontairement
+effacées. Le nouveau firmware peut toutefois effectuer ses propres migrations NVS au
+démarrage ; une sauvegarde des réglages importants reste prudente.
+
+**Ne pas utiliser ce paquet** pour passer de M5Launcher ou d'un autre firmware à ROZA,
+ni si la table de partitions a changé. Dans ces cas, utiliser l'image complète à
+`0x0000` et prévoir la réinitialisation des réglages. Il ne s'agit pas d'une OTA :
+le Cardputer doit toujours être connecté en USB et placé en mode téléchargement.
 
 ## Entrer en mode téléchargement
 
