@@ -55,6 +55,24 @@
 #define CFG_PROBE_BASELINE_NAME "cloudflare"
 #endif
 
+// --- Radio LoRa ---
+// Émission désactivée par défaut : la réception reste disponible.
+// N'activer qu'après validation de la réglementation de la région et du duty-cycle.
+// La configuration locale peut remplacer cette valeur sans modifier l'interface.
+#ifndef CFG_LORA_TX_ENABLED
+#define CFG_LORA_TX_ENABLED 0
+#endif
+
+// --- GNSS ---
+// 0 = portable (usage général), 1 = statique, 2 = piéton, 3 = véhicule,
+// 4 = maritime, 5 à 7 = aviation. Le modèle portable est le choix sûr par défaut.
+#ifndef CFG_GNSS_DYNAMIC_MODEL
+#define CFG_GNSS_DYNAMIC_MODEL 0
+#endif
+#if CFG_GNSS_DYNAMIC_MODEL < 0 || CFG_GNSS_DYNAMIC_MODEL > 7
+#error "CFG_GNSS_DYNAMIC_MODEL doit être compris entre 0 et 7"
+#endif
+
 // --- 电台（Radio app）---
 // 内置预置电台列表：逗号分隔的 {名称, 直链URL, 风格} 初始化项，只支持 http:// MP3 直链。
 // 列表末尾固定会再追加一个 "[Custom URL]" 项。想不重编译就改列表：SD 卡根目录放 /radio.txt

@@ -15,6 +15,15 @@
 #define CFG_PROBE_BASELINE_IP "1.1.1.1"
 #define CFG_PROBE_BASELINE_NAME "cloudflare"
 
+// Radio : l'émission LoRa reste désactivée par défaut.
+// Ne l'activer qu'après vérification de la bande autorisée, de la puissance, de l'antenne
+// et des limites de duty-cycle applicables à ta région.
+// #define CFG_LORA_TX_ENABLED 1
+
+// GNSS : 0 = portable (défaut), 1 = statique, 2 = piéton, 3 = véhicule,
+// 4 = maritime, 5 à 7 = aviation.
+// #define CFG_GNSS_DYNAMIC_MODEL 0
+
 // Par défaut, un mot de passe aléatoire unique est généré et enregistré par appareil.
 // Définir cette option uniquement si tu souhaites imposer ton propre mot de passe.
 // #define CFG_HOTSPOT_DEFAULT_PW "REMPLACER_PAR_UN_MOT_DE_PASSE_UNIQUE"

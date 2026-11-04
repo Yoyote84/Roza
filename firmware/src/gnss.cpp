@@ -88,9 +88,16 @@ static void gnssSendPcas(const char* body) {
   GPSSerial.print(line);
 }
 
-// 统一发送高动态（PCAS11,6）、5Hz更新率（PCAS02,200）、精简语句集 nav+gsv（PCAS03）
+// Envoie le modèle dynamique configuré (portable par défaut), 5 Hz et les seules
+// phrases NMEA utiles à la navigation et à la vue satellite.
+static void gnssSendDynamicModel() {
+  char command[24];
+  snprintf(command, sizeof(command), "PCAS11,%d", CFG_GNSS_DYNAMIC_MODEL);
+  gnssSendPcas(command);
+}
+
 static void gnssSendDefaultPcas() {
-  gnssSendPcas("PCAS11,6");
+  gnssSendDynamicModel();
   gnssSendPcas("PCAS02,200");
   gnssSendPcas("PCAS03,1,0,1,1,1,0,0,0,0,0,,,0,0");
 }
@@ -121,8 +128,8 @@ void gnssInit() {
   //   5: Aviation <1g (航空低过载模式, 最大速度 100m/s ≈ 360km/h)
   //   6: Aviation <2g (航空中过载模式, 最大速度 250m/s ≈ 900km/h, 最大垂直速度 100m/s, 通用高动态)
   //   7: Aviation <4g (航空高过载模式, 最大速度 500m/s ≈ 1800km/h)
-  // 设置为 6 (Aviation <2g)，完美覆盖高铁 350km/h、无人机与民航巡航，彻底根治高速移动下卡死失步。
-  gnssSendPcas("PCAS11,6");
+  // Modèle portable par défaut : les profils véhicule/aviation restent configurables localement.
+  gnssSendDynamicModel();
   delay(20);
   // 默认启动 5Hz 高更新率 (200ms)；避免出厂默认 1Hz 在高速移动下位置延迟严重 (300km/h 下 1Hz 间隔达 83 米)。
   gnssSendPcas("PCAS02,200");

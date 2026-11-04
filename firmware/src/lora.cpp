@@ -5,6 +5,7 @@
 #include "ui_common.h"
 #include "sd_files.h"   // 蹲守日志写 SD（SD 和 LoRa 共用同一条 SPI，靠 NSS 区分）
 #include "gnss.h"       // 日志里带上定位，才分得清哪一段是在哪儿测的
+#include "config.h"
 #include <ctime>
 #include <cmath>
 
@@ -320,6 +321,12 @@ static void loraStartListenAuto() {
 // 返回是否真的发出去了——限速窗口里没发成的，调用方要把输入框内容留着（原来是不管发没发成
 // 都直接清空 composeBuf，用户打了一半的话在"wait Ns to send"期间按回车就凭空消失了）。
 static bool loraSendText(const String& text) {
+#if !CFG_LORA_TX_ENABLED
+  // Sécurité : la réception reste active, mais aucune émission n'est autorisée
+  // tant qu'une configuration régionale et un contrôle de duty-cycle ne sont pas validés.
+  (void)text;
+  return false;
+#else
   if (!loraReady) return false;
   uint32_t now = millis();
   if (now - lastSendMs < CHAT_MIN_INTERVAL_MS) return false;   // 软性限速，还没到点就先不发
@@ -335,10 +342,25 @@ static bool loraSendText(const String& text) {
   memcpy(buf + 5, text.c_str(), n);
 
   radio.standby();
-  radio.transmit(buf, 5 + n);
-  radio.startReceive();
+  const int16_t txState = radio.transmit(buf, 5 + n);
+  if (txState != RADIOLIB_ERR_NONE) {
+    loraErr = txState;
+    const int16_t rxState = radio.startReceive();
+    if (rxState != RADIOLIB_ERR_NONE) {
+      loraErr = rxState;
+      loraReady = false;
+    }
+    return false;
+  }
+  const int16_t rxState = radio.startReceive();
+  if (rxState != RADIOLIB_ERR_NONE) {
+    loraErr = rxState;
+    loraReady = false;
+    return false;
+  }
   chatLogPush(true, chatNodeId, text);
   return true;
+#endif
 }
 
 // 找 SCAN 扫到的峰值频点（峰值保持，跟频谱图里高亮的那根柱子是同一个）——

@@ -61,7 +61,9 @@ Aucun fichier de dessin, de rendu, de thème ou de disposition de l'interface n'
 
 - Le Cardputer ADV seul ne contient pas le SX1262. LoRa et GNSS nécessitent le M5Stack Cap LoRa-1262 et son antenne adaptée.
 - Le démarrage de l'application LoRa sélectionne la réception ; aucune émission automatique n'est déclenchée.
-- L'application permet toutefois une émission manuelle. Les préréglages contiennent aussi US915 et CN470, et le code n'impose pas encore de garde régionale ni de budget de duty-cycle.
+- Depuis la mise à niveau de sécurité, l'émission est désactivée à la compilation par défaut (CFG_LORA_TX_ENABLED=0). La réception, le scan et le décodage restent disponibles.
+- L'activation éventuelle de l'émission exige une configuration locale explicite et une validation préalable de la région, de la puissance, de l'antenne et du duty-cycle. Il n'existe pas encore de limiteur dynamique de duty-cycle : ne pas activer cette option avant son implémentation et sa validation.
+- Les préréglages de réception contiennent aussi US915 et CN470 ; les écouter ne signifie pas que l'émission sur ces bandes est autorisée.
 - Le chat LoRa ROZA est un protocole privé simple, non chiffré et non compatible Meshtastic. Ne pas y transmettre de données privées.
 - Le mode AIS VHF de LoRa ne décode pas les trames AIS : il mesure uniquement l'énergie/RSSI sur les canaux AIS et journalise des mesures. L'antenne LoRa 868 MHz n'est pas une antenne VHF AIS adaptée.
 - Ne pas tester l'émission en France avant une validation réglementaire et matérielle. Les premiers essais radio doivent rester en réception uniquement, antenne installée.
@@ -69,6 +71,7 @@ Aucun fichier de dessin, de rendu, de thème ou de disposition de l'interface n'
 ### GNSS et cartographie
 
 - Le GNSS dépend du Cap ; sans ce module, l'initialisation série ne prouve aucune réception satellite.
+- Le modèle dynamique GNSS est désormais configurable (CFG_GNSS_DYNAMIC_MODEL) et revient par défaut au profil portable (0), plus approprié à un appareil tenu à la main. Les profils véhicule, maritime et aviation restent sélectionnables dans la configuration locale.
 - La source de tuiles par défaut est Autonavi en GCJ-02, adaptée principalement à la Chine. La carte détaillée en Europe nécessite une source WGS-84 autorisée et compatible avec le client HTTP actuel.
 - Le code sait afficher des états sans fix ; la qualité réelle, le temps au premier fix et la stabilité doivent être testés dehors sur matériel.
 
