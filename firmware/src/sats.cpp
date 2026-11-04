@@ -9,24 +9,7 @@
 #include "net_job.h"
 #include "wifi_net.h"
 #include "geoloc.h"
-#if defined(__has_include)
-#  if __has_include("secrets.h")
-#    include "secrets.h"
-#  endif
-#endif
-
-#ifndef CLASH_BASE
-#define CLASH_BASE ""
-#endif
-#ifndef CLASH_SECRET
-#define CLASH_SECRET ""
-#endif
-#ifndef CLASH_PROXY_GROUP
-#define CLASH_PROXY_GROUP ""
-#endif
-#ifndef N2YO_API_KEY
-#define N2YO_API_KEY ""
-#endif
+#include "api_config.h"
 #include "http_json.h"
 
 static const int MAX_SATS = 60;
