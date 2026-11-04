@@ -46,6 +46,25 @@ static int       proxyNodeCount = 0;
 static int       nodeCursor = 0;
 static int       nodeScroll = 0;
 static String    switchStatus = "";
+
+static void normalizeNodeSelection() {
+  if (proxyNodeCount < 0) proxyNodeCount = 0;
+  if (proxyNodeCount > MAX_NODES) proxyNodeCount = MAX_NODES;
+  if (proxyNodeCount == 0) {
+    nodeCursor = 0;
+    nodeScroll = 0;
+    return;
+  }
+
+  if (nodeCursor < 0) nodeCursor = 0;
+  if (nodeCursor >= proxyNodeCount) nodeCursor = proxyNodeCount - 1;
+
+  const int maxScroll = proxyNodeCount > 4 ? proxyNodeCount - 4 : 0;
+  if (nodeScroll < 0) nodeScroll = 0;
+  if (nodeScroll > maxScroll) nodeScroll = maxScroll;
+  if (nodeCursor < nodeScroll) nodeScroll = nodeCursor;
+  if (nodeCursor >= nodeScroll + 4) nodeScroll = nodeCursor - 3;
+}
 static uint32_t  switchStatusTime = 0;
 
 // ---- /traffic 常开流 ----
@@ -381,7 +400,7 @@ static void pollRouter() {
             proxyNodeCount++;
           }
         }
-        if (nodeCursor >= proxyNodeCount && proxyNodeCount > 0) nodeCursor = proxyNodeCount - 1;
+        normalizeNodeSelection();
       }
     }
     if (!version[0]) {
@@ -464,6 +483,7 @@ bool routerKey(char k) {
     if (k == 'r' || k == 'R') { tick = 0; job.request(); }
     if (k == 'm' || k == 'M') hostByBytes = !hostByBytes;
   } else { // R_PAGE_NODES
+    normalizeNodeSelection();
     if (k == ';' || k == ',') { // UP
       if (nodeCursor > 0) {
         nodeCursor--;
@@ -475,11 +495,11 @@ bool routerKey(char k) {
         if (nodeCursor >= nodeScroll + 4) nodeScroll = nodeCursor - 3;
       }
     } else if (k == '\n') { // Enter -> 切换节点
-      if (proxyNodeCount > 0 && nodeCursor < proxyNodeCount) {
+      if (nodeCursor >= 0 && nodeCursor < proxyNodeCount && nodeCursor < MAX_NODES) {
         switchProxyNode(proxyNodes[nodeCursor].name);
       }
     } else if (k == 't' || k == 'T' || k == ' ') { // 测速当前节点
-      if (proxyNodeCount > 0 && nodeCursor < proxyNodeCount) {
+      if (nodeCursor >= 0 && nodeCursor < proxyNodeCount && nodeCursor < MAX_NODES) {
         testNodeDelay(nodeCursor);
       }
     } else if (k == 'r' || k == 'R') {
@@ -702,6 +722,7 @@ static void drawRouterTraffic() {
 }
 
 static void drawRouterNodes() {
+  normalizeNodeSelection();
   char rightBuf[32];
   snprintf(rightBuf, sizeof(rightBuf), "GROUP: %s", CLASH_PROXY_GROUP);
   drawPageHeader("Router Nodes", rightBuf, 0xFDA0);
@@ -730,7 +751,7 @@ static void drawRouterNodes() {
   int startY = cy + 18;
   for (int r = 0; r < maxRows; r++) {
     int idx = nodeScroll + r;
-    if (idx >= proxyNodeCount) break;
+    if (idx < 0 || idx >= proxyNodeCount || idx >= MAX_NODES) break;
 
     int rowY = startY + r * 17;
     bool isSel = (idx == nodeCursor);
