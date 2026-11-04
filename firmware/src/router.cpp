@@ -8,24 +8,7 @@
 #include "ui_common.h"
 #include "net_job.h"
 #include "wifi_net.h"
-#if defined(__has_include)
-#  if __has_include("secrets.h")
-#    include "secrets.h"
-#  endif
-#endif
-
-#ifndef CLASH_BASE
-#define CLASH_BASE ""
-#endif
-#ifndef CLASH_SECRET
-#define CLASH_SECRET ""
-#endif
-#ifndef CLASH_PROXY_GROUP
-#define CLASH_PROXY_GROUP ""
-#endif
-#ifndef N2YO_API_KEY
-#define N2YO_API_KEY ""
-#endif
+#include "api_config.h"
 #include "http_json.h"
 
 static const uint32_t POLL_MS = 1500;
@@ -84,7 +67,7 @@ static bool clashLine(const char* path, String& out, int skipObjects = 0) {
   snprintf(url, sizeof(url), "%s%s", CLASH_BASE, path);
   clashErr = "";
   if (!http.begin(client, url)) { clashErr = "http begin failed"; return false; }
-  http.addHeader("Authorization", String("Bearer ") + CLASH_SECRET);
+  if (CLASH_SECRET[0]) http.addHeader("Authorization", String("Bearer ") + CLASH_SECRET);
   int code = http.GET();
   if (code != 200) { clashErr = String("http ") + code; http.end(); return false; }
 
@@ -136,8 +119,10 @@ static bool clashGet(const char* path, JsonDocument& doc) {
   WiFiClient client;
   char url[256];
   snprintf(url, sizeof(url), "%s%s", CLASH_BASE, path);
-  String authorization = String("Bearer ") + CLASH_SECRET;
-  HttpJsonOptions options(2500, 4000, nullptr, authorization.c_str());
+  String authorization;
+  if (CLASH_SECRET[0]) authorization = String("Bearer ") + CLASH_SECRET;
+  const char* authHeader = CLASH_SECRET[0] ? authorization.c_str() : nullptr;
+  HttpJsonOptions options(2500, 4000, nullptr, authHeader);
   options.stream = false;
   clashErr = "";
   return fetchJsonHttp(client, url, doc, nullptr, options, clashErr);
@@ -234,7 +219,7 @@ static bool trafficEnsureOpen() {
   trafHttp.setReuse(false);
   clashErr = "";
   if (!trafHttp.begin(trafClient, url)) { clashErr = "http begin failed"; return false; }
-  trafHttp.addHeader("Authorization", String("Bearer ") + CLASH_SECRET);
+  if (CLASH_SECRET[0]) trafHttp.addHeader("Authorization", String("Bearer ") + CLASH_SECRET);
   int code = trafHttp.GET();
   if (code != 200) { clashErr = String("http ") + code; trafHttp.end(); return false; }
   trafOpen = true;
@@ -275,6 +260,13 @@ static void setErrFromClashErr() {
 }
 
 static void pumpTraffic() {
+  if (!CLASH_BASE[0]) {
+    trafficClose();
+    online = false;
+    errMsg = "configure CLASH_BASE";
+    dirty = true;
+    return;
+  }
   if (!wifiEnsureConnected()) {
     if (online || !errMsg.length()) { online = false; errMsg = "wifi not connected"; dirty = true; }
     trafficClose();
@@ -310,8 +302,8 @@ static bool switchProxyNode(const char* target) {
   http.setConnectTimeout(2000);
   http.setTimeout(2500);
   String url = String(CLASH_BASE) + "/proxies/" + urlEncode(CLASH_PROXY_GROUP);
-  if (!http.begin(client, url)) return false;
-  http.addHeader("Authorization", String("Bearer ") + CLASH_SECRET);
+  if (!CLASH_BASE[0] || !CLASH_PROXY_GROUP[0] || !http.begin(client, url)) return false;
+  if (CLASH_SECRET[0]) http.addHeader("Authorization", String("Bearer ") + CLASH_SECRET);
   http.addHeader("Content-Type", "application/json");
   JsonDocument bodyDoc;
   bodyDoc["name"] = target;
@@ -335,7 +327,7 @@ static bool switchProxyNode(const char* target) {
 }
 
 static void testNodeDelay(int idx) {
-  if (idx < 0 || idx >= proxyNodeCount) return;
+  if (!CLASH_BASE[0] || !CLASH_PROXY_GROUP[0] || idx < 0 || idx >= proxyNodeCount) return;
   String dp = String("/proxies/") + urlEncode(proxyNodes[idx].name) +
               "/delay?url=http://www.gstatic.com/generate_204&timeout=1500";
   JsonDocument d;
@@ -363,7 +355,7 @@ static void pollRouter() {
     int c = clashCountConns();
     if (c >= 0) conns = c;
   }
-  if (tick % 6 == 0) {
+  if (tick % 6 == 0 && CLASH_PROXY_GROUP[0]) {
     JsonDocument d;
     String gp = String("/proxies/") + urlEncode(CLASH_PROXY_GROUP);
     if (clashGet(gp.c_str(), d)) {
