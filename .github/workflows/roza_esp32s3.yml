@@ -1,3 +1,6 @@
+# Github Actions Workflow for ROZA Firmware
+# Compile le firmware ROZA sur PlatformIO pour ESP32-S3
+
 name: ROZA Firmware Build
 
 on:
@@ -15,6 +18,10 @@ on:
       - ".github/workflows/roza_esp32s3.yml"
   workflow_dispatch:
 
+env:
+  # Version de PlatformIO à utiliser
+  PLATFORMIO_VERSION: latest
+
 permissions:
   contents: read
 
@@ -24,40 +31,49 @@ concurrency:
 
 jobs:
   build:
-    name: PlatformIO build (Cardputer ADV / ESP32-S3)
+    name: Compilation PlatformIO (Cardputer ADV)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: firmware
     steps:
-      - name: Checkout
+      - name: Récupérer le dépôt
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install PlatformIO
-        run: python -m pip install --upgrade pip platformio
-
-      - name: Show PlatformIO version
-        run: pio --version
-
-      - name: Compile firmware
-        working-directory: firmware
-        run: pio run -e cardputer-adv
-
-      - name: Verify generated binaries
-        working-directory: firmware
+      - name: Installer PlatformIO
         run: |
-          test -s .pio/build/cardputer-adv/firmware.bin
-          test -s .pio/build/cardputer-adv/bootloader.bin
-          test -s .pio/build/cardputer-adv/partitions.bin
-          ls -lh .pio/build/cardputer-adv/*.bin
+          curl -fsSL https://platformio.org/install.sh | bash
+          export PATH="$HOME/.platformio/bin:$PATH"
+          platformio version
 
-      - name: Upload firmware artifacts
+      - name: Compiler le firmware avec PlatformIO
+        run: |
+          export PATH="$HOME/.platformio/bin:$PATH"
+          platformio run -e cardputer-adv
+
+      - name: Vérifier la génération des binaires
+        run: |
+          export PATH="$HOME/.platformio/bin:$PATH"
+          ls -la firmware/.pioenvs/cardputer-adv/
+
+      - name: Publier les artefacts de compilation
         uses: actions/upload-artifact@v4
         with:
           name: roza-cardputer-adv-${{ github.sha }}
-          path: firmware/.pio/build/cardputer-adv/*.bin
+          path: |
+            firmware/.pioenvs/cardputer-adv/firmware.elf
+            firmware/.pioenvs/cardputer-adv/firmware.bin
+            firmware/.pioenvs/cardputer-adv/bootloader.elf
+            firmware/.pioenvs/cardputer-adv/bootloader.bin
+            firmware/.pioenvs/cardputer-adv/partition_table.elf
+            firmware/.pioenvs/cardputer-adv/partition_table.bin
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publier la taille du binaire
+        run: |
+          export PATH="$HOME/.platformio/bin:$PATH"
+          SIZE=$(platformio run -e cardputer-adv --dry-run 2>/dev/null | grep "Size" || echo "unknown")
+          echo "Binary size: $SIZE"
