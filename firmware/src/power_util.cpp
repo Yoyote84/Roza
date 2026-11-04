@@ -229,7 +229,7 @@ static void persistPct(uint8_t pct, uint32_t now) {
 // （顶栏图标/LED/电池页）按需调的，屏幕不重绘时可能几分钟才调一次。第一版就是放在那里，
 // 桌面测试台一眼看出来——每次调用间隔都超过会话宽限期，于是每次都被当成新会话重置，
 // 推算值永远停在基准上不动。
-static const float   CHARGE_PCT_PER_MIN = 0.5f;   // 1750mAh 配典型充电电流，满充约 3 小时
+static const float   CHARGE_PCT_PER_MIN = 0.5f;   // Taux heuristique non calibré : aucun capteur de courant/état de charge n'est disponible.
 static const uint8_t CHARGE_CAP_PCT     = 99;
 // 充电判定偶尔会抖一下（CC 段某个 12s 窗口正好走平）。抖动期间既不推进推算、也不拿被充电
 // 抬高的电压去更新基准，否则基准会一路虚高。只有真正离开够久才结束会话。
@@ -287,23 +287,21 @@ int powerBatteryLevel() {
   return (int)lastKnownPct;
 }
 
-// Estime le temps restant avant extinction de la batterie (en minutes).
-// Si en charge, renvoie 0 (inconnu).
-// Si niveau connu et pas en charge, estime basé sur consommation moyenne.
-// Consommation typique Cardputer ADV : ~120 mA avec écran allumé, Wi-Fi/Bluetooth off.
-// Capacité batterie estimée : ~500 mAh.
-// À 50% : environ 2-4 heures restant.
-// Renvoie -1 si impossible à estimer.
+// Estimation indicative du temps restant, en minutes.
+// La courbe de pourcentage provient d'un unique cycle complet de décharge d'environ
+// 4 h 08, réalisé sous une charge lourde (routeur avec Wi-Fi actif). Elle représente
+// une fraction du temps de fonctionnement observé, pas une capacité en mAh.
+// L'estimation peut donc varier fortement selon les périphériques actifs et l'état
+// de la batterie. En charge ou sans mesure valide : -1 (inconnu).
 int powerRemainingTime() {
-  if (chargeActive) return -1;  // En charge, on ne peut pas estimer
-  if (lastKnownPct <= 0 || lastKnownPct > 100) return -1;
-  // Consommation moyenne estimée : 120 mA
-  // Capacité batterie estimée : 500 mAh
-  // Temps restant = (pourcentage * capacité) / consommation * 60 (minutes)
-  int minutes = (lastKnownPct * 500 / 120) * 60 / 100;
-  // Limite raisonnable : max 48 heures
-  if (minutes > 48 * 60) return 48 * 60;
-  return minutes;
+  ensureLastKnownLoaded();
+  if (charging || chargeActive || ema < 0 || lastKnownPct > 100) return -1;
+  if (lastKnownPct == 0) return 0;
+
+  // Référence observée : 4,13 h = 248 min sur le cycle ayant servi à construire CURVE[].
+  // Arrondi à la minute la plus proche ; il s'agit d'une indication, pas d'une garantie.
+  static const int REFERENCE_RUNTIME_MINUTES = 248;
+  return (lastKnownPct * REFERENCE_RUNTIME_MINUTES + 50) / 100;
 }
 
 // ---------------------------------------------------------------------------

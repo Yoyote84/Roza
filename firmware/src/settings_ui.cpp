@@ -337,18 +337,18 @@ void drawBatteryDetail() {
   cv.setTextColor(TFT_WHITE, 0x0821); cv.setTextSize(2);
   cv.drawString(b, 54, bpy + 23);
 
-  // Temps restant
+  // Autonomie indicative : afficher aussi les minutes pour éviter un faux "0h".
   char t[16];
   int rem = powerRemainingTime();
-  if (rem >= 0) {
-    if (rem >= 48 * 60) snprintf(t, sizeof(t), "∞h");
-    else snprintf(t, sizeof(t), "%dh", rem / 60);
+  if (rem < 0) {
+    snprintf(t, sizeof(t), "--");
+  } else if (rem < 60) {
+    snprintf(t, sizeof(t), "%dm", rem);
   } else {
-    snprintf(t, sizeof(t), "--h");
+    snprintf(t, sizeof(t), "%dh%02dm", rem / 60, rem % 60);
   }
   cv.setTextColor(0xFFAA00, 0x0821); cv.setTextSize(1);
   cv.drawString(t, 54, bpy + 44);
-
 
   // 端电压
   cv.setTextSize(1);

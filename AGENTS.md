@@ -35,7 +35,7 @@ Si le push échoue à cause d'un conflit, d'une authentification ou d'une restri
 - Plusieurs modifications cohérentes peuvent être réalisées au cours d'une même tâche.
 - Cependant, chaque étape fonctionnelle terminée doit être publiée sur GitHub avant de commencer une nouvelle étape indépendante.
 - Ne pas garder une série de modifications terminées en attente dans l'environnement local.
-- L'ordre des étapes suit la feuille de route définie dans `firmware/AGENTS.md`.
+- L'ordre des étapes suit la feuille de route définie dans la section « Feuille de route » de ce fichier.
 
 ## Communication
 
@@ -70,15 +70,16 @@ Si le push échoue à cause d'un conflit, d'une authentification ou d'une restri
 ## Base active depuis novembre 2026
 
 - Le seul projet firmware actif est `firmware/`.
+- La compilation active est **PlatformIO + Arduino-ESP32**, environnement `cardputer-adv`, commande de référence : `cd firmware && pio run -e cardputer-adv`.
+- Le workflow officiel est `.github/workflows/roza_esp32s3.yml` ; il compile avec PlatformIO. Ne pas basculer vers ESP-IDF natif ni utiliser `idf.py` sans décision explicite documentée.
 - Les anciens fichiers racine `CMakeLists.txt`, `main/`, `partitions.csv` et `sdkconfig.defaults` sont conservés comme historique/audit ; ne pas les utiliser ni les modifier pour développer le firmware actif.
-- Le firmware actif est un projet ESP-IDF natif C++23.
-- Utiliser le composant ESP Component Registry `espp/m5stack-cardputer` version exacte `1.3.11` (licence MIT) comme BSP matériel.
-- Ne pas réécrire les pilotes écran, clavier, IMU, batterie, microSD, SX1262 ou GNSS si le BSP les couvre déjà. Étendre proprement le BSP seulement si une fonction manque réellement.
-- Ne jamais supposer que le Cardputer ADV et le Cardputer original ont le même clavier : l'ADV utilise TCA8418.
+- Respecter les versions exactes de plateforme, framework Arduino et bibliothèques définies dans `firmware/platformio.ini` et documentées dans `firmware/docs/dependency-pins.md`. Ne pas mettre à jour une dépendance sans étude d'impact et compilation.
+- Cible matérielle : ESP32-S3FN8, 8 Mo Flash, sans PSRAM. Ne pas supposer que le Cardputer ADV et le Cardputer original ont le même clavier : l'ADV utilise TCA8418.
+- Ne pas réécrire les pilotes écran, clavier, IMU, batterie, microSD, SX1262 ou GNSS si les bibliothèques déjà intégrées les couvrent. Étendre proprement les pilotes existants seulement si une fonction manque réellement.
 - Ne pas monter ni formater automatiquement la microSD 128 Go avant identification de son système de fichiers.
 - Ne jamais activer la radio LoRa en émission au démarrage. Toute émission nécessite une configuration régionale conforme et une antenne installée.
 - Le Wi-Fi et le Bluetooth restent inactifs par défaut.
-- Toute nouvelle fonction doit être compilée par la CI avant d'être déclarée intégrée.
+- Toute nouvelle fonction doit être compilée par la CI sur le commit exact avant d'être déclarée intégrée.
 
 ## Feuille de route
 

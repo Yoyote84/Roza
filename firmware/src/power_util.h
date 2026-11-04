@@ -25,6 +25,7 @@ int powerBatteryMv();
 // 最近一次采样窗口的峰峰值(mV)。见 .cpp：它能区分"正在快充"和"插着已充满"。
 int powerBatterySpread();
 
+// Autonomie indicative en minutes ; -1 si inconnue ou en charge. Basée sur un seul cycle mesuré.
 int powerRemainingTime();
 // 诊断：连采 n 次原始电压，把分布打到串口（串口 BATT 指令）。
 // 这块板子没有电流传感，电量只能从一个被负载污染的电压反推——想改进先得看清噪声本身。
