@@ -6,14 +6,12 @@ on:
     paths:
       - "firmware/**"
       - "README.md"
-      - "AGENTS.md"
       - ".github/workflows/roza_esp32s3.yml"
   pull_request:
     branches: [main]
     paths:
       - "firmware/**"
       - "README.md"
-      - "AGENTS.md"
       - ".github/workflows/roza_esp32s3.yml"
   workflow_dispatch:
 
@@ -26,38 +24,41 @@ concurrency:
 
 jobs:
   build:
-    name: Compilation ESP32-S3 (ESP-IDF 5.5.1)
+    name: PlatformIO build (Cardputer ADV / ESP32-S3)
     runs-on: ubuntu-latest
-    container:
-      image: espressif/idf:v5.5.1
-    timeout-minutes: 40
-    defaults:
-      run:
-        shell: bash
-        working-directory: firmware
+    timeout-minutes: 45
     steps:
-      - name: Récupérer le dépôt
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Vérifier l'environnement ESP-IDF
-        run: |
-          . "$IDF_PATH/export.sh"
-          idf.py --version
-          python --version
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
 
-      - name: Compiler le firmware ROZA
-        run: |
-          . "$IDF_PATH/export.sh"
-          idf.py set-target esp32s3
-          idf.py build
+      - name: Install PlatformIO
+        run: python -m pip install --upgrade pip platformio
 
-      - name: Publier les artefacts de compilation
+      - name: Show PlatformIO version
+        run: pio --version
+
+      - name: Compile firmware
+        working-directory: firmware
+        run: pio run -e cardputer-adv
+
+      - name: Verify generated binaries
+        working-directory: firmware
+        run: |
+          test -s .pio/build/cardputer-adv/firmware.bin
+          test -s .pio/build/cardputer-adv/bootloader.bin
+          test -s .pio/build/cardputer-adv/partitions.bin
+          ls -lh .pio/build/cardputer-adv/*.bin
+
+      - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: roza-esp32s3-${{ github.sha }}
-          path: |
-            firmware/build/*.bin
-            firmware/build/bootloader/bootloader.bin
-            firmware/build/partition_table/partition-table.bin
+          name: roza-cardputer-adv-${{ github.sha }}
+          path: firmware/.pio/build/cardputer-adv/*.bin
           if-no-files-found: error
           retention-days: 14
