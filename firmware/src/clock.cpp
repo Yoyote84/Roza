@@ -1,5 +1,6 @@
 #include "clock.h"
 #include "ui_common.h"
+#include "roza_theme.h"
 #include "icons.h"
 #include "power_util.h"
 #include <ctime>
@@ -71,7 +72,7 @@ static void drawMiniBar(int y, const char* label, float frac, uint16_t col, cons
   cv.setTextColor(ICON_DIM, TFT_BLACK);
   cv.drawString(label, 15, y + 1);
   cv.setTextDatum(middle_right);
-  cv.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  cv.setTextColor(ROZA_PAPER_DIM, TFT_BLACK);
   cv.drawString(val, SW - 15, y + 1);
   cv.fillRoundRect(x0, y, w, 3, 1, DIM_BORDER);
   int fw = (int)(w * frac);
@@ -132,7 +133,7 @@ static void drawTimeBody(int h, int m, int s) {
 
   // 秒数放在右侧偏上（平滑无衬线数字，与大数字形成层次反差）
   cv.setFont(&fonts::Font4);
-  cv.setTextColor(cv.color565(0, 255, 180), TFT_BLACK);
+  cv.setTextColor(ROZA_OLIVE_LIGHT, TFT_BLACK);
   cv.setTextDatum(top_left);
   cv.setTextSize(0.9, 0.9);
   cv.drawString(ss, SW / 2 + 34, 32);
@@ -159,7 +160,7 @@ static void drawStyleHierarchic() {
     char d[32];
     snprintf(d, sizeof(d), "%04d-%02d-%02d %s",
              ti.tm_year + 1900, ti.tm_mon + 1, ti.tm_mday, WEEKDAYS[ti.tm_wday % 7]);
-    cv.setTextColor(TFT_CYAN, TFT_BLACK);
+    cv.setTextColor(ROZA_OLIVE_LIGHT, TFT_BLACK);
     cv.drawString(d, SW / 2, 12);
   } else {
     cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
@@ -179,12 +180,12 @@ static void drawStyleHierarchic() {
 
     int dim = daysInMonth(year, ti.tm_mon + 1);
     snprintf(v, sizeof(v), "%d/%d", ti.tm_mday, dim);
-    drawMiniBar(99, "MONTH", (float)ti.tm_mday / dim, cv.color565(90, 170, 230), v);
+    drawMiniBar(99, "MONTH", (float)ti.tm_mday / dim, ROZA_OLIVE, v);
 
     bool leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
     float yf = (ti.tm_yday + 1) / (leap ? 366.0f : 365.0f);
     snprintf(v, sizeof(v), "%d%%", (int)(yf * 100));
-    drawMiniBar(116, "YEAR", yf, cv.color565(150, 120, 230), v);
+    drawMiniBar(116, "YEAR", yf, ROZA_OLIVE_LIGHT, v);
   } else {
     drawMiniBar(82, "DAY",   0.0f, DIM_BORDER, "--%");
     drawMiniBar(99, "MONTH", 0.0f, DIM_BORDER, "--/--");
@@ -252,20 +253,20 @@ static void drawStyleAnalog() {
   float cosH = cosf(angH), sinH = sinf(angH);
   int xH = cx + (int)(cosH * rH), yH = cy + (int)(sinH * rH);
   float nxH = -sinH, nyH = cosH;
-  cv.drawLine(cx, cy, xH, yH, TFT_WHITE);
+  cv.drawLine(cx, cy, xH, yH, ROZA_PAPER);
   cv.drawLine(cx + (int)roundf(nxH), cy + (int)roundf(nyH),
-              xH + (int)roundf(nxH), yH + (int)roundf(nyH), TFT_WHITE);
+              xH + (int)roundf(nxH), yH + (int)roundf(nyH), ROZA_PAPER);
   cv.drawLine(cx - (int)roundf(nxH), cy - (int)roundf(nyH),
-              xH - (int)roundf(nxH), yH - (int)roundf(nyH), TFT_WHITE);
+              xH - (int)roundf(nxH), yH - (int)roundf(nyH), ROZA_PAPER);
 
   // 分针（较长稍细）
   int rM = (int)(r * 0.76f);
   float cosM = cosf(angM), sinM = sinf(angM);
   int xM = cx + (int)(cosM * rM), yM = cy + (int)(sinM * rM);
   float nxM = -sinM, nyM = cosM;
-  cv.drawLine(cx, cy, xM, yM, cv.color565(180, 220, 255));
+  cv.drawLine(cx, cy, xM, yM, ROZA_PAPER_DIM);
   cv.drawLine(cx + (int)roundf(nxM), cy + (int)roundf(nyM),
-              xM + (int)roundf(nxM), yM + (int)roundf(nyM), cv.color565(180, 220, 255));
+              xM + (int)roundf(nxM), yM + (int)roundf(nyM), ROZA_PAPER_DIM);
 
   // 秒针（细长带尾巴，平滑扫秒）
   int rS = (int)(r * 0.88f);
@@ -285,7 +286,7 @@ static void drawStyleAnalog() {
     char dBuf[16];
     snprintf(dBuf, sizeof(dBuf), "%02d-%02d", ti.tm_mon + 1, ti.tm_mday);
     cv.setTextDatum(top_left);
-    cv.setTextColor(TFT_CYAN, TFT_BLACK);
+    cv.setTextColor(ROZA_OLIVE_LIGHT, TFT_BLACK);
     cv.drawString(dBuf, 12, 10);
     cv.setTextColor(ICON_DIM, TFT_BLACK);
     cv.drawString(WEEKDAYS[ti.tm_wday % 7], 12, 21);
@@ -343,7 +344,7 @@ static void drawStyleDigital() {
   cv.setFont(&fonts::Font4);
   cv.setTextSize(0.85, 0.85);
   cv.setTextDatum(top_left);
-  cv.setTextColor(cv.color565(0, 255, 180), TFT_BLACK);
+  cv.setTextColor(ROZA_OLIVE_LIGHT, TFT_BLACK);
   cv.drawString(ss, SW - 36, cy - 18);
 
   cv.setFont(&fonts::Font0); cv.setTextSize(1);
@@ -361,7 +362,7 @@ static void drawStyleDigital() {
     char dBuf[32];
     snprintf(dBuf, sizeof(dBuf), "%04d-%02d-%02d %s",
              ti.tm_year + 1900, ti.tm_mon + 1, ti.tm_mday, WEEKDAYS[ti.tm_wday % 7]);
-    cv.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    cv.setTextColor(ROZA_PAPER_DIM, TFT_BLACK);
     cv.drawString(dBuf, 14, 114);
   } else {
     cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
@@ -374,7 +375,7 @@ static void drawStyleDigital() {
   if (lvl >= 0) snprintf(batBuf, sizeof(batBuf), "%d%%", lvl);
   else strcpy(batBuf, "--%");
   cv.setTextDatum(middle_right);
-  uint16_t batCol = (lvl <= 20) ? TFT_RED : (lvl <= 50 ? TFT_YELLOW : TFT_GREEN);
+  uint16_t batCol = (lvl <= 20) ? TFT_RED : (lvl <= 50 ? TFT_YELLOW : ROZA_OLIVE_LIGHT);
   cv.setTextColor(batCol, TFT_BLACK);
   cv.drawString(batBuf, SW - 38, 114);
   drawBattery(SW - 34, 108);

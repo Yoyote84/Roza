@@ -11,7 +11,7 @@
 #include "gnss.h"
 #include "keyboard_adv.h"
 
-static const char* WEEKDAYS[7] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+static const char* WEEKDAYS[7] = {"Dim","Lun","Mar","Mer","Jeu","Ven","Sam"};
 
 void centerMsg(const char* msg, uint16_t color) {
   M5.Display.fillScreen(TFT_BLACK);
@@ -302,49 +302,51 @@ static void drawGroupTabs() {
 // 37 个 App 的简练功能一句话导览 (常量字符串，0 额外堆开销)
 static const char* appDesc(AppId id) {
   switch (id) {
-    case APP_TIME:      return "Clock, Stopwatch & Countdown Timer";
-    case APP_COMPASS:   return "IMU Compass & Attitude Sensor";
-    case APP_FILES:     return "SD Card File Explorer & Reader";
-    case APP_SPECTRUM:  return "I2S Mic Real-time Audio FFT";
-    case APP_CALC:      return "Scientific Math Calculator";
-    case APP_CONV:      return "Unit & Currency Converter";
-    case APP_PLAYER:    return "WAV Audio Player from SD";
-    case APP_HASHOVEN:  return "SHA-512 Stress Oven & Cracker";
-    case APP_BADAPPLE:  return "Bad Apple!! 1bpp Video Player";
-    case APP_WIFICHAN:  return "2.4GHz RF Spectrum Analyzer";
-    case APP_WSNIFF:    return "Promiscuous 802.11 Packet Sniffer";
-    case APP_WARDRIVE:  return "WiFi Wardriving & GPS Logger";
-    case APP_RID:       return "Drone ID (ASTM F3411 & GB)";
-    case APP_BTSCAN:    return "BLE Beacon & Device Scanner";
-    case APP_HOTSPOT:   return "WiFi SoftAP & Captive Portal";
-    case APP_LANSCAN:   return "Local Network ARP & Port Scanner";
-    case APP_NETPROBE:  return "Network Diagnostics & DNS Fuzzer";
-    case APP_BTKB:      return "BLE Wireless Keyboard (HID)";
-    case APP_BTMEDIA:   return "BLE Media Remote & Volume";
-    case APP_DUCKY:     return "USB Rubber Ducky Keystroke Inject";
-    case APP_LORA:      return "SX1262 LoRa 433/868/915MHz";
-    case APP_GNSS:      return "GPS/BDS Satellites & Speed";
-    case APP_MAP:       return "Offline World & Regional Map";
-    case APP_IR:        return "Infrared Remote Transmitter";
-    case APP_ASTRO:     return "Sun, Moon Phase & Terminator";
-    case APP_WEATHER:   return "Multi-day Forecast & Air Quality";
-    case APP_ADSB:      return "Live Aircraft Flight Radar";
-    case APP_SATS:      return "Satellite Passes & Tracker";
-    case APP_TYPHOON:   return "Pacific Typhoon Warnings";
-    case APP_QUAKE:     return "USGS & JMA Earthquake Map";
-    case APP_CHAT:      return "ChatGPT AI Terminal";
-    case APP_GITHUB:    return "GitHub Event & Star Tracker";
-    case APP_RADIO:     return "Internet Web Streaming Radio";
-    case APP_ROUTER:    return "Clash / Mihomo Dashboard";
-    case APP_FX:        return "Foreign Exchange Currency Rates";
-    case APP_OKX:       return "OKX USDT/CNY Market Ticker";
-    case APP_READER:    return "Novel & TXT Reader (GBK/UTF-8)";
-    case APP_SETTINGS:  return "System Configuration & Sleep";
+    case APP_TIME:      return "Horloge, chrono et minuterie";
+    case APP_COMPASS:   return "Boussole et inclinaison IMU";
+    case APP_FILES:     return "Explorateur de fichiers SD";
+    case APP_SPECTRUM:  return "Analyseur audio en temps reel";
+    case APP_CALC:      return "Calculatrice scientifique";
+    case APP_CONV:      return "Conversion unites et devises";
+    case APP_PLAYER:    return "Lecteur audio WAV sur SD";
+    case APP_HASHOVEN:  return "Atelier de hachage et chiffrement";
+    case APP_BADAPPLE:  return "Lecteur video monochrome";
+    case APP_WIFICHAN:  return "Analyse du spectre Wi-Fi";
+    case APP_WSNIFF:    return "Capture passive des paquets Wi-Fi";
+    case APP_WARDRIVE:  return "Releve Wi-Fi avec position GPS";
+    case APP_RID:       return "Identification de drones";
+    case APP_BTSCAN:    return "Detection des balises Bluetooth";
+    case APP_HOTSPOT:   return "Point d acces et portail captif";
+    case APP_LANSCAN:   return "Analyse du reseau local";
+    case APP_NETPROBE:  return "Diagnostic reseau et DNS";
+    case APP_BTKB:      return "Clavier Bluetooth";
+    case APP_BTMEDIA:   return "Telecommande media Bluetooth";
+    case APP_DUCKY:     return "Macros clavier USB";
+    case APP_LORA:      return "Radio LoRa SX1262";
+    case APP_GNSS:      return "Reception GPS et satellites";
+    case APP_MAP:       return "Carte hors ligne";
+    case APP_IR:        return "Telecommande infrarouge";
+    case APP_ASTRO:     return "Soleil, Lune et journee";
+    case APP_WEATHER:   return "Meteo et qualite de l air";
+    case APP_ADSB:      return "Suivi du trafic aerien";
+    case APP_SATS:      return "Passages des satellites";
+    case APP_TYPHOON:   return "Alertes cycloniques";
+    case APP_QUAKE:     return "Carte des seismes";
+    case APP_CHAT:      return "Terminal ChatGPT";
+    case APP_GITHUB:    return "Activite GitHub";
+    case APP_RADIO:     return "Radio en ligne";
+    case APP_ROUTER:    return "Tableau de bord routeur";
+    case APP_FX:        return "Taux de change";
+    case APP_OKX:       return "Marches OKX";
+    case APP_READER:    return "Lecteur de livres et textes";
+    case APP_SETTINGS:  return "Parametres et veille";
     default:            return "";
   }
 }
 
 void drawMenu() {
+  cv.setFont(&fonts::Font0);
+  cv.setTextSize(1);
   cv.fillScreen(TFT_BLACK);
   drawTopBar();
   cv.drawFastHLine(0, 17, SW, DIM_BORDER);
@@ -407,7 +409,7 @@ void drawMenu() {
   if (!debugOn) {
     cv.setTextDatum(middle_center); cv.setTextSize(1);
     cv.setTextColor(ROZA_PAPER_DIM, TFT_BLACK);
-    cv.drawString(appDesc(APPS[menuIndex].id), SW / 2, 128);
+    cv.drawString(truncPx(appDesc(APPS[menuIndex].id), SW - 16), SW / 2, 128);
   }
 }
 

@@ -5,6 +5,7 @@
 #include "led.h"
 #include "power_util.h"
 #include "ui_common.h"
+#include "roza_theme.h"
 #include "weather.h"
 #include "ram_profile.h"
 #include "list_sel.h"
@@ -55,7 +56,7 @@ void drawSettings() {
 
   char pageStr[32];
   snprintf(pageStr, sizeof(pageStr), "%u/%u", (unsigned)(page + 1), (unsigned)pageCount);
-  drawPageHeader("Settings", pageStr, 0x07FF);
+  drawPageHeader("Parametres", pageStr, ROZA_OLIVE_LIGHT);
 
   const int startY = 16, cardH = 24, gap = 2;
   const int cardX = 4, cardW = SW - 8;
@@ -68,19 +69,19 @@ void drawSettings() {
 
     // 1. 卡片背景与边框
     if (sel) {
-      cv.fillRoundRect(cardX, y, cardW, cardH, 3, 0x0C82);
+      cv.fillRoundRect(cardX, y, cardW, cardH, 3, ROZA_CARD);
       cv.drawRoundRect(cardX, y, cardW, cardH, 3, ACCENT);
-      cv.drawRoundRect(cardX + 1, y + 1, cardW - 2, cardH - 2, 2, 0x05E8);
+      cv.drawRoundRect(cardX + 1, y + 1, cardW - 2, cardH - 2, 2, ROZA_OLIVE_LIGHT);
     } else {
-      cv.fillRoundRect(cardX, y, cardW, cardH, 3, 0x0821);
-      cv.drawRoundRect(cardX, y, cardW, cardH, 3, 0x1062);
+      cv.fillRoundRect(cardX, y, cardW, cardH, 3, ROZA_INK);
+      cv.drawRoundRect(cardX, y, cardW, cardH, 3, ROZA_OLIVE_DARK);
     }
 
     // 2. 左侧图标与设置项名称
     int midY = y + cardH / 2;
-    drawSetIcon(cardX + 14, midY, 7, sel ? ACCENT : 0x52AA, SETTINGS[i].id);
+    drawSetIcon(cardX + 14, midY, 7, sel ? ACCENT : ROZA_OLIVE, SETTINGS[i].id);
 
-    cv.setTextColor(sel ? TFT_WHITE : 0xCE79, sel ? 0x0C82 : 0x0821);
+    cv.setTextColor(sel ? ROZA_PAPER : ROZA_PAPER_DIM, sel ? ROZA_CARD : ROZA_INK);
     cv.setTextDatum(middle_left); cv.setTextSize(1);
     cv.drawString(SETTINGS[i].name, cardX + 28, midY);
 
@@ -97,16 +98,16 @@ void drawSettings() {
 
       const int bw = 32, bh = 14, bx = rx - bw, by = y + 5;
       if (on) {
-        uint16_t onCol = (sid == SET_DEBUG) ? 0x073F : (sid == SET_BOOT_SOUND ? 0xFDA0 : 0x07E0);
-        cv.fillRoundRect(bx, by, bw, bh, 2, 0x0821);
+        uint16_t onCol = ROZA_OLIVE_LIGHT;
+        cv.fillRoundRect(bx, by, bw, bh, 2, ROZA_INK);
         cv.drawRoundRect(bx, by, bw, bh, 2, onCol);
-        cv.setTextColor(onCol, 0x0821);
+        cv.setTextColor(onCol, ROZA_INK);
         cv.setTextDatum(middle_center);
         cv.drawString("ON", bx + bw / 2, by + 7);
       } else {
-        cv.fillRoundRect(bx, by, bw, bh, 2, 0x0821);
-        cv.drawRoundRect(bx, by, bw, bh, 2, 0x2124);
-        cv.setTextColor(0x7BEF, 0x0821);
+        cv.fillRoundRect(bx, by, bw, bh, 2, ROZA_INK);
+        cv.drawRoundRect(bx, by, bw, bh, 2, ROZA_OLIVE_DARK);
+        cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
         cv.setTextDatum(middle_center);
         cv.drawString("OFF", bx + bw / 2, by + 7);
       }
@@ -117,35 +118,35 @@ void drawSettings() {
       int bw = strlen(mnm) * 6 + 10;
       if (bw < 32) bw = 32;
       int bx = rx - bw, by = y + 5;
-      uint16_t col = on ? 0xFD02 : 0x7BEF;
-      uint16_t borderCol = on ? 0xFD02 : 0x2124;
-      cv.fillRoundRect(bx, by, bw, 14, 2, 0x0821);
+      uint16_t col = on ? ROZA_OLIVE_LIGHT : ROZA_PAPER_DIM;
+      uint16_t borderCol = on ? ROZA_OLIVE_LIGHT : ROZA_OLIVE_DARK;
+      cv.fillRoundRect(bx, by, bw, 14, 2, ROZA_INK);
       cv.drawRoundRect(bx, by, bw, 14, 2, borderCol);
-      cv.setTextColor(col, 0x0821);
+      cv.setTextColor(col, ROZA_INK);
       cv.setTextDatum(middle_center);
       cv.drawString(mnm, bx + bw / 2, by + 7);
     } else if (sid == SET_THEME) {
       // 主题项：胶囊使用对应主题颜色
       const char* tnm = themeName(themeMode);
-      uint16_t tcol = (themeMode == 0) ? 0x07FF : getGroupTheme(themeMode - 1).primary;
+      uint16_t tcol = (themeMode == 0) ? ROZA_OLIVE_LIGHT : getGroupTheme(themeMode - 1).primary;
       int bw = strlen(tnm) * 6 + 10;
       if (bw < 36) bw = 36;
       int bx = rx - bw, by = y + 5;
-      cv.fillRoundRect(bx, by, bw, 14, 2, 0x0821);
+      cv.fillRoundRect(bx, by, bw, 14, 2, ROZA_INK);
       cv.drawRoundRect(bx, by, bw, 14, 2, tcol);
-      cv.setTextColor(tcol, 0x0821);
+      cv.setTextColor(tcol, ROZA_INK);
       cv.setTextDatum(middle_center);
       cv.drawString(tnm, bx + bw / 2, by + 7);
     } else if (sid == SET_BATTERY) {
       int lvl = powerBatteryLevel();
-      uint16_t bcol = (lvl > 50) ? 0x07E0 : (lvl > 20) ? TFT_YELLOW : TFT_RED;
+      uint16_t bcol = (lvl > 50) ? ROZA_OLIVE_LIGHT : (lvl > 20) ? TFT_YELLOW : TFT_RED;
       char bb[16]; snprintf(bb, sizeof(bb), "%d%%%s", lvl, powerCharging() ? "+" : "");
       int bw = strlen(bb) * 6 + 10;
       if (bw < 34) bw = 34;
       int bx = rx - bw, by = y + 5;
-      cv.fillRoundRect(bx, by, bw, 14, 2, 0x0821);
+      cv.fillRoundRect(bx, by, bw, 14, 2, ROZA_INK);
       cv.drawRoundRect(bx, by, bw, 14, 2, bcol);
-      cv.setTextColor(bcol, 0x0821);
+      cv.setTextColor(bcol, ROZA_INK);
       cv.setTextDatum(middle_center);
       cv.drawString(bb, bx + bw / 2, by + 7);
     } else if (sid == SET_FORMAT || sid == SET_ABOUT || sid == SET_GNSS || sid == SET_PCMODE) {
@@ -156,10 +157,10 @@ void drawSettings() {
       int bw = val.length() * 6 + 10;
       if (bw < 34) bw = 34;
       int bx = rx - bw, by = y + 5;
-      uint16_t vcol = sel ? 0x07FF : 0xCE79;
-      cv.fillRoundRect(bx, by, bw, 14, 2, 0x0821);
-      cv.drawRoundRect(bx, by, bw, 14, 2, sel ? vcol : 0x2124);
-      cv.setTextColor(vcol, 0x0821);
+      uint16_t vcol = sel ? ROZA_OLIVE_LIGHT : ROZA_PAPER_DIM;
+      cv.fillRoundRect(bx, by, bw, 14, 2, ROZA_INK);
+      cv.drawRoundRect(bx, by, bw, 14, 2, sel ? vcol : ROZA_OLIVE_DARK);
+      cv.setTextColor(vcol, ROZA_INK);
       cv.setTextDatum(middle_center);
       cv.drawString(val, bx + bw / 2, by + 7);
     }
@@ -168,7 +169,7 @@ void drawSettings() {
   // 底部辅助导航与页码点 (y = 125..134)
   drawPageDots(page, pageCount);
   cv.setTextDatum(bottom_left); cv.setTextSize(1);
-  cv.setTextColor(0x52AA, TFT_BLACK);
+  cv.setTextColor(ROZA_OLIVE, TFT_BLACK);
   cv.drawString("; . nav", 6, SH - 2);
 
   cv.setTextDatum(bottom_right);
@@ -184,8 +185,8 @@ void drawBar(const char* title, int pct, const char* hint) {
 
   // 居中大卡片
   const int cx = 10, cy = 18, cw = SW - 20, ch = 96;
-  cv.fillRoundRect(cx, cy, cw, ch, 4, 0x0821);
-  cv.drawRoundRect(cx, cy, cw, ch, 4, 0x18C3);
+  cv.fillRoundRect(cx, cy, cw, ch, 4, ROZA_INK);
+  cv.drawRoundRect(cx, cy, cw, ch, 4, ROZA_OLIVE_DARK);
 
   // 图标 + 百分比读数
   if (strstr(title, "Bright") != nullptr) {
@@ -195,7 +196,7 @@ void drawBar(const char* title, int pct, const char* hint) {
   }
 
   cv.setTextDatum(middle_left); cv.setTextSize(2);
-  cv.setTextColor(TFT_WHITE, 0x0821);
+  cv.setTextColor(ROZA_PAPER, ROZA_INK);
   cv.drawString(pctStr, 52, 40);
 
   // 12 段式霓虹水平刻度计 (y = 62)
@@ -208,15 +209,15 @@ void drawBar(const char* title, int pct, const char* hint) {
     int sx = startX + s * (segW + segGap);
     if (s < filled) {
       cv.fillRoundRect(sx, 62, segW, segH, 2, ACCENT);
-      cv.drawFastVLine(sx + 1, 64, segH - 4, TFT_WHITE);
+      cv.drawFastVLine(sx + 1, 64, segH - 4, ROZA_PAPER);
     } else {
-      cv.fillRoundRect(sx, 62, segW, segH, 2, 0x1082);
-      cv.drawRoundRect(sx, 62, segW, segH, 2, 0x18C3);
+      cv.fillRoundRect(sx, 62, segW, segH, 2, ROZA_CARD);
+      cv.drawRoundRect(sx, 62, segW, segH, 2, ROZA_OLIVE_DARK);
     }
   }
 
   // 刻度标注
-  cv.setTextColor(0x52AA, 0x0821); cv.setTextDatum(top_left); cv.setTextSize(1);
+  cv.setTextColor(ROZA_OLIVE, ROZA_INK); cv.setTextDatum(top_left); cv.setTextSize(1);
   cv.drawString("MIN", startX, 83);
   cv.setTextDatum(top_right);
   cv.drawString("MAX", startX + nSeg * (segW + segGap) - segGap, 83);
@@ -237,10 +238,10 @@ void drawSleep() {
   drawPageHeader("Screen Timeout", b, ACCENT);
 
   const int cx = 10, cy = 18, cw = SW - 20, ch = 96;
-  cv.fillRoundRect(cx, cy, cw, ch, 4, 0x0821);
-  cv.drawRoundRect(cx, cy, cw, ch, 4, 0x18C3);
+  cv.fillRoundRect(cx, cy, cw, ch, 4, ROZA_INK);
+  cv.drawRoundRect(cx, cy, cw, ch, 4, ROZA_OLIVE_DARK);
 
-  cv.setTextColor(ACCENT, 0x0821);
+  cv.setTextColor(ACCENT, ROZA_INK);
   cv.setTextDatum(middle_center); cv.setTextSize(3);
   cv.drawString(b, SW / 2, 46);
 
@@ -260,9 +261,9 @@ void drawSleep() {
       cv.fillRoundRect(px, 74, pw, ph, 2, ACCENT);
       cv.setTextColor(TFT_BLACK, ACCENT);
     } else {
-      cv.fillRoundRect(px, 74, pw, ph, 2, 0x1082);
-      cv.drawRoundRect(px, 74, pw, ph, 2, 0x18C3);
-      cv.setTextColor(0x7BEF, 0x1082);
+      cv.fillRoundRect(px, 74, pw, ph, 2, ROZA_CARD);
+      cv.drawRoundRect(px, 74, pw, ph, 2, ROZA_OLIVE_DARK);
+      cv.setTextColor(ROZA_PAPER_DIM, ROZA_CARD);
     }
     cv.setTextDatum(middle_center); cv.setTextSize(1);
     cv.drawString(tb, px + pw / 2, 74 + ph / 2);
@@ -281,14 +282,14 @@ void drawTz() {
   drawPageHeader("Timezone", pageBuf, ACCENT);
 
   const int cx = 10, cy = 18, cw = SW - 20, ch = 96;
-  cv.fillRoundRect(cx, cy, cw, ch, 4, 0x0821);
-  cv.drawRoundRect(cx, cy, cw, ch, 4, 0x18C3);
+  cv.fillRoundRect(cx, cy, cw, ch, 4, ROZA_INK);
+  cv.drawRoundRect(cx, cy, cw, ch, 4, ROZA_OLIVE_DARK);
 
-  cv.setTextColor(TFT_WHITE, 0x0821);
+  cv.setTextColor(ROZA_PAPER, ROZA_INK);
   cv.setTextDatum(middle_center); cv.setTextSize(2);
   cv.drawString(TZ_OPTS[tzOptIdx].label, SW / 2, 46);
 
-  cv.setTextColor(0x07FF, 0x0821);
+  cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
   cv.setTextDatum(middle_center); cv.setTextSize(1);
   char posixBuf[40];
   snprintf(posixBuf, sizeof(posixBuf), "Rule: %s", TZ_OPTS[tzOptIdx].posix);
@@ -307,23 +308,23 @@ void drawBatteryDetail() {
   int16_t mv = M5.Power.getBatteryVoltage();
   bool charging = powerCharging();
 
-  drawPageHeader("Battery & Power", charging ? "CHARGING" : "DISCHARGING", charging ? 0x07E0 : TFT_YELLOW);
+  drawPageHeader("Battery & Power", charging ? "CHARGING" : "DISCHARGING", charging ? ROZA_OLIVE_LIGHT : TFT_YELLOW);
 
   // 卡片 1 (左)：实时电量与状态
   const int c1w = 113, c2w = 114;
   const int bpy = 16, bph = 102;
-  cv.fillRoundRect(4, bpy, c1w, bph, 4, 0x0821);
-  cv.drawRoundRect(4, bpy, c1w, bph, 4, 0x18C3);
+  cv.fillRoundRect(4, bpy, c1w, bph, 4, ROZA_INK);
+  cv.drawRoundRect(4, bpy, c1w, bph, 4, ROZA_OLIVE_DARK);
 
   cv.setTextDatum(top_left); cv.setTextSize(1);
-  cv.setTextColor(ACCENT, 0x0821);
+  cv.setTextColor(ACCENT, ROZA_INK);
   cv.drawString("LIVE STATUS", 8, bpy + 4);
-  cv.drawFastHLine(6, bpy + 14, c1w - 4, 0x1082);
+  cv.drawFastHLine(6, bpy + 14, c1w - 4, ROZA_CARD);
 
   // 电池电芯图标 (x = 10, y = 36)
   int bx = 10, by = bpy + 22, bw = 38, bh = 18;
-  cv.drawRoundRect(bx, by, bw, bh, 3, TFT_LIGHTGREY);
-  cv.fillRect(bx + bw, by + 5, 3, bh - 10, TFT_LIGHTGREY);
+  cv.drawRoundRect(bx, by, bw, bh, 3, ROZA_PAPER_DIM);
+  cv.fillRect(bx + bw, by + 5, 3, bh - 10, ROZA_PAPER_DIM);
   if (lvl >= 0) {
     int fillW = (bw - 4) * constrain(lvl, 0, 100) / 100;
     uint16_t bcol = lvl <= 20 ? TFT_RED : (lvl <= 50 ? TFT_ORANGE : ACCENT);
@@ -334,7 +335,7 @@ void drawBatteryDetail() {
   char b[32];
   if (lvl >= 0) snprintf(b, sizeof(b), "%d%%", lvl);
   else          snprintf(b, sizeof(b), "--%%");
-  cv.setTextColor(TFT_WHITE, 0x0821); cv.setTextSize(2);
+  cv.setTextColor(ROZA_PAPER, ROZA_INK); cv.setTextSize(2);
   cv.drawString(b, 54, bpy + 23);
 
   // Autonomie indicative : afficher aussi les minutes pour éviter un faux "0h".
@@ -347,44 +348,44 @@ void drawBatteryDetail() {
   } else {
     snprintf(t, sizeof(t), "%dh%02dm", rem / 60, rem % 60);
   }
-  cv.setTextColor(0xFFAA00, 0x0821); cv.setTextSize(1);
+  cv.setTextColor(0xFFAA00, ROZA_INK); cv.setTextSize(1);
   cv.drawString(t, 54, bpy + 44);
 
   // 端电压
   cv.setTextSize(1);
   if (mv >= 0) snprintf(b, sizeof(b), "Volt: %.2f V", mv / 1000.0f);
   else         snprintf(b, sizeof(b), "Volt: n/a");
-  cv.setTextColor(0x07FF, 0x0821);
+  cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
   cv.drawString(b, 10, bpy + 48);
 
   // 充放电状态胶囊
   const int sbw = c1w - 18, sbh = 16, sbx = 9, sby = bpy + 68;
   if (charging) {
-    cv.fillRoundRect(sbx, sby, sbw, sbh, 2, 0x0821);
-    cv.drawRoundRect(sbx, sby, sbw, sbh, 2, 0x07E0);
-    cv.setTextColor(0x07E0, 0x0821);
+    cv.fillRoundRect(sbx, sby, sbw, sbh, 2, ROZA_INK);
+    cv.drawRoundRect(sbx, sby, sbw, sbh, 2, ROZA_OLIVE_LIGHT);
+    cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
     cv.setTextDatum(middle_center);
     cv.drawString("CHARGING +", sbx + sbw / 2, sby + sbh / 2);
   } else {
-    cv.fillRoundRect(sbx, sby, sbw, sbh, 2, 0x0821);
-    cv.drawRoundRect(sbx, sby, sbw, sbh, 2, 0x2124);
-    cv.setTextColor(0xCE79, 0x0821);
+    cv.fillRoundRect(sbx, sby, sbw, sbh, 2, ROZA_INK);
+    cv.drawRoundRect(sbx, sby, sbw, sbh, 2, ROZA_OLIVE_DARK);
+    cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
     cv.setTextDatum(middle_center);
     cv.drawString("DISCHARGING", sbx + sbw / 2, sby + sbh / 2);
   }
 
   // 卡片 2 (右)：硬件规格与设计参数
   const int c2x = 121;
-  cv.fillRoundRect(c2x, bpy, c2w, bph, 4, 0x0821);
-  cv.drawRoundRect(c2x, bpy, c2w, bph, 4, 0x18C3);
+  cv.fillRoundRect(c2x, bpy, c2w, bph, 4, ROZA_INK);
+  cv.drawRoundRect(c2x, bpy, c2w, bph, 4, ROZA_OLIVE_DARK);
 
   cv.setTextDatum(top_left); cv.setTextSize(1);
-  cv.setTextColor(0x07FF, 0x0821);
+  cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
   cv.drawString("POWER SPECS", c2x + 6, bpy + 4);
-  cv.drawFastHLine(c2x + 2, bpy + 14, c2w - 4, 0x1082);
+  cv.drawFastHLine(c2x + 2, bpy + 14, c2w - 4, ROZA_CARD);
 
   int y2 = bpy + 18; const int lh = 13;
-  cv.setTextColor(0xCE79, 0x0821);
+  cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
   cv.drawString("PMIC : TP4057", c2x + 6, y2); y2 += lh;
   cv.drawString("Cap  : ~1400 mAh", c2x + 6, y2); y2 += lh;
   cv.drawString("Cell : 1S Li-Po", c2x + 6, y2); y2 += lh;
@@ -408,11 +409,11 @@ void drawFormat() {
   }
   // 顶部醒目警告条
   cv.fillRect(0, 0, SW, 20, TFT_RED);
-  cv.setTextColor(TFT_WHITE, TFT_RED);
+  cv.setTextColor(ROZA_PAPER, TFT_RED);
   cv.setTextDatum(middle_center); cv.setTextSize(2);
   cv.drawString(formatStep == 0 ? "Format SD?" : "ARE YOU SURE?", SW / 2, 10);
 
-  cv.setTextColor(TFT_WHITE, TFT_BLACK);
+  cv.setTextColor(ROZA_PAPER, TFT_BLACK);
   cv.setTextDatum(middle_center); cv.setTextSize(1);
   if (formatStep == 0) {
     cv.drawString("This ERASES everything", SW / 2, 48);
@@ -433,18 +434,18 @@ void drawFormat() {
 
 // 一行：标签 + 占比进度条 + 百分比，下面再跟一行"已用/总量"细节
 static void drawUsageBar(int y, const char* label, int pct, const String& detail) {
-  cv.setTextColor(TFT_WHITE, TFT_BLACK);
+  cv.setTextColor(ROZA_PAPER, TFT_BLACK);
   cv.setTextDatum(top_left); cv.setTextSize(1);
   cv.drawString(label, 8, y);
   const int barX = 44, barW = SW - 44 - 34, barH = 10;
-  cv.drawRect(barX, y, barW, barH, 0x2124);
+  cv.drawRect(barX, y, barW, barH, ROZA_OLIVE_DARK);
   uint16_t col = pct >= 85 ? TFT_RED : (pct >= 65 ? TFT_ORANGE : ACCENT);
   cv.fillRect(barX + 1, y + 1, (barW - 2) * constrain(pct, 0, 100) / 100, barH - 2, col);
   char pb[8]; snprintf(pb, sizeof(pb), "%d%%", pct);
   cv.setTextColor(col, TFT_BLACK);
   cv.setTextDatum(top_right);
   cv.drawString(pb, SW - 6, y);
-  cv.setTextColor(0x52AA, TFT_BLACK);
+  cv.setTextColor(ROZA_OLIVE, TFT_BLACK);
   cv.setTextDatum(top_left);
   cv.drawString(detail, barX, y + 12);
 }
@@ -470,16 +471,16 @@ static void drawAboutInfo() {
   // 卡片 1 (左)：计算核心
   const int c1w = 113, c2w = 114;
   const int bpy = 16, bph = 102;
-  cv.fillRoundRect(4, bpy, c1w, bph, 4, 0x0821);
-  cv.drawRoundRect(4, bpy, c1w, bph, 4, 0x18C3);
+  cv.fillRoundRect(4, bpy, c1w, bph, 4, ROZA_INK);
+  cv.drawRoundRect(4, bpy, c1w, bph, 4, ROZA_OLIVE_DARK);
 
   cv.setTextDatum(top_left); cv.setTextSize(1);
-  cv.setTextColor(ACCENT, 0x0821);
+  cv.setTextColor(ACCENT, ROZA_INK);
   cv.drawString("COMPUTE", 8, bpy + 4);
-  cv.drawFastHLine(6, bpy + 14, c1w - 4, 0x1082);
+  cv.drawFastHLine(6, bpy + 14, c1w - 4, ROZA_CARD);
 
   int y1 = bpy + 18; const int lh = 13;
-  cv.setTextColor(0xCE79, 0x0821);
+  cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
   cv.drawString("MCU : ESP32-S3", 8, y1); y1 += lh;
   cv.drawString("Freq: 240 MHz", 8, y1); y1 += lh;
   cv.drawString("Arch: Xtensa LX7", 8, y1); y1 += lh;
@@ -489,16 +490,16 @@ static void drawAboutInfo() {
 
   // 卡片 2 (右)：外设与系统
   const int c2x = 121;
-  cv.fillRoundRect(c2x, bpy, c2w, bph, 4, 0x0821);
-  cv.drawRoundRect(c2x, bpy, c2w, bph, 4, 0x18C3);
+  cv.fillRoundRect(c2x, bpy, c2w, bph, 4, ROZA_INK);
+  cv.drawRoundRect(c2x, bpy, c2w, bph, 4, ROZA_OLIVE_DARK);
 
   cv.setTextDatum(top_left); cv.setTextSize(1);
-  cv.setTextColor(0x07FF, 0x0821);
+  cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
   cv.drawString("SYSTEM & IO", c2x + 6, bpy + 4);
-  cv.drawFastHLine(c2x + 2, bpy + 14, c2w - 4, 0x1082);
+  cv.drawFastHLine(c2x + 2, bpy + 14, c2w - 4, ROZA_CARD);
 
   int y2 = bpy + 18;
-  cv.setTextColor(0xCE79, 0x0821);
+  cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
   cv.drawString("Flash : 8 MB QSPI", c2x + 6, y2); y2 += lh;
   cv.drawString("LCD   : 1.14\" IPS", c2x + 6, y2); y2 += lh;
   cv.drawString("Keys  : TCA8418", c2x + 6, y2); y2 += lh;
@@ -532,27 +533,27 @@ static void drawAboutUsage() {
   y += 26;
 
   // 底部芯片指标卡片
-  cv.fillRoundRect(4, y, SW - 8, 20, 3, 0x0821);
-  cv.drawRoundRect(4, y, SW - 8, 20, 3, 0x18C3);
+  cv.fillRoundRect(4, y, SW - 8, 20, 3, ROZA_INK);
+  cv.drawRoundRect(4, y, SW - 8, 20, 3, ROZA_OLIVE_DARK);
 
   cv.setTextDatum(middle_left); cv.setTextSize(1);
-  cv.setTextColor(0x07FF, 0x0821);
+  cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
   cv.drawString("Low-Water: " + fmtBytes(ESP.getMinFreeHeap()), 10, y + 10);
 
   char temp[24]; snprintf(temp, sizeof(temp), "Temp: %.0f C", temperatureRead());
   cv.setTextDatum(middle_right);
-  cv.setTextColor(TFT_YELLOW, 0x0821);
+  cv.setTextColor(TFT_YELLOW, ROZA_INK);
   cv.drawString(temp, SW - 10, y + 10);
 }
 
 void drawAboutRam() {
   const int cardX = 4, cardY = 16, cardW = SW - 8, cardH = 102;
-  cv.fillRoundRect(cardX, cardY, cardW, cardH, 4, 0x0821);
-  cv.drawRoundRect(cardX, cardY, cardW, cardH, 4, 0x18C3);
+  cv.fillRoundRect(cardX, cardY, cardW, cardH, 4, ROZA_INK);
+  cv.drawRoundRect(cardX, cardY, cardW, cardH, 4, ROZA_OLIVE_DARK);
 
   int count = ramMarkCount();
   if (count == 0) {
-    cv.setTextColor(0x52AA, 0x0821);
+    cv.setTextColor(ROZA_OLIVE, ROZA_INK);
     cv.setTextDatum(middle_center); cv.setTextSize(1);
     cv.drawString("No RAM marks recorded", SW / 2, cardY + cardH / 2);
 
@@ -564,7 +565,7 @@ void drawAboutRam() {
   // 表头
   const int hdrY = cardY + 7;
   cv.setTextSize(1);
-  cv.setTextColor(ACCENT, 0x0821);
+  cv.setTextColor(ACCENT, ROZA_INK);
 
   cv.setTextDatum(middle_left);
   cv.drawString("Stage", cardX + 4, hdrY);
@@ -575,7 +576,7 @@ void drawAboutRam() {
   cv.drawString("larg8", 188, hdrY);
   cv.drawString("dLarg", 228, hdrY);
 
-  cv.drawFastHLine(cardX + 2, cardY + 15, cardW - 4, 0x1082);
+  cv.drawFastHLine(cardX + 2, cardY + 15, cardW - 4, ROZA_CARD);
 
   // 列表范围与滚动
   const int VISIBLE_ROWS = 6;
@@ -596,57 +597,57 @@ void drawAboutRam() {
     char sBuf[12];
     snprintf(sBuf, sizeof(sBuf), "%.10s", m.stage);
     cv.setTextDatum(middle_left);
-    cv.setTextColor(0xCE79, 0x0821);
+    cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
     cv.drawString(sBuf, cardX + 4, midY);
 
     // free8
     char fb[12];
     snprintf(fb, sizeof(fb), "%lu", (unsigned long)m.free8);
     cv.setTextDatum(middle_right);
-    cv.setTextColor(0x07FF, 0x0821);
+    cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
     cv.drawString(fb, 107, midY);
 
     // dFree
     if (idx == 0) {
-      cv.setTextColor(0x52AA, 0x0821);
+      cv.setTextColor(ROZA_OLIVE, ROZA_INK);
       cv.drawString("-", 149, midY);
     } else {
       long dFree = (long)m.free8 - (long)ramMarkAt(idx - 1).free8;
       char dfb[14];
       snprintf(dfb, sizeof(dfb), "%+ld", dFree);
-      uint16_t dfCol = (dFree > 0) ? 0x07E0 : (dFree < 0 ? 0xFDA0 : 0x52AA);
-      cv.setTextColor(dfCol, 0x0821);
+      uint16_t dfCol = (dFree > 0) ? ROZA_OLIVE_LIGHT : (dFree < 0 ? 0xFDA0 : ROZA_OLIVE);
+      cv.setTextColor(dfCol, ROZA_INK);
       cv.drawString(dfb, 149, midY);
     }
 
     // largest8
     char lb[12];
     snprintf(lb, sizeof(lb), "%lu", (unsigned long)m.largest8);
-    cv.setTextColor(0x07FF, 0x0821);
+    cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
     cv.drawString(lb, 188, midY);
 
     // dLarg
     if (idx == 0) {
-      cv.setTextColor(0x52AA, 0x0821);
+      cv.setTextColor(ROZA_OLIVE, ROZA_INK);
       cv.drawString("-", 228, midY);
     } else {
       long dLarg = (long)m.largest8 - (long)ramMarkAt(idx - 1).largest8;
       char dlb[14];
       snprintf(dlb, sizeof(dlb), "%+ld", dLarg);
-      uint16_t dlCol = (dLarg > 0) ? 0x07E0 : (dLarg < 0 ? 0xFDA0 : 0x52AA);
-      cv.setTextColor(dlCol, 0x0821);
+      uint16_t dlCol = (dLarg > 0) ? ROZA_OLIVE_LIGHT : (dLarg < 0 ? 0xFDA0 : ROZA_OLIVE);
+      cv.setTextColor(dlCol, ROZA_INK);
       cv.drawString(dlb, 228, midY);
     }
   }
 
   // 滚动条（超过 VISIBLE_ROWS 时绘制）
   if (count > VISIBLE_ROWS) {
-    drawScrollBar(SW - 7, startY, VISIBLE_ROWS * rowH, aboutRamScroll, count, VISIBLE_ROWS, ACCENT, 0x18C3);
+    drawScrollBar(SW - 7, startY, VISIBLE_ROWS * rowH, aboutRamScroll, count, VISIBLE_ROWS, ACCENT, ROZA_OLIVE_DARK);
   }
 
   // 底部提示
   cv.setTextDatum(bottom_left); cv.setTextSize(1);
-  cv.setTextColor(0x52AA, TFT_BLACK);
+  cv.setTextColor(ROZA_OLIVE, TFT_BLACK);
   cv.drawString("; . page", 6, SH - 2);
 
   cv.setTextDatum(bottom_right);
