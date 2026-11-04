@@ -87,22 +87,24 @@
   {"Drone Zone",     "http://ice1.somafm.com/dronezone-128-mp3",    "Drone Ambient"},
 #endif
 
-// --- 地图在线瓦片（GNSS Map）---
-// URL 模板，占位符 {s}=子域、{x}、{y}、{z}。必须是 http://（TLS 握手需要 40KB+ 连续堆，
-// 地图页拿不出来，见 gnss.cpp 注释）。默认是高德（GCJ-02 坐标，国内可达）。
-// 换成 OSM 系的 WGS-84 源时，务必把 CFG_MAP_TILE_WGS84 设成 1，否则位置会偏几百米。
-// 注意：多数官方 OSM 服务器只有 https 且有使用条款，请换成自己可用的 http 瓦片源/自建镜像。
+// --- Cartographie GNSS : tuiles hors ligne sur microSD ---
+// Le Cardputer n'embarque aucune carte détaillée : les tuiles restent sur la microSD.
+// Format actuellement décodé : JPEG 256x256, /map/{z}/{x}/{y}.jpg.
+// Les tuiles OSM/Europe utilisent WGS-84. Le marqueur /map/wgs84 identifie le paquet.
+// Le téléchargement en ligne est désactivé par défaut : aucun service centré sur la Chine
+// ni serveur de tuiles non validé n'est contacté. Une source HTTP JPEG autorisée peut être
+// configurée localement après vérification de ses conditions d'utilisation.
+#ifndef CFG_MAP_ONLINE_ENABLED
+#define CFG_MAP_ONLINE_ENABLED 0
+#endif
 #ifndef CFG_MAP_TILE_URL
-#define CFG_MAP_TILE_URL "http://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}"
+#define CFG_MAP_TILE_URL ""
 #endif
-// 子域字符集合，按轮次轮流用；模板里没有 {s} 时忽略。
 #ifndef CFG_MAP_TILE_SUBS
-#define CFG_MAP_TILE_SUBS "1234"
+#define CFG_MAP_TILE_SUBS ""
 #endif
-// 在线瓦片的坐标系：0 = GCJ-02（高德等国内源），1 = WGS-84（OSM 等）。
-// SD 卡上的离线瓦片包仍以 /map/wgs84 等标牌文件为准（见 README）。
 #ifndef CFG_MAP_TILE_WGS84
-#define CFG_MAP_TILE_WGS84 0
+#define CFG_MAP_TILE_WGS84 1
 #endif
 
 // --- SSH（SSH app）---

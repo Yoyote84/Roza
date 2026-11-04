@@ -26,7 +26,7 @@ Cela inclut la partition NVS (`0x9000`), qui contient les préférences et ident
 enregistrés par le firmware. **Chaque flash de cette image réinitialise donc les réglages
 ROZA** (fuseau horaire, luminosité, réseaux Wi-Fi mémorisés, mot de passe du hotspot, etc.).
 
-La microSD est une mémoire séparée : cette image ne l'efface pas et ne la formate pas.
+La microSD est une mémoire séparée : cette image ne l'efface pas et ne la formate pas. Les cartes détaillées ne sont pas incluses dans le binaire : elles se copient séparément sur la microSD, selon `firmware/docs/MAPS_OFFLINE.md`.
 Attention : le pilote SD actuel monte la carte en lecture/écriture ; il ne garantit pas un
 montage matériellement protégé en lecture seule. La fonction appelée « Format SD » ne
 recrée pas le système de fichiers : elle supprime récursivement les fichiers et dossiers.

@@ -2314,24 +2314,15 @@ static void renderMaskWindow(M5Canvas& dst, int yOff, int mapH, double originX, 
   }
 }
 
-// ---- 在线瓦片 ----
-// 瓦片源：高德**卫星影像**（webst0X，style=6，免 key，返回 JPEG）。
-//
-// 为什么不用更好看的路网图：路网图（webrd/wprd）只提供 PNG，而 PNG 的 deflate 要一块
-// 32KB 连续内存装 LZ77 窗口（格式规定，压不下来）。实机实测：主画布 64KB + 地图缓存 48KB +
-// WiFi 协议栈之后，free heap 只剩 ~42KB 且 largestBlock 只有 24KB，pngle 的 32KB 申请必然失败，
-// drawPng 直接返回 false（日志里就是 png=0）。换 8bpp 缓存、改静态数组都试过，都不成。
-// JPEG 解码器(tjpgd)是按 MCU 块流式解的，工作区只要几 KB，在 16KB 的空洞里都跑得开。
-// 顺带一提卫星影像在 z14 的信息量其实比路网图大，只是没有路名。
-//
-// 原本用的是 Carto dark_all，但实测国内 TCP 443 直接超时
-// （PROBE a.basemaps.cartocdn.com:443 -> BLOCKED，tile.openstreetmap.org 同样），
-// TLS 握手连不上，一块也拉不下来。高德 webrd0X 实测 8ms 就通。
-// ⚠️ 高德用 GCJ-02 坐标，所以所有经纬度进瓦片坐标之前都要过 latLonToTilePx()。
-// ⚠️ 高德的图是浅色的，跟这套深色 UI 不搭，解码完会整体做一次灰度反相（见 tintMapDark）。
-// 个人设备自用；要发布得按高德的条款署名。
-// 窗口 240x101 最多跨 2x2 = 4 块瓦片，逐块拉、逐块解到 mapBg 上。
-// PNG 解码用 M5GFX 自带的（drawPng 直接吃内存里的字节），不用另外引库。
+// ---- Tuiles cartographiques ----
+// Les tuiles détaillées sont lues depuis la microSD en JPEG (voir docs/MAPS_OFFLINE.md).
+// Le décodeur PNG a besoin d'un bloc contigu de 32 Ko, indisponible de façon fiable
+// sur l'ESP32-S3 sans PSRAM lorsque l'interface et le réseau occupent déjà la mémoire.
+// Le profil livré est donc WGS-84 et hors ligne par défaut ; aucun fournisseur chinois
+// ni téléchargement distant n'est activé dans la configuration standard.
+// Une source distante ne peut être activée qu'avec une URL HTTP retournant du JPEG,
+// autorisée par son fournisseur et définie explicitement dans config_local.h.
+// Fenêtre 240x101 : au plus 2x2 tuiles, lues une par une pour garder la boucle réactive.
 
 // ⚠️ 拉瓦片绝对不能放在 drawGnssMap() 里同步做。render() 是在 loop() 里调的，
 // 一次拉图最坏要几十秒（连 Wi-Fi 15s + 每块瓦片 connect/read 超时），期间主循环停在里面，
@@ -2543,7 +2534,7 @@ static void startTileJob(double lat, double lon, int z, int mapH) {
   mapBg.fillSprite(cv.color565(18, 20, 26));   // 还没拉到的地方留个底色，别是花的
   bgKind = BG_TILES;                            // 先按"瓦片视图"算坐标，拉不到再退回掩码
   // 若 SD 卡可用，直接进入 JOB_TILE 执行高速本地瓦片读取；否则才进入 JOB_WIFI 确认联网
-  jobState = sdReady() ? JOB_TILE : JOB_WIFI;
+  jobState = (CFG_MAP_ONLINE_ENABLED && !sdReady()) ? JOB_WIFI : JOB_TILE;
   dirty = true;
 }
 
@@ -2573,7 +2564,11 @@ static bool jobTileAt(int idx, int& wrapped, int& ty, int& dx, int& dy) {
 // ⚠️ 卡上是 WGS-84/OSM 瓦片包时不拿高德（GCJ-02）补缺：两套坐标差几百米，
 // 拼在一起接缝处道路会错开，还不如留占位框
 static bool onlineFallbackAllowed() {
+#if CFG_MAP_ONLINE_ENABLED
   return WiFi.status() == WL_CONNECTED && (isOsmCoord() == (CFG_MAP_TILE_WGS84 != 0));
+#else
+  return false;
+#endif
 }
 
 // 补拉一块之前失败的在线瓦片。成功就只对这一块做同样的压暗；一轮补完还有失败的，退避后再来
@@ -2910,6 +2905,12 @@ void drawGnssMap() {
     cv.drawString(mapErr, SW - 6, GNSS_HDR_BOTTOM + 2);
   }
   if (z > 0 && haveCenter) drawScaleBar(6, mapBot - 6, metersPerPixel(lat, z));
+  // Attribution visible lorsque des tuiles OpenStreetMap de la microSD sont affichées.
+  if (jobFromSd) {
+    cv.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    cv.setTextDatum(top_right); cv.setTextSize(1);
+    cv.drawString("© OpenStreetMap contributors", SW - 3, mapTop + 2);
+  }
 
   if (millis() - gnssLastByteMs > 3000) {
     cv.setTextColor(TFT_RED, TFT_BLACK);

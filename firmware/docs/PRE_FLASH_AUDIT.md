@@ -72,7 +72,9 @@ Aucun fichier de dessin, de rendu, de thème ou de disposition de l'interface n'
 
 - Le GNSS dépend du Cap ; sans ce module, l'initialisation série ne prouve aucune réception satellite.
 - Le modèle dynamique GNSS est désormais configurable (CFG_GNSS_DYNAMIC_MODEL) et revient par défaut au profil portable (0), plus approprié à un appareil tenu à la main. Les profils véhicule, maritime et aviation restent sélectionnables dans la configuration locale.
-- La source de tuiles par défaut est Autonavi en GCJ-02, adaptée principalement à la Chine. La carte détaillée en Europe nécessite une source WGS-84 autorisée et compatible avec le client HTTP actuel.
+- Le profil livré est désormais WGS-84, centré sur les cartes hors ligne de la microSD ; le téléchargement distant est désactivé par défaut et l'ancienne source Autonavi/GCJ-02 n'est plus utilisée.
+- Le lecteur accepte des tuiles JPEG 256×256 sous `/map/{z}/{x}/{y}.jpg` (ou les variantes documentées), avec le marqueur `/map/wgs84`. Les tuiles PNG habituelles d'OSM France ne sont pas décodables de façon fiable sur cette cible sans PSRAM ; elles doivent être converties en JPEG avant copie.
+- Aucun paquet de cartes détaillées n'est intégré au firmware : sans paquet sur la microSD, la carte affiche le fond mondial simplifié. Voir `firmware/docs/MAPS_OFFLINE.md`.
 - Le code sait afficher des états sans fix ; la qualité réelle, le temps au premier fix et la stabilité doivent être testés dehors sur matériel.
 
 ### Autres périphériques
