@@ -15,8 +15,8 @@
 #define CFG_PROBE_BASELINE_IP "1.1.1.1"
 #define CFG_PROBE_BASELINE_NAME "cloudflare"
 
-// Le point d'accès Hotspot utilise une clé par défaut publique dans le firmware.
-// Définir ici une phrase secrète personnelle d'au moins 8 caractères avant de l'activer.
+// Par défaut, un mot de passe aléatoire unique est généré et enregistré par appareil.
+// Définir cette option uniquement si tu souhaites imposer ton propre mot de passe.
 // #define CFG_HOTSPOT_DEFAULT_PW "REMPLACER_PAR_UN_MOT_DE_PASSE_UNIQUE"
 
 // La source cartographique intégrée est Autonavi/GCJ-02 et convient surtout à la Chine.
