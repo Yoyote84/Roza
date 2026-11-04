@@ -19,8 +19,8 @@ on:
   workflow_dispatch:
 
 env:
-  # Version de PlatformIO à utiliser
-  PLATFORMIO_VERSION: latest
+  # Version de PlatformIO à installer (omettre "latest" non valide pour pip)
+  PLATFORMIO_VERSION: 6.1.6
 
 permissions:
   contents: read
@@ -45,7 +45,7 @@ jobs:
       - name: Installer PlatformIO via pip
         run: |
           python -m pip install --upgrade pip
-          pip install platformio==${{ env.PLATFORMIO_VERSION }}
+          pip install platformio
 
       - name: Compiler le firmware avec PlatformIO
         run: |
