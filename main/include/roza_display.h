@@ -1,31 +1,30 @@
 #pragma once
 
 /*
- * РОЗА — Display driver for ST7789V2 on M5Stack Cardputer ADV
- * Licence : MIT (voir fichier LICENSE ou attributions dans la source)
- * 
- * Pilote wrappé autour d'Arduino_ST7789 adapté pour l'architecture РОЗА.
- * Gère l'initialisation, le rétroéclairage et les fonctions d'affichage de base.
+ * ROZA — Driver LCD ST7789V2 pour ESP-IDF natif.
+ * Pilote ESP-IDF utilisant driver/spi_master et GPIO.
+ * Licence : adaptation ESP-IDF, code original Arduino_ST7789 MIT.
  */
 
 #pragma once
 
-#include <Arduino.h>
-#include <Arduino_GFX_Library.h>
+#include "driver/spi_master.h"
+#include "driver/gpio.h"
+#include "soc/gpio_sig_map.h"
 
 // Configuration de l'écran ST7789V2 pour M5Stack Cardputer ADV
 #define ROZA_DISPLAY_WIDTH    240
 #define ROZA_DISPLAY_HEIGHT   135
 
-// Broches M5Stack Cardputer ADV (validées documentation M5Stack & Launcher)
-#define ROZA_PIN_LCD_RST      33
-#define ROZA_PIN_LCD_DC       34
-#define ROZA_PIN_LCD_CS       37
-#define ROZA_PIN_LCK_SCK      36
-#define ROZA_PIN_LCD_MOSI     35
-#define ROZA_PIN_LCD_BL       38  // Rétroéclairage
+// Broches M5Stack Cardputer ADV (validées documentation M5Stack)
+#define ROZA_PIN_LCD_RST      GPIO_NUM_33
+#define ROZA_PIN_LCD_DC       GPIO_NUM_34
+#define ROZA_PIN_LCD_CS       GPIO_NUM_37
+#define ROZA_PIN_LCD_SCK      GPIO_NUM_36
+#define ROZA_PIN_LCD_MOSI     GPIO_NUM_35
+#define ROZA_PIN_LCD_BL       GPIO_NUM_38  // Rétroéclairage
 
-// Polarity et timing ST7789V2
+// Balises d'initialisation ST7789V2 (polynômes de configuration)
 #define ROZA_TFT_IPS          true
 #define ROZA_OFFSET_COL1      52
 #define ROZA_OFFSET_ROW1      40
@@ -56,7 +55,9 @@ void roza_display_backlight_off(void);
 roza_display_state_t roza_display_get_state(void);
 
 /*
- * Fonctions d'affichage de base
+ * Fonctions d'affichage de base (implémentation ESP-IDF native)
+ * Ces fonctions utilisent le driver SPI master bas niveau.
+ * Les séquences d'initialisation sont celles du datasheet ST7789V2.
  */
 void roza_display_clear(uint16_t color);
 void roza_display_draw_pixel(int16_t x, int16_t y, uint16_t color);
@@ -65,8 +66,9 @@ void roza_display_draw_horizontal_line(int16_t x, int16_t y, int16_t length, uin
 void roza_display_draw_vertical_line(int16_t x, int16_t y, int16_t length, uint16_t color);
 
 /*
- * Fonction d'affichage de démarrage РОЗА avec identité visuelle
- * Affiche l'écran de bienvenue thème années 1940-1950
+ * Fonction d'affichage de démarrage ROZA avec identité visuelle
+ * Affiche l'écran de bienvenue thème années 1940-1950.
+ * Utilise les registres ST7789V2 définis dans le datasheet.
  */
 void roza_display_show_welcome(void);
 
@@ -80,5 +82,3 @@ void roza_display_deinit(void);
  * Accesseurs de contexte
  */
 roza_display_context_t* roza_display_get_context(void);
-
-#endif /* ROZA_DISPLAY_H */
