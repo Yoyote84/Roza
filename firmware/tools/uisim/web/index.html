@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07110c">
-  <meta name="description" content="Visualiseur web des écrans du firmware ROZA pour M5Stack Cardputer ADV.">
+  <meta name="description" content="Visualiseur web des écrans du firmware РO3A pour M5Stack Cardputer ADV.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <title>ROZA · Cardputer ADV</title>
+  <title>РO3A · Cardputer ADV</title>
   <style>
     :root{color-scheme:dark;--bg:#07110c;--panel:#101c15;--line:#243b2c;--green:#66f59a;--muted:#9bb2a2}
     *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% -20%,#193c27 0,var(--bg) 55%);color:#e8f5ec;font:15px system-ui,-apple-system,sans-serif;min-height:100vh}
@@ -23,11 +23,11 @@
   </style>
 </head>
 <body>
-<header><div class="eyebrow">M5STACK CARDPUTER ADV · 240 × 135</div><h1>ROZA Screen Viewer</h1><p>Explore les véritables captures d’écran produites par le code graphique du firmware.</p></header>
+<header><div class="eyebrow">M5STACK CARDPUTER ADV · 240 × 135</div><h1>РO3A · Cardputer ADV</h1><p>Explore les véritables captures d’écran produites par le code graphique du firmware РO3A.</p></header>
 <main>
   <div class="viewer">
     <section>
-      <div class="screen-shell"><div class="screen-frame" id="frame"><div class="screen-placeholder">Chargement des écrans ROZA…</div></div>
+      <div class="screen-shell"><div class="screen-frame" id="frame"><div class="screen-placeholder">Chargement des écrans РO3A…</div></div>
         <div class="screen-meta"><div class="screen-name" id="name">—</div><div class="screen-count" id="count">—</div></div>
       </div>
       <div class="controls"><button id="prev" type="button">← Précédent</button><button class="primary" id="next" type="button">Suivant →</button></div>
@@ -50,7 +50,7 @@
     selected = (index + visible.length) % visible.length;
     const file = visible[selected];
     $('frame').innerHTML = '';
-    const img = new Image(); img.alt = 'Écran ROZA : ' + label(file); img.src = './screens/' + encodeURIComponent(file);
+    const img = new Image(); img.alt = 'Écran РO3A : ' + label(file); img.src = './screens/' + encodeURIComponent(file);
     $('frame').append(img); $('name').textContent = label(file);
     $('count').textContent = (selected+1) + ' / ' + visible.length;
     $('prev').disabled = visible.length < 2; $('next').disabled = visible.length < 2;
