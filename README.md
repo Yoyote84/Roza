@@ -1,46 +1,36 @@
 # РОЗА — firmware autonome pour M5Stack Cardputer ADV
 
-**Version :** 0.1.0-foundation  
-**Langue de l'interface :** français  
-**Cible :** M5Stack Cardputer ADV (ESP32-S3FN8, 8 Mo Flash)  
-**Extension :** M5Stack Cap LoRa-1262 (SX1262 + AT6668)  
-**Stockage utilisateur :** microSD 128 Go
+**Cible :** M5Stack Cardputer ADV (ESP32-S3FN8, 8 Mo Flash, sans PSRAM)  
+**Extension :** M5Stack Cap LoRa-1262 (SX1262 + GNSS ATGM336H-6N / AT6668)  
+**Stockage utilisateur :** microSD 128 Go  
+**Langue :** français  
+**Philosophie :** hors ligne d'abord, Wi-Fi désactivé tant qu'une application ne le demande pas.
 
-## Intention
+## Projet actif
 
-РОЗА est un firmware hors connexion d'abord, à esthétique historique sobre (années 1940–1950). Le Wi-Fi est désactivé par défaut et ne sera activé que sur demande explicite.
+Le projet firmware propre et actif se trouve désormais dans **[`firmware/`](firmware/)**. Il utilise ESP-IDF natif et le BSP ESPP officiel pour Cardputer / Cardputer ADV, afin de réutiliser les pilotes maintenus plutôt que de conserver les pilotes artisanaux défectueux de la première fondation.
 
-## État de cette livraison
+Les anciens fichiers C présents à la racine et dans `main/` sont conservés pour audit et historique ; ils ne font plus partie du projet actif et ne doivent plus être étendus.
 
-Cette archive est la **fondation du projet**, pas encore un firmware fonctionnel complet. Elle contient un projet ESP-IDF minimal, une configuration cible, les premières définitions matérielles et la documentation d'architecture. Le code de démarrage ne pilote volontairement pas encore l'écran, le clavier, la SD, le GPS ou la radio : chaque pilote sera ajouté et testé sur le matériel avant d'être déclaré opérationnel.
+## Compilation
 
-## Matériel confirmé
-
-- ESP32-S3FN8, 240 MHz, Flash interne 8 Mo.
-- Écran ST7789V2, 240 × 135.
-- Clavier 56 touches via TCA8418 sur Cardputer ADV.
-- BMI270 sur I²C.
-- microSD via SPI.
-- Cap LoRa-1262 : SX1262 en SPI et récepteur GNSS AT6668 en UART.
-
-## Construire
-
-Prérequis : ESP-IDF installé et configuré (version stable 5.x compatible ESP32-S3).
+Depuis le dépôt :
 
 ```sh
+cd firmware
 . "$IDF_PATH/export.sh"
 idf.py set-target esp32s3
 idf.py build
 ```
 
-Pour flasher, connecter le Cardputer en USB. Le mode téléchargement M5Stack : mettre l'interrupteur sur OFF, maintenir G0, remettre sous tension, puis relâcher G0. Vérifier la procédure dans la documentation de la révision matérielle utilisée.
+La CI GitHub Actions compile désormais ce dossier avec ESP-IDF 5.5.1. Le BSP `espp/m5stack-cardputer` est épinglé en version 1.3.11.
 
-**Ne flasher qu'après une compilation réussie.** Cette fondation ne contient pas encore de pilote écran ; son démarrage se vérifie par le journal série.
+## Matériel et sécurité
 
-## Règles de sécurité
+- Le BSP prend en charge l'écran ST7789V2, le clavier ADV TCA8418, l'IMU BMI270, la batterie, la microSD et le Cap SX1262 + GNSS.
+- Le Wi-Fi et le Bluetooth ne sont pas démarrés au boot.
+- La microSD n'est pas montée automatiquement dans cette fondation : son système de fichiers doit être identifié avant toute opération, sans formatage.
+- La radio LoRa n'est pas initialisée ni utilisée pour émettre au démarrage. L'antenne doit être vissée avant toute alimentation du Cap.
+- Aucun test matériel n'est revendiqué sans essai réel sur le Cardputer ADV.
 
-- Ne jamais alimenter le module LoRa sans son antenne correctement vissée.
-- Ne pas retirer/insérer le Cap sous tension.
-- Ne pas formater la microSD avant sauvegarde et identification de son système de fichiers.
-- La microSD et le SX1262 partagent SPI : accès arbitré, CS inactifs par défaut.
-- Le Wi-Fi/Bluetooth restent désactivés dans la configuration initiale.
+Voir [firmware/README.md](firmware/README.md), [firmware/UPSTREAMS.md](firmware/UPSTREAMS.md) et [AGENTS.md](AGENTS.md).

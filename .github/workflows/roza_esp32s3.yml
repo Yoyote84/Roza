@@ -1,71 +1,63 @@
-# Github Actions Workflow for ROZA Firmware
-# Compile le firmware ROZA sur ESP-IDF stable pour ESP32-S3.
-
 name: ROZA Firmware Build
 
 on:
   push:
     branches: [main]
+    paths:
+      - "firmware/**"
+      - "README.md"
+      - "AGENTS.md"
+      - ".github/workflows/roza_esp32s3.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "firmware/**"
+      - "README.md"
+      - "AGENTS.md"
+      - ".github/workflows/roza_esp32s3.yml"
+  workflow_dispatch:
 
-env:
-  # Version explicite d'ESP-IDF à utiliser
-  ESP_IDF_VERSION: v5.1
+permissions:
+  contents: read
+
+concurrency:
+  group: roza-firmware-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    name: Compilation ESP32-S3 (ESP-IDF 5.5.1)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
+    container:
+      image: espressif/idf:v5.5.1
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+        working-directory: firmware
     steps:
-      - name: Checkout code
+      - name: Récupérer le dépôt
         uses: actions/checkout@v4
 
-      # === ÉTAPE 1 : Installation complète d'ESP-IDF AVANT export.sh ===
-      - name: Install ESP-IDF (avant export)
+      - name: Vérifier l'environnement ESP-IDF
         run: |
-          # On clone d'abord
-          git clone --depth 1 --branch $ESP_IDF_VERSION https://github.com/espressif/esp-idf.git /opt/esp-idf
-          
-          # Puis on installe TOUTES les outils AVANT de sourcer export.sh
-          # Cela garantit que tous les outils (gdb, python, etc.) sont disponibles
-          cd /opt/esp-idf
-          ./install.sh
-          
-          # Maintenant on peut sourcer export.sh en toute sécurité
-          # (cette fois-ci, tous les outils seront dans le PATH)
-          source /opt/esp-idf/export.sh
-
-      - name: Vérifier l'installation d'ESP-IDF
-        run: |
-          source /opt/esp-idf/export.sh
+          . "$IDF_PATH/export.sh"
           idf.py --version
-          # Vérifier les outils critiques
-          which xtensa-esp-elf-gdb || echo "ATTENTION : xtensa-esp-elf-gdb non trouvé dans le PATH"
-          which riscv32-esp-elf-gdb || echo "ATTENTION : riscv32-esp-elf-gdb non trouvé dans le PATH"
+          python --version
 
-      - name: Installer les dépendances Python
+      - name: Compiler le firmware ROZA
         run: |
-          pip install west
-
-      - name: Configurer le projet
-        run: |
-          source /opt/esp-idf/export.sh
-          cd /public/Roza
+          . "$IDF_PATH/export.sh"
           idf.py set-target esp32s3
-          # Configuration minimale requise (sans modifier l'utilisateur sans besoin)
-          idf.py menuconfig --set-options "make.applealu.enabled=no"
+          idf.py build
 
-      - name: Compiler le firmware
-        run: |
-          source /opt/esp-idf/export.sh
-          cd /public/Roza
-          idf.py build --check
-
-      - name: Upload build artifacts
+      - name: Publier les artefacts de compilation
         uses: actions/upload-artifact@v4
         with:
-          name: ROZA-firmware-${{ github.sha }}
-          path: /public/Roza/build/*
-          if-no-files-found: warn
+          name: roza-esp32s3-${{ github.sha }}
+          path: |
+            firmware/build/*.bin
+            firmware/build/bootloader/bootloader.bin
+            firmware/build/partition_table/partition-table.bin
+          if-no-files-found: error
+          retention-days: 14

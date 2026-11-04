@@ -35,13 +35,12 @@ Si le push échoue à cause d'un conflit, d'une authentification ou d'une restri
 - Plusieurs modifications cohérentes peuvent être réalisées au cours d'une même tâche.
 - Cependant, chaque étape fonctionnelle terminée doit être publiée sur GitHub avant de commencer une nouvelle étape indépendante.
 - Ne pas garder une série de modifications terminées en attente dans l'environnement local.
-- L'ordre des étapes suit la feuille de route G0→G1→G2→G3→G4→G5.
+- L'ordre des étapes suit la feuille de route définie dans `firmware/AGENTS.md`.
 
 ## Communication
 
 - Toutes les explications et tous les rapports doivent être en français.
-- Annonce clairement à chaque fin de tâche :
-  "Modifications publiées sur GitHub. Vérification externe possible."
+- Annonce clairement à chaque fin de tâche : "Modifications publiées sur GitHub. Vérification externe possible."
 - N'utiliser cette phrase que si le push et la vérification sur GitHub ont réellement réussi.
 
 ## Priorité Absolue
@@ -55,32 +54,37 @@ Si le push échoue à cause d'un conflit, d'une authentification ou d'une restri
 - Ne jamais créer de faux pilote, de stub ni de fonction simulée présentée comme fonctionnelle.
 - Ne pas toucher à un autre dépôt que /public/Roza.
 - Ne jamais déplacer de fichiers simplement pour masquer une erreur.
-- Respecter l'architecture propre de ROZA.
 - Réutiliser intelligemment les pilotes open source compatibles.
 - Vérifier les licences et conserver les attributions nécessaires.
 - Ne jamais supposer qu'un pilote fonctionne matériellement sans test sur la carte.
 - Documenter les modifications et les commandes nécessaires pour compiler.
 
-## Ordre de Priorité de Développement
-
-1. G0 — Fondation (déjà réalisée)
-2. G1.1 — Écran ST7789V2 (en cours correction)
-3. G1.2 — Clavier TCA8418
-4. G1.3 — Mesure batterie ADC
-5. G2 — Bus SPI partagé + I²C communal
-6. G3 — Interface graphique complète
-7. G4 — GPS AT6668 + Radio SX1262
-8. G5 — Applications ROZA (carnet, agenda, etc.)
-
 ## Dépôt Officiel
 
 - Dépôt : https://github.com/Yoyote84/Roza
 - Branche autorisée : main
-- Dossier de travail : /public/Roza
+- Clone local : /public/Roza
+- Dossier de firmware actif : /public/Roza/firmware
 - Ne jamais créer un autre dépôt ou une autre branche sans autorisation.
 
-## État des Fichiers Non Modifiés
+## Base active depuis novembre 2026
 
-- Les fichiers existants ne doivent pas être supprimés ni écrasés sans justification technique valide.
-- Les fichiers de documentation et d'audit (MARKDOWN, README, etc.) doivent être préservés et synchronisés avec GitHub.
-- Les pilotes et le code source font l'objet d'une révision continue.
+- Le seul projet firmware actif est `firmware/`.
+- Les anciens fichiers racine `CMakeLists.txt`, `main/`, `partitions.csv` et `sdkconfig.defaults` sont conservés comme historique/audit ; ne pas les utiliser ni les modifier pour développer le firmware actif.
+- Le firmware actif est un projet ESP-IDF natif C++23.
+- Utiliser le composant ESP Component Registry `espp/m5stack-cardputer` version exacte `1.3.11` (licence MIT) comme BSP matériel.
+- Ne pas réécrire les pilotes écran, clavier, IMU, batterie, microSD, SX1262 ou GNSS si le BSP les couvre déjà. Étendre proprement le BSP seulement si une fonction manque réellement.
+- Ne jamais supposer que le Cardputer ADV et le Cardputer original ont le même clavier : l'ADV utilise TCA8418.
+- Ne pas monter ni formater automatiquement la microSD 128 Go avant identification de son système de fichiers.
+- Ne jamais activer la radio LoRa en émission au démarrage. Toute émission nécessite une configuration régionale conforme et une antenne installée.
+- Le Wi-Fi et le Bluetooth restent inactifs par défaut.
+- Toute nouvelle fonction doit être compilée par la CI avant d'être déclarée intégrée.
+
+## Feuille de route
+
+1. G0 — Fondation ESP-IDF propre et compilation reproductible.
+2. G1 — Écran, clavier et IMU via le BSP existant.
+3. G2 — Batterie et stockage microSD, après vérification des formats et calibrations.
+4. G3 — Interface ROZA et navigation au clavier.
+5. G4 — GNSS AT6668 et SX1262, réception d'abord, émission seulement après validation réglementaire et matérielle.
+6. G5 — Applications hors ligne : carnet, notes, journal, agenda et outils.
