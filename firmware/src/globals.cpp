@@ -398,12 +398,12 @@ const TzOpt TZ_OPTS[] = {
   {"Central Europe", "CET-1CEST,M3.5.0,M10.5.0/3"},
 };
 const int TZ_OPT_COUNT = sizeof(TZ_OPTS) / sizeof(TZ_OPTS[0]);
-int tzOptIdx = 0;
-const char* TZ_INFO = TZ_OPTS[0].posix;
+int tzOptIdx = 5;  // Europe centrale par défaut pour la configuration française.
+const char* TZ_INFO = TZ_OPTS[5].posix;
 
 void tzInit() {
-  tzOptIdx = loadInt("tz", "idx", 0);
-  if (tzOptIdx < 0 || tzOptIdx >= TZ_OPT_COUNT) tzOptIdx = 0;
+  tzOptIdx = loadInt("tz", "idx", 5);
+  if (tzOptIdx < 0 || tzOptIdx >= TZ_OPT_COUNT) tzOptIdx = 5;
   TZ_INFO = TZ_OPTS[tzOptIdx].posix;
   setenv("TZ", TZ_INFO, 1);
   tzset();
