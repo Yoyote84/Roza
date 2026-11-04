@@ -33,7 +33,7 @@
 #ifndef CFG_HOTSPOT_SSID
 #define CFG_HOTSPOT_SSID "Cardputer-ADV"
 #endif
-#if CFG_HOTSPOT_DEFAULT_PW not set, ROZA generates and stores a unique random WPA2 passphrase on first use.
+// Si CFG_HOTSPOT_DEFAULT_PW reste vide, ROZA génère et mémorise un mot de passe WPA2 unique au premier usage.
 #ifndef CFG_HOTSPOT_DEFAULT_PW
 #define CFG_HOTSPOT_DEFAULT_PW ""
 #endif
