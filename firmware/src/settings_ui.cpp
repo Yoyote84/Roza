@@ -22,8 +22,8 @@ String setValue(SetId id) {
     case SET_BRIGHT:  snprintf(b, sizeof(b), "%d%%", brightPct); return String(b);
     case SET_VOL:
       if (debugOn) return String("MUTE (DBG)");
-      snprintf(b, sizeof(b), volPct == 0 ? "MUTE" : "%d%%", volPct); return String(b);
-    case SET_BOOT_SOUND: return String(bootSoundOn ? "ON" : "OFF");
+      snprintf(b, sizeof(b), volPct == 0 ? "MUET" : "%d%%", volPct); return String(b);
+    case SET_BOOT_SOUND: return String(bootSoundOn ? "OUI" : "NON");
     case SET_LED:     return String(ledModeName());
     case SET_THEME:   return String(themeName(themeMode));
     case SET_SLEEP: {
@@ -38,7 +38,7 @@ String setValue(SetId id) {
       if (lvl < 0) return String("--");
       snprintf(b, sizeof(b), "%d%%", lvl); return String(b);
     }
-    case SET_DEBUG:   return String(debugOn ? "ON" : "OFF");
+    case SET_DEBUG:   return String(debugOn ? "OUI" : "NON");
     case SET_FORMAT:  return String(sdMounted ? "Effacer >" : "Pas de SD");
     case SET_ABOUT:   return String("Infos >");
   }
@@ -103,13 +103,13 @@ void drawSettings() {
         cv.drawRoundRect(bx, by, bw, bh, 2, onCol);
         cv.setTextColor(onCol, ROZA_INK);
         cv.setTextDatum(middle_center);
-        cv.drawString("ON", bx + bw / 2, by + 7);
+        cv.drawString("OUI", bx + bw / 2, by + 7);
       } else {
         cv.fillRoundRect(bx, by, bw, bh, 2, ROZA_INK);
         cv.drawRoundRect(bx, by, bw, bh, 2, ROZA_OLIVE_DARK);
         cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
         cv.setTextDatum(middle_center);
-        cv.drawString("OFF", bx + bw / 2, by + 7);
+        cv.drawString("NON", bx + bw / 2, by + 7);
       }
     } else if (sid == SET_LED) {
       // LED 灯效模式微胶囊
@@ -170,10 +170,10 @@ void drawSettings() {
   drawPageDots(page, pageCount);
   cv.setTextDatum(bottom_left); cv.setTextSize(1);
   cv.setTextColor(ROZA_OLIVE, TFT_BLACK);
-  cv.drawString("; . nav", 6, SH - 2);
+  cv.drawString("; . naviguer", 6, SH - 2);
 
   cv.setTextDatum(bottom_right);
-  cv.drawString("Enter set", SW - 6, SH - 2);
+  cv.drawString("Entree : OK", SW - 6, SH - 2);
 }
 
 // 通用：段式霓虹发光刻度计（亮度/音量共用）
@@ -234,8 +234,8 @@ void drawSleep() {
 
   int s = SLEEP_OPTS[sleepOptIdx];
   char b[16];
-  if (s == 0) snprintf(b, sizeof(b), "Never"); else snprintf(b, sizeof(b), "%ds", s);
-  drawPageHeader("Screen Timeout", b, ACCENT);
+  if (s == 0) snprintf(b, sizeof(b), "Jamais"); else snprintf(b, sizeof(b), "%ds", s);
+  drawPageHeader("Veille ecran", b, ACCENT);
 
   const int cx = 10, cy = 18, cw = SW - 20, ch = 96;
   cv.fillRoundRect(cx, cy, cw, ch, 4, ROZA_INK);
@@ -254,7 +254,7 @@ void drawSleep() {
     int px = startX + i * (pw + pgap);
     bool on = (i == sleepOptIdx);
     char tb[8];
-    if (SLEEP_OPTS[i] == 0) snprintf(tb, sizeof(tb), "Off");
+    if (SLEEP_OPTS[i] == 0) snprintf(tb, sizeof(tb), "Arret");
     else                    snprintf(tb, sizeof(tb), "%ds", SLEEP_OPTS[i]);
 
     if (on) {
@@ -271,7 +271,7 @@ void drawSleep() {
 
   cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
   cv.setTextDatum(bottom_center); cv.setTextSize(1);
-  cv.drawString("; . prev/next    ` return", SW / 2, SH - 2);
+  cv.drawString("; . prec./suiv.    ` retour", SW / 2, SH - 2);
 }
 
 void drawTz() {
@@ -279,7 +279,7 @@ void drawTz() {
 
   char pageBuf[16];
   snprintf(pageBuf, sizeof(pageBuf), "%d/%d", tzOptIdx + 1, TZ_OPT_COUNT);
-  drawPageHeader("Timezone", pageBuf, ACCENT);
+  drawPageHeader("Fuseau horaire", pageBuf, ACCENT);
 
   const int cx = 10, cy = 18, cw = SW - 20, ch = 96;
   cv.fillRoundRect(cx, cy, cw, ch, 4, ROZA_INK);
@@ -292,12 +292,12 @@ void drawTz() {
   cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
   cv.setTextDatum(middle_center); cv.setTextSize(1);
   char posixBuf[40];
-  snprintf(posixBuf, sizeof(posixBuf), "Rule: %s", TZ_OPTS[tzOptIdx].posix);
+  snprintf(posixBuf, sizeof(posixBuf), "Regle: %s", TZ_OPTS[tzOptIdx].posix);
   cv.drawString(posixBuf, SW / 2, 74);
 
   cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
   cv.setTextDatum(bottom_center); cv.setTextSize(1);
-  cv.drawString("; . prev/next    ` return", SW / 2, SH - 2);
+  cv.drawString("; . prec./suiv.    ` retour", SW / 2, SH - 2);
 }
 
 // 电池与电源仪表盘：双联硬件卡片
@@ -308,7 +308,7 @@ void drawBatteryDetail() {
   int16_t mv = M5.Power.getBatteryVoltage();
   bool charging = powerCharging();
 
-  drawPageHeader("Battery & Power", charging ? "CHARGING" : "DISCHARGING", charging ? ROZA_OLIVE_LIGHT : TFT_YELLOW);
+  drawPageHeader("Batterie & alim.", charging ? "EN CHARGE" : "DECHARGE", charging ? ROZA_OLIVE_LIGHT : TFT_YELLOW);
 
   // 卡片 1 (左)：实时电量与状态
   const int c1w = 113, c2w = 114;
@@ -318,7 +318,7 @@ void drawBatteryDetail() {
 
   cv.setTextDatum(top_left); cv.setTextSize(1);
   cv.setTextColor(ACCENT, ROZA_INK);
-  cv.drawString("LIVE STATUS", 8, bpy + 4);
+  cv.drawString("ETAT EN DIRECT", 8, bpy + 4);
   cv.drawFastHLine(6, bpy + 14, c1w - 4, ROZA_CARD);
 
   // 电池电芯图标 (x = 10, y = 36)
@@ -353,8 +353,8 @@ void drawBatteryDetail() {
 
   // 端电压
   cv.setTextSize(1);
-  if (mv >= 0) snprintf(b, sizeof(b), "Volt: %.2f V", mv / 1000.0f);
-  else         snprintf(b, sizeof(b), "Volt: n/a");
+  if (mv >= 0) snprintf(b, sizeof(b), "Tension: %.2f V", mv / 1000.0f);
+  else         snprintf(b, sizeof(b), "Tension: n/d");
   cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
   cv.drawString(b, 10, bpy + 48);
 
@@ -365,13 +365,13 @@ void drawBatteryDetail() {
     cv.drawRoundRect(sbx, sby, sbw, sbh, 2, ROZA_OLIVE_LIGHT);
     cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
     cv.setTextDatum(middle_center);
-    cv.drawString("CHARGING +", sbx + sbw / 2, sby + sbh / 2);
+    cv.drawString("EN CHARGE +", sbx + sbw / 2, sby + sbh / 2);
   } else {
     cv.fillRoundRect(sbx, sby, sbw, sbh, 2, ROZA_INK);
     cv.drawRoundRect(sbx, sby, sbw, sbh, 2, ROZA_OLIVE_DARK);
     cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
     cv.setTextDatum(middle_center);
-    cv.drawString("DISCHARGING", sbx + sbw / 2, sby + sbh / 2);
+    cv.drawString("DECHARGE", sbx + sbw / 2, sby + sbh / 2);
   }
 
   // 卡片 2 (右)：硬件规格与设计参数
@@ -381,22 +381,22 @@ void drawBatteryDetail() {
 
   cv.setTextDatum(top_left); cv.setTextSize(1);
   cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
-  cv.drawString("POWER SPECS", c2x + 6, bpy + 4);
+  cv.drawString("SPECS ALIM.", c2x + 6, bpy + 4);
   cv.drawFastHLine(c2x + 2, bpy + 14, c2w - 4, ROZA_CARD);
 
   int y2 = bpy + 18; const int lh = 13;
   cv.setTextColor(ROZA_PAPER_DIM, ROZA_INK);
   cv.drawString("PMIC : TP4057", c2x + 6, y2); y2 += lh;
-  cv.drawString("Cap  : ~1400 mAh", c2x + 6, y2); y2 += lh;
-  cv.drawString("Cell : 1S Li-Po", c2x + 6, y2); y2 += lh;
+  cv.drawString("Cap. : ~1400 mAh", c2x + 6, y2); y2 += lh;
+  cv.drawString("Pile : 1S Li-Po", c2x + 6, y2); y2 += lh;
   cv.drawString("V_min: 3.30 V", c2x + 6, y2); y2 += lh;
   cv.drawString("V_max: 4.20 V", c2x + 6, y2); y2 += lh;
-  cv.drawString("Sens : V-Curve Est", c2x + 6, y2);
+  cv.drawString("Est. courbe V", c2x + 6, y2);
 
   // 底部提示
   cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
   cv.setTextDatum(bottom_center); cv.setTextSize(1);
-  cv.drawString("`  return to settings", SW / 2, SH - 2);
+  cv.drawString("`  retour reglages", SW / 2, SH - 2);
 }
 
 void drawFormat() {
@@ -404,32 +404,32 @@ void drawFormat() {
   if (!sdMounted) {
     cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
     cv.setTextDatum(middle_center); cv.setTextSize(2);
-    cv.drawString("No SD card", SW / 2, SH / 2 - 6);
+    cv.drawString("Carte SD absente", SW / 2, SH / 2 - 6);
     return;
   }
   // 顶部醒目警告条
   cv.fillRect(0, 0, SW, 20, TFT_RED);
   cv.setTextColor(ROZA_PAPER, TFT_RED);
   cv.setTextDatum(middle_center); cv.setTextSize(2);
-  cv.drawString(formatStep == 0 ? "Format SD?" : "ARE YOU SURE?", SW / 2, 10);
+  cv.drawString(formatStep == 0 ? "Formater SD ?" : "CONFIRMER ?", SW / 2, 10);
 
   cv.setTextColor(ROZA_PAPER, TFT_BLACK);
   cv.setTextDatum(middle_center); cv.setTextSize(1);
   if (formatStep == 0) {
-    cv.drawString("This ERASES everything", SW / 2, 48);
-    char c[32]; snprintf(c, sizeof(c), "on the %.1f GB card.", sdSizeMB / 1024.0);
+    cv.drawString("Efface toutes donnees", SW / 2, 48);
+    char c[32]; snprintf(c, sizeof(c), "sur carte %.1f Go.", sdSizeMB / 1024.0);
     cv.drawString(c, SW / 2, 64);
     cv.setTextColor(TFT_YELLOW, TFT_BLACK);
-    cv.drawString("Press Y to continue", SW / 2, 92);
+    cv.drawString("Touche Y : suite", SW / 2, 92);
   } else {
     cv.setTextColor(TFT_RED, TFT_BLACK);
-    cv.drawString("ALL DATA WILL BE LOST!", SW / 2, 52);
+    cv.drawString("TOUT SERA EFFACE !", SW / 2, 52);
     cv.setTextColor(TFT_YELLOW, TFT_BLACK);
-    cv.drawString("Press Y again to FORMAT", SW / 2, 84);
+    cv.drawString("Touche Y : FORMATER", SW / 2, 84);
   }
   cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
   cv.setTextDatum(bottom_center);
-  cv.drawString("`  cancel", SW / 2, SH - 2);
+  cv.drawString("`  annuler", SW / 2, SH - 2);
 }
 
 // 一行：标签 + 占比进度条 + 百分比，下面再跟一行"已用/总量"细节
@@ -476,7 +476,7 @@ static void drawAboutInfo() {
 
   cv.setTextDatum(top_left); cv.setTextSize(1);
   cv.setTextColor(ACCENT, ROZA_INK);
-  cv.drawString("COMPUTE", 8, bpy + 4);
+  cv.drawString("CALCUL", 8, bpy + 4);
   cv.drawFastHLine(6, bpy + 14, c1w - 4, ROZA_CARD);
 
   int y1 = bpy + 18; const int lh = 13;
@@ -484,9 +484,9 @@ static void drawAboutInfo() {
   cv.drawString("MCU : ESP32-S3", 8, y1); y1 += lh;
   cv.drawString("Freq: 240 MHz", 8, y1); y1 += lh;
   cv.drawString("Arch: Xtensa LX7", 8, y1); y1 += lh;
-  cv.drawString("Core: Dual-Core", 8, y1); y1 += lh;
+  cv.drawString("Coeur: double", 8, y1); y1 += lh;
   cv.drawString("SRAM: 320 KB", 8, y1); y1 += lh;
-  cv.drawString("PSRAM: None", 8, y1);
+  cv.drawString("PSRAM: aucune", 8, y1);
 
   // 卡片 2 (右)：外设与系统
   const int c2x = 121;
@@ -495,7 +495,7 @@ static void drawAboutInfo() {
 
   cv.setTextDatum(top_left); cv.setTextSize(1);
   cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
-  cv.drawString("SYSTEM & IO", c2x + 6, bpy + 4);
+  cv.drawString("SYSTEME & E/S", c2x + 6, bpy + 4);
   cv.drawFastHLine(c2x + 2, bpy + 14, c2w - 4, ROZA_CARD);
 
   int y2 = bpy + 18;
@@ -505,7 +505,7 @@ static void drawAboutInfo() {
   cv.drawString("Keys  : TCA8418", c2x + 6, y2); y2 += lh;
   cv.drawString("Audio : NS4168", c2x + 6, y2); y2 += lh;
   cv.drawString("Sync  : NTP & GPS", c2x + 6, y2); y2 += lh;
-  cv.drawString("Build : Slacker v4", c2x + 6, y2);
+  cv.drawString("Base : Slacker v4", c2x + 6, y2);
 }
 
 static void drawAboutUsage() {
@@ -538,7 +538,7 @@ static void drawAboutUsage() {
 
   cv.setTextDatum(middle_left); cv.setTextSize(1);
   cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
-  cv.drawString("Low-Water: " + fmtBytes(ESP.getMinFreeHeap()), 10, y + 10);
+  cv.drawString("RAM mini: " + fmtBytes(ESP.getMinFreeHeap()), 10, y + 10);
 
   char temp[24]; snprintf(temp, sizeof(temp), "Temp: %.0f C", temperatureRead());
   cv.setTextDatum(middle_right);
@@ -555,7 +555,7 @@ void drawAboutRam() {
   if (count == 0) {
     cv.setTextColor(ROZA_OLIVE, ROZA_INK);
     cv.setTextDatum(middle_center); cv.setTextSize(1);
-    cv.drawString("No RAM marks recorded", SW / 2, cardY + cardH / 2);
+    cv.drawString("Aucun releve RAM", SW / 2, cardY + cardH / 2);
 
     cv.setTextDatum(bottom_left);
     cv.drawString("; . page", 6, SH - 2);
@@ -568,7 +568,7 @@ void drawAboutRam() {
   cv.setTextColor(ACCENT, ROZA_INK);
 
   cv.setTextDatum(middle_left);
-  cv.drawString("Stage", cardX + 4, hdrY);
+  cv.drawString("Etape", cardX + 4, hdrY);
 
   cv.setTextDatum(middle_right);
   cv.drawString("free8", 107, hdrY);
@@ -652,7 +652,7 @@ void drawAboutRam() {
 
   cv.setTextDatum(bottom_right);
   if (count > VISIBLE_ROWS) {
-    cv.drawString("[ ] scroll", SW - 6, SH - 2);
+    cv.drawString("[ ] defil.", SW - 6, SH - 2);
   } else if (count >= 2) {
     char totBuf[16];
     long total = (long)ramMarkAt(count - 1).free8 - (long)ramMarkAt(0).free8;
@@ -665,7 +665,7 @@ void drawAbout() {
   cv.fillScreen(TFT_BLACK);
   char pageStr[16];
   snprintf(pageStr, sizeof(pageStr), "%d/%d", aboutPage + 1, ABOUT_PAGE_COUNT);
-  drawPageHeader("About System", pageStr, ACCENT);
+  drawPageHeader("A propos systeme", pageStr, ACCENT);
 
   if (aboutPage == 0)      drawAboutInfo();
   else if (aboutPage == 1) drawAboutUsage();
