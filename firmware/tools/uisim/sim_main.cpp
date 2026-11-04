@@ -141,6 +141,9 @@ bool playerIsPlaying() { return false; }
 bool radioIsActive()   { return false; }
 
 int  powerBatteryLevel() { return 76; }
+// Valeur de démonstration cohérente avec 76 % et la référence de 248 min du firmware.
+// Cette implémentation est réservée au simulateur hôte ; le firmware utilise power_util.cpp.
+int  powerRemainingTime() { return (76 * 248 + 50) / 100; }
 bool powerCharging()     { return false; }
 int  powerBatteryMv()    { return 4120; }
 
