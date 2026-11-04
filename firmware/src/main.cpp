@@ -1138,20 +1138,12 @@ void setup() {
   bootSelfTest();                        // 开机自检：屏上打硬件检测日志（动画之后、联网之前）
   ramMark("selftest");
 
-  // 开机连网+对时：用上次记住的网络自动连，连上之后**保持常开**（不再像早期版本那样
-  // 对完时就关掉 radio）——这样天气/飞机/瓦片/Router 这些联网页面进去就能用。
-  // 常开会踩一个坑：记住的网不在范围内时协议栈每 ~2.4s 重试一次（NO_AP_FOUND），期间
-  // WiFi.scanNetworks() 会因为 STA 正忙而失败。那个坑现在由 doScan() 自己扛（扫描前先把
-  // STA 复位一次），详见 wifi_net.cpp 顶部那段策略说明。
-  // 没有记住的就先不连，跑 millis 时钟，等用户在设置→Wi-Fi 里选一次（之后会被记住）。
-  // 这段之前是阻塞的 connectWith()（最坏 WiFi 15s + NTP 8s ≈ 23s 卡在黑屏），改成后台
-  // 状态机：这里只踢一脚开始连，真正推进靠 loop() 里的 bootWifiUpdate()，开机动画播完
-  // 立刻能进菜单，联网/对时在后台悄悄跑完。
-  tlsCryptoWarmup();   // 必须在任何 CanvasLease 之前：理由见 tls_ca.cpp
-  bootWifiStart();
-  // ⚠️ 这里只是"踢了一脚"。协议栈那 ~36KB 是后台异步吃掉的，所以真正的账要等
-  // wifi_net.cpp 里连上时那一枪（"wifi up"）才看得见——别把这一行的 Δ 当成 WiFi 的开销。
-  ramMark("wifi start");
+  // ROZA : aucun démarrage réseau au boot, même si des identifiants sont mémorisés.
+  // Le Wi-Fi ne démarre que lorsqu'une application/commande demandée par l'utilisateur
+  // appelle explicitement la connexion ou le scan. Après une connexion volontaire,
+  // wifiKeeperResume() autorise les reconnexions ultérieures.
+  // L'horloge reste autonome hors ligne ; aucune synchronisation NTP automatique.
+
 
   lastActivityMs = millis();
   dirty = true;
