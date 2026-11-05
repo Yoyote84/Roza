@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Host-side tests for the firmware package safety checks."""
 import struct
+import subprocess
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 import package_flash as package
@@ -33,27 +35,65 @@ def esp_image(chip_id=9, magic=0xE9):
 
 
 class PackageSafetyTests(unittest.TestCase):
-    def test_checksum_manifests_are_independent_and_self_contained(self):
+    def test_checksum_manifests_verify_inside_each_download_archive(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            flash = root / "roza-cardputer-adv-8mb.bin"
-            update = root / "ROZA_UPDATE.bin"
-            flash.write_bytes(b"full image")
-            update.write_bytes(b"app only")
-            flash_manifest = root / "SHA256SUMS-flash.txt"
-            update_manifest = root / "SHA256SUMS-update.txt"
+            cases = (
+                (
+                    "flash",
+                    "roza-cardputer-adv-8mb.bin",
+                    b"full image",
+                    "SHA256SUMS-flash.txt",
+                ),
+                (
+                    "update",
+                    "ROZA_UPDATE.bin",
+                    b"app only",
+                    "SHA256SUMS-update.txt",
+                ),
+            )
 
-            package.write_checksum_manifest(flash_manifest, [flash])
-            package.write_checksum_manifest(update_manifest, [update])
+            for kind, filename, payload, manifest_name in cases:
+                with self.subTest(artifact=kind):
+                    package_dir = root / kind
+                    package_dir.mkdir()
+                    binary = package_dir / filename
+                    manifest = package_dir / manifest_name
+                    binary.write_bytes(payload)
+                    package.write_checksum_manifest(manifest, [binary])
 
-            flash_lines = flash_manifest.read_text().splitlines()
-            update_lines = update_manifest.read_text().splitlines()
-            self.assertEqual(len(flash_lines), 1)
-            self.assertEqual(len(update_lines), 1)
-            self.assertIn(flash.name, flash_lines[0])
-            self.assertNotIn(update.name, flash_manifest.read_text())
-            self.assertIn(update.name, update_lines[0])
-            self.assertNotIn(flash.name, update_manifest.read_text())
+                    # GitHub Actions artifacts are downloaded as ZIP archives.
+                    archive = root / f"{kind}.zip"
+                    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zipped:
+                        zipped.write(binary, binary.name)
+                        zipped.write(manifest, manifest.name)
+
+                    extracted = root / f"{kind}-extracted"
+                    extracted.mkdir()
+                    with zipfile.ZipFile(archive) as zipped:
+                        zipped.extractall(extracted)
+
+                    manifest_bytes = (extracted / manifest_name).read_bytes()
+                    self.assertTrue(manifest_bytes.endswith(b"\n"))
+                    self.assertEqual(len(manifest_bytes.splitlines()), 1)
+                    result = subprocess.run(
+                        ["sha256sum", "-c", manifest_name],
+                        cwd=extracted,
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertIn(f"{filename}: OK", result.stdout)
+
+                    # A changed payload must make the same archive check fail.
+                    (extracted / filename).write_bytes(payload + b"tampered")
+                    failed = subprocess.run(
+                        ["sha256sum", "-c", manifest_name],
+                        cwd=extracted,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(failed.returncode, 0)
 
     def test_accepts_exact_roza_layout(self):
         self.assertEqual(package.validate_partition_table(valid_table()), 0x7E0000)

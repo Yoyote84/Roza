@@ -25,7 +25,7 @@ def sha256(path: Path) -> str:
 def write_checksum_manifest(path: Path, files: list[Path]) -> None:
     """Write a self-contained SHA-256 manifest for one downloadable artifact."""
     path.write_text(
-        "".join(f"{sha256(file)}  {file.name}\\n" for file in files),
+        "".join(f"{sha256(file)}  {file.name}\n" for file in files),
         encoding="utf-8",
     )
 
