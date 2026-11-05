@@ -12,6 +12,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <cstring>
+#include <stdlib.h>
 
 static const char* APP_CATALOG_URL =
   "https://raw.githubusercontent.com/Yoyote84/Roza/main/firmware/data/apps/catalog.json";
@@ -34,8 +35,8 @@ struct RuntimePage {
   char action[13];
 };
 
-static StoreEntry storeApps[MAX_STORE_APPS];
-static RuntimePage runtimePages[MAX_APP_PAGES];
+static StoreEntry* storeApps = nullptr;
+static RuntimePage* runtimePages = nullptr;
 static int storeCount = 0;
 static int storeSelected = 0;
 static int runtimePage = 0;
@@ -49,6 +50,28 @@ static char storeError[72] = "";
 static void setStoreError(const char* message) {
   snprintf(storeError, sizeof(storeError), "%s", message ? message : "");
   dirty = true;
+}
+
+// Keep the boot-time static RAM budget low: the Cardputer ADV has no PSRAM and
+// the display needs one large contiguous DMA buffer. Allocate store-only buffers
+// lazily, after the user opens ROZA Apps.
+static bool ensureStoreMemory() {
+  if (storeApps && runtimePages) return true;
+
+  StoreEntry* apps = static_cast<StoreEntry*>(calloc(MAX_STORE_APPS, sizeof(StoreEntry)));
+  RuntimePage* pages = static_cast<RuntimePage*>(calloc(MAX_APP_PAGES, sizeof(RuntimePage)));
+  if (!apps || !pages) {
+    free(apps);
+    free(pages);
+    storeApps = nullptr;
+    runtimePages = nullptr;
+    setStoreError("Memoire insuffisante pour ROZA Apps.");
+    return false;
+  }
+
+  storeApps = apps;
+  runtimePages = pages;
+  return true;
 }
 static bool copyField(char* dst, size_t cap, const char* src, bool allowEmpty) {
   if (!dst || cap == 0 || !src) return false;
@@ -352,6 +375,10 @@ void appStoreEnter() {
   storeSelected = 0;
   if (!sdMounted) {
     setStoreError("Carte microSD absente : installation impossible.");
+    dirty = true;
+    return;
+  }
+  if (!ensureStoreMemory()) {
     dirty = true;
     return;
   }
