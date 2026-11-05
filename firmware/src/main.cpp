@@ -83,6 +83,7 @@ SET_LOOP_TASK_STACK_SIZE(12 * 1024);
 #include "sats.h"
 #include "router.h"
 #include "github.h"
+#include "update_check.h"
 #include "ssh_app.h"
 #include "hash_oven.h"
 #include "pcmode.h"
@@ -238,6 +239,7 @@ void render() {
     case SCREEN_BATTERY:    drawBatteryDetail(); break;
     case SCREEN_FORMAT:     drawFormat(); break;
     case SCREEN_ABOUT:      drawAbout(); break;
+    case SCREEN_UPDATE:     drawUpdateCheck(); break;
     case SCREEN_COMPASS:    drawCompass(); break;
     case SCREEN_COMPASS_DETAIL: drawImuDetail(); break;
     case SCREEN_FILES:      drawFiles(); break;
@@ -518,6 +520,7 @@ static void handleKeyAction(char k) {
           case SET_BATTERY: screen = SCREEN_BATTERY; break;
           case SET_FORMAT: screen = SCREEN_FORMAT; formatStep = 0; break;
           case SET_ABOUT:  screen = SCREEN_ABOUT; aboutPage = 0; aboutRamReset(); break;
+          case SET_UPDATE: screen = SCREEN_UPDATE; updateCheckEnter(); break;
         }
         dirty = true;
       }
@@ -979,6 +982,11 @@ static void handleKeyAction(char k) {
       if (k == '`') { screen = SCREEN_SETTINGS; dirty = true; }
       return;
 
+    case SCREEN_UPDATE:
+      if (k == '`') { screen = SCREEN_SETTINGS; dirty = true; }
+      else if (k == 'r' || k == 'R') updateCheckRequest();
+      return;
+
     case SCREEN_ABOUT:
       if (k == '`') { screen = SCREEN_SETTINGS; dirty = true; }
       else if (aboutPage == 2 && (k == '[' || k == '{')) { aboutRamScrollMove(-1); dirty = true; }
@@ -1256,6 +1264,7 @@ void loop() {
   bcTrailHeartbeat();   // 喂停滞看门狗：这一行不再被执行，5 秒后它就会把面包屑打出来
   M5.update();
   bootWifiUpdate();   // 推进开机后台连网/对时状态机；连完/超时后自动变 no-op
+  if (screen == SCREEN_UPDATE) updateCheckUpdate();
   if (bgFetchService()) bgReplay();   // 后台拉取刚结束：画布已要回来，补上忙时攒下的按键
 
   // 后台拉取进行中：按键先攒着、串口指令先留在接收缓冲里（见 bg_fetch.h 的线程边界）

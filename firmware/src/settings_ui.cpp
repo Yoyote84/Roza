@@ -151,7 +151,7 @@ void drawSettings() {
       cv.setTextColor(bcol, ROZA_INK);
       cv.setTextDatum(middle_center);
       cv.drawString(bb, bx + bw / 2, by + 7);
-    } else if (sid == SET_FORMAT || sid == SET_ABOUT || sid == SET_GNSS || sid == SET_PCMODE) {
+    } else if (sid == SET_FORMAT || sid == SET_ABOUT || sid == SET_UPDATE || sid == SET_GNSS || sid == SET_PCMODE) {
       String val = setValue(sid);
     } else {
       // 其它数值/档位项 (Bright, Vol, Sleep, Tz, Units)
