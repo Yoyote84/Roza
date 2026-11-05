@@ -83,6 +83,7 @@ SET_LOOP_TASK_STACK_SIZE(12 * 1024);
 #include "sats.h"
 #include "router.h"
 #include "github.h"
+#include "app_store.h"
 #include "ssh_app.h"
 #include "hash_oven.h"
 #include "pcmode.h"
@@ -295,6 +296,7 @@ void render() {
     case SCREEN_SATS:        drawSats(); break;
     case SCREEN_ROUTER:      drawRouter(); break;
     case SCREEN_GITHUB:      drawGithub(); break;
+    case SCREEN_APP_STORE:   appStoreDraw(); break;
     case SCREEN_SSH:         drawSsh(); break;
     case SCREEN_PCMODE:      break;
     // 哨兵，不是真页面。这里刻意不写 default: —— 少了 default，新加一个 Screen 却忘了
@@ -323,6 +325,7 @@ void cleanupApp(Screen s) {
     return;
   }   // 关 BLE 控制器并释放
   switch (s) {
+    case SCREEN_APP_STORE:        appStoreExit(); break;
     case SCREEN_FILES:            filesExit(); break;                              // 释放文件列表
     case SCREEN_READER_SHELF:     readerShelfExit(); break;                        // 释放书架列表
     case SCREEN_READER:
@@ -481,10 +484,16 @@ static void handleKeyAction(char k) {
           case APP_GITHUB:   screen = SCREEN_GITHUB; githubEnter(); break;
           case APP_SSH:      screen = SCREEN_SSH; sshEnter(); break;
           case APP_READER:   readerEnter(); break;
+          case APP_STORE:    screen = SCREEN_APP_STORE; appStoreEnter(); break;
           case APP_SETTINGS: screen = SCREEN_SETTINGS; settingsIndex = 0; break;
         }
         dirty = true;
       }
+      return;
+
+    case SCREEN_APP_STORE:
+      appStoreKey(k);
+      dirty = true;
       return;
 
     case SCREEN_SETTINGS:

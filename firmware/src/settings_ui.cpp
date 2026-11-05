@@ -33,7 +33,7 @@ String setValue(SetId id) {
       if (s == 0) return String("Jamais");
       snprintf(b, sizeof(b), "%ds", s); return String(b);
     }
-    case SET_TZ:      return String(TZ_OPTS[tzOptIdx].label);
+    case SET_TZ:      return String(timeSynced ? "OK" : "A regler");
     case SET_WX_UNIT: return String(weatherImperial ? "Imperial" : "Metric");
     case SET_BATTERY: {
       int lvl = powerBatteryLevel();
@@ -288,6 +288,8 @@ void manualTimeBegin() {
   time_t now = time(nullptr);
   if (now >= 1735689600) localtime_r(&now, &manualTimeValue);
   else { memset(&manualTimeValue, 0, sizeof(manualTimeValue)); manualTimeValue.tm_year=126; manualTimeValue.tm_mday=1; manualTimeValue.tm_hour=12; }
+  if (manualTimeValue.tm_year < 125) manualTimeValue.tm_year = 125;  // 2025 minimum
+  if (manualTimeValue.tm_year > 199) manualTimeValue.tm_year = 199;  // 2099 maximum
   manualTimeField=0; manualTimeEditing=true; dirty=true;
 }
 bool manualTimeEditingNow() { return manualTimeEditing; }
@@ -297,13 +299,13 @@ void manualTimeKey(char k) {
   if (k==',') manualTimeField=(manualTimeField+4)%5;
   else if (k=='/') manualTimeField=(manualTimeField+1)%5;
   else if (k=='-' || k=='_') {
-    if(manualTimeField==0) manualTimeValue.tm_year=max(126,manualTimeValue.tm_year-1);
+    if(manualTimeField==0) manualTimeValue.tm_year=max(125,manualTimeValue.tm_year-1);
     else if(manualTimeField==1) manualTimeValue.tm_mon=(manualTimeValue.tm_mon+11)%12;
     else if(manualTimeField==2) manualTimeValue.tm_mday=manualTimeValue.tm_mday>1?manualTimeValue.tm_mday-1:manualDaysInMonth(manualTimeValue.tm_year+1900,manualTimeValue.tm_mon+1);
     else if(manualTimeField==3) manualTimeValue.tm_hour=(manualTimeValue.tm_hour+23)%24;
     else manualTimeValue.tm_min=(manualTimeValue.tm_min+59)%60;
   } else if(k=='+' || k=='=') {
-    if(manualTimeField==0) manualTimeValue.tm_year=min(250,manualTimeValue.tm_year+1);
+    if(manualTimeField==0) manualTimeValue.tm_year=min(199,manualTimeValue.tm_year+1);
     else if(manualTimeField==1) manualTimeValue.tm_mon=(manualTimeValue.tm_mon+1)%12;
     else if(manualTimeField==2) manualTimeValue.tm_mday=manualTimeValue.tm_mday<manualDaysInMonth(manualTimeValue.tm_year+1900,manualTimeValue.tm_mon+1)?manualTimeValue.tm_mday+1:1;
     else if(manualTimeField==3) manualTimeValue.tm_hour=(manualTimeValue.tm_hour+1)%24;
@@ -334,7 +336,7 @@ void drawTz() {
     cv.setTextSize(3); cv.setTextColor(ACCENT,ROZA_INK); cv.drawString(timeBuf,SW/2,72);
     cv.setTextSize(1); cv.setTextColor(ROZA_OLIVE_LIGHT,ROZA_INK); cv.drawString(dayBuf,SW/2,91);
     cv.setTextColor(TFT_YELLOW,TFT_BLACK); cv.setTextDatum(bottom_center); cv.drawString(names[manualTimeField],SW/2,115);
-    cv.setTextColor(TFT_DARKGREY,TFT_BLACK); cv.drawString(", / champ  - / = valeur  Entree sauver  retour",SW/2,SH-2);
+    cv.setTextColor(TFT_DARKGREY,TFT_BLACK); cv.drawString(", / champ  - / + valeur  Entree sauver",SW/2,SH-2);
     return;
   }
 
@@ -358,7 +360,7 @@ void drawTz() {
 
   cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
   cv.setTextDatum(bottom_center); cv.setTextSize(1);
-  cv.drawString("; . fuseau   m: heure/date   ` retour", SW / 2, SH - 2);
+  cv.drawString("; . fuseau   m: regler date/heure   ` retour", SW / 2, SH - 2);
 }
 
 // 电池与电源仪表盘：双联硬件卡片

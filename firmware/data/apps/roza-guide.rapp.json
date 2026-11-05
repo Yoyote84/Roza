@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "id": "roza-guide",
+  "name": "Guide ROZA",
+  "version": "1.0.0",
+  "pages": [
+    {
+      "title": "Navigation",
+      "text": "Utilise les touches ; et . pour parcourir les pages. La touche retour revient au catalogue. Enter ouvre le raccourci.",
+      "action": "none"
+    },
+    {
+      "title": "Date et heure",
+      "text": "Parametres > Date/heure. Appuie sur m pour regler annee, mois, jour, heure et minutes. Enter sauvegarde dans la memoire interne.",
+      "action": "settings"
+    },
+    {
+      "title": "Fichiers et cartes",
+      "text": "Les applications ROZA compatibles sont stockees dans /ROZA/apps sur la microSD. Aucun formatage de carte n'est effectue.",
+      "action": "files"
+    }
+  ]
+}

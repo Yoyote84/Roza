@@ -176,61 +176,37 @@ bool canvasAvailable() {
 // 成 6 行、一屏只看得到 2 行，永远不知道下面还有什么。
 // ⚠️ 往这里加 app 一定要同步改 GROUPS[]（下面的 static_assert 会在忘记时把编译拦下来）。
 const AppDef APPS[] = {
-  // --- TOOLS：本地工具，不依赖任何射频 ---
-  // Clock 和 Timer 合并成 Time（时钟 / 秒表+倒计时 两页）——它们本来就是"看时间"的一件事，
-  // 分成两格纯属历史。腾出来的那一格给了 Astro（见 SKY 组）。
+  // --- TOOLS : outils locaux ---
   {"Time",      APP_TIME},     {"IMU",      APP_COMPASS},  {"Files",    APP_FILES},
   {"Spectrum",  APP_SPECTRUM}, {"Calc",     APP_CALC},     {"Converter",APP_CONV},    {"Player",   APP_PLAYER},
   {"Hash Oven", APP_HASHOVEN},
-  // --- SCAN：被动找东西。全靠混杂模式/扫描，**一个都不需要真的连上网**，
-  //     所以没网、没路由器的地方这四个照样能用——这条界线用户能直接感觉到。
-  //     （原来它们和下面 NET 那四个挤在一个 8 格满员的 NETWORK 组里，加不进任何东西。）
-  //     BLE Scan 也归这里：它跟上面四个是同一件事——找周围有什么，不需要连上谁。
-  //     （原来它是 Bluetooth app 里的一个子屏，跟"当键盘用"绑在一起纯属共享一次 BLE init。）
+  // --- SCAN : decouverte passive ---
   {"WiFi Chan", APP_WIFICHAN}, {"Sniffer",  APP_WSNIFF},   {"Wardrive", APP_WARDRIVE}, {"Drone ID", APP_RID},
   {"BLE Scan",  APP_BTSCAN},
-  // --- NET：主动收发，要真连上（或自己当 AP）才有意义 ---
+  // --- NET : reseau actif ---
   {"Hotspot",   APP_HOTSPOT},  {"LAN Scan", APP_LANSCAN},  {"NetProbe", APP_NETPROBE},
-  {"Router",    APP_ROUTER},   {"SSH",      APP_SSH},
-  // --- SIGNAL：Wi-Fi 以外的收发通道。叫 SIGNAL 不叫 RADIO 是因为红外是光不是射频，
-  //     而这四个的共同点是"隔空收发信号"（LoRa/BLE 收发、GNSS 只收、IR 只发）。
-  //     Drone ID 曾经也塞在这一组，但它是靠 esp_wifi_set_promiscuous 蹭 Wi-Fi 扫的，
-  //     跟这四个的收发硬件毫无关系，挪去 NETWORK 跟 Sniffer 归一类了 ---
-  // --- HID：把这台设备当键盘/遥控器去敲别人。BT Keys、BT Media 和 Ducky
-  //     都通过 bt.cpp 的 BLE HID 实现；Ducky 是蓝牙脚本执行器，不是 USB HID ---
+  {"Router",    APP_ROUTER},   {"SSH",      APP_SSH},      {"ChatGPT",  APP_CHAT},
+  // --- HID ---
   {"BT Keys",   APP_BTKB},     {"BT Media", APP_BTMEDIA},  {"Ducky",    APP_DUCKY},
-  // --- SIG：隔空收发信号 + 定位。⚠️ 名字从 SIGNAL 缩成 SIG 是被 tab 宽度逼的，
-  //     7 组时每格只有 240/7 = 34px，而 "SIGNAL" 要 36px——下面有编译期检查兜着 ---
-  //     Map 从 GNSS 的第 5 个子页拆出来单独成 app：它自己就是个完整的联网应用
-  //     （HTTP 瓦片状态机 + 48KB 底图缓存 + WGS-84→GCJ-02 换算），跟"看当前定位"不是一件事。
-  //     拆出来最实在的好处是那 48KB 的申请从"翻页翻到就悄悄发生"变成一次明确的进入动作。
-  //     摆在 GNSS 旁边是因为没锁定时你多半要先去隔壁看一眼 fix 状态。
-  {"LoRa",      APP_LORA},     {"GNSS",     APP_GNSS},      {"Map",      APP_MAP},
+  // --- SIG ---
+  {"LoRa",      APP_LORA},     {"GNSS",     APP_GNSS},     {"Map",      APP_MAP},
   {"IR",        APP_IR},
-  // --- SKY：抬头看天的（天文 / 天气 / 头顶的飞机 / 头顶的卫星）---
-  //     Astro 是从别处收拢来的：月相和晨昏线原本是 Clock 的第 2、3 页，日照是 Weather 的
-  //     第 3 页。三处都是"给时间和位置就能算"的天文页，散在两个 app 里纯属历史。
-  //     ⚠️ 它跟这一组其余三个的关键区别：**完全不联网**，晨昏线连位置都不要。
-  //     Quake 摆在 Typhoon 旁边：都是"天灾预警"，都靠一个免 key 的公开 JSON 源，
-  //     也都用 worldmap.h 那张陆地掩码打点。区别是 JMA 只发西北太平洋，USGS 是全球的。
+  // --- SKY ---
   {"Astro",     APP_ASTRO},    {"Weather",  APP_WEATHER},  {"Planes",   APP_ADSB},
   {"Sats",      APP_SATS},     {"Typhoon",  APP_TYPHOON},  {"Quake",    APP_QUAKE},
-  // --- MORE：上面几类都不沾边的。Ducky 是 USB HID（插线敲键盘），以前挂在 RADIO 下面
-  //     纯属分类错误。Router 是路由器网络监控，已归入 NET 组 ---
-  //     FX 也归这里：它跟 GitHub/Router 一样是"盯一个外部数字"的个人仪表盘，
-  //     不是网络工具。Settings 永远排最后。
-  {"ChatGPT",   APP_CHAT},     {"GitHub",   APP_GITHUB},    {"Radio",    APP_RADIO},
-  {"FX",        APP_FX},       {"OKX",      APP_OKX},       {"Reader",   APP_READER},
-  {"BadApple",  APP_BADAPPLE}, {"Settings",  APP_SETTINGS},
+  // --- MORE ---
+  {"GitHub",    APP_GITHUB},   {"Radio",    APP_RADIO},    {"FX",       APP_FX},
+  {"OKX",       APP_OKX},      {"Reader",   APP_READER},   {"BadApple", APP_BADAPPLE},
+  {"Apps",      APP_STORE},    {"Settings", APP_SETTINGS},
 };
 const int APP_COUNT = sizeof(APPS) / sizeof(APPS[0]);
 
 // ⚠️ 组名最多 6 个字符：tab 条是 SW/GROUP_COUNT 平分屏宽，6 组时每格 240/6 = 40px，
 // 而 Font0 是 6px/字符——"SIGNAL" 已经占到 36px，只剩 2px 边距。再加组或起更长的名字之前
 // 先算这笔账（ui_common.cpp 的 drawGroupTabs）。
-constexpr GroupDef GROUPS[] = { {"TOOLS", 0, 8}, {"SCAN", 8, 5}, {"NET", 13, 5},
-                                {"HID", 18, 3}, {"SIG", 21, 4}, {"SKY", 25, 6},
-                                {"MORE", 31, 8} };
+constexpr GroupDef GROUPS[] = { {"TOOLS", 0, 8}, {"SCAN", 8, 5}, {"NET", 13, 6},
+                                {"HID", 19, 3}, {"SIG", 22, 4}, {"SKY", 26, 6},
+                                {"MORE", 32, 8} };
 const int GROUP_COUNT = sizeof(GROUPS) / sizeof(GROUPS[0]);
 
 const int MENU_COLS = 4;
@@ -289,7 +265,7 @@ const SetDef SETTINGS[] = {
   {"LED",        SET_LED},
   {"Theme",      SET_THEME},
   {"Screen off", SET_SLEEP},
-  {"Timezone",   SET_TZ},
+  {"Date/heure", SET_TZ},
   {"Units",      SET_WX_UNIT},
   {"Battery",    SET_BATTERY},
   {"Debug bar",  SET_DEBUG},

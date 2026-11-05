@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "apps": [
+    {
+      "id": "roza-guide",
+      "name": "Guide ROZA",
+      "version": "1.0.0",
+      "description": "Guide interactif pour decouvrir ROZA et le Cardputer ADV.",
+      "url": "https://raw.githubusercontent.com/Yoyote84/Roza/main/firmware/data/apps/roza-guide.rapp.json"
+    }
+  ]
+}

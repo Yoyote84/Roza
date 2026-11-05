@@ -630,6 +630,7 @@ void drawAppIcon(int cx, int cy, int r, uint16_t col, AppId id) {
   else if (id == APP_BADAPPLE) icoApple(cx, cy, r, col);
   else if (id == APP_RADIO)   icoRadio(cx, cy, r, col);
   else if (id == APP_READER)  icoBook(cx, cy, r, col);
+  else if (id == APP_STORE) { icoFolder(cx, cy, r, col); cv.drawFastHLine(cx + 2, cy - 2, r, col); cv.drawFastVLine(cx + r / 2 + 2, cy - r / 2 - 1, r, col); }
   else if (id == APP_HASHOVEN) icoFlame(cx, cy, r, col);
   else if (id == APP_SSH)      icoTerminal(cx, cy, r, col);
   else                        icoSliders(cx, cy, r, col);
