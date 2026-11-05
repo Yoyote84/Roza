@@ -169,7 +169,8 @@ void drawUpdateCheck() {
     cv.drawString(trunc(resultMessage, 36), SW / 2, 65);
     cv.setTextColor(ROZA_PAPER_DIM, TFT_BLACK);
     cv.drawString(updateAssetFound ? "ROZA_UPDATE.bin disponible" : "Paquet USB indisponible", SW / 2, 83);
-    if (publishedDate.length() >= 10) cv.drawString(publishedDate.substring(0, 10), SW / 2, 99);
+    if (updateAvailable && updateAssetFound) cv.drawString("USB manuel: ecrire a 0x10000", SW / 2, 99);
+    else if (publishedDate.length() >= 10) cv.drawString(publishedDate.substring(0, 10), SW / 2, 99);
   }
   cv.setTextDatum(bottom_center);
   cv.setTextColor(ROZA_OLIVE, TFT_BLACK);

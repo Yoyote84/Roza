@@ -14,5 +14,5 @@ try:
 except Exception:
     version = "dev"
 
-env.Append(CPPDEFINES=[("ROZA_BUILD_VERSION", '"' + version + '"')])
+env.Append(CPPDEFINES=[("ROZA_BUILD_VERSION", r'\"' + version + r'\"')])
 print("[ROZA] Build version: " + version)
