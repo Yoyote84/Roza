@@ -519,6 +519,25 @@ void termLogLine(const char* s, uint16_t col) {
   tlogCol[idx] = col;
 }
 void termLogDraw(bool cursor) {
+  // Diagnostic de secours : le POST reste visible même si le tampon DMA M5Canvas
+  // n'a pas pu être alloué. Le rendu direct ne dépend pas de cv.
+  if (!canvasAvailable()) {
+    M5.Display.fillScreen(TFT_BLACK);
+    M5.Display.setFont(&fonts::Font0);
+    M5.Display.setTextSize(1);
+    M5.Display.setTextDatum(top_left);
+    M5.Display.setTextColor(0x9CD3, TFT_BLACK);
+    M5.Display.drawString("ROZA // DIAGNOSTIC", 8, 4);
+    int y = 18;
+    for (int i = 0; i < tlogCount && y < SH - 4; ++i) {
+      uint16_t color = tlogCol[i] ? tlogCol[i] : (tlog[i][0] != ' ' ? ACCENT : 0xC618);
+      M5.Display.setTextColor(color, TFT_BLACK);
+      M5.Display.drawString(tlog[i], 8, y);
+      y += 10;
+    }
+    return;
+  }
+
   cv.fillScreen(TFT_BLACK);
 
   // 赛博控制台外框与标题
@@ -635,7 +654,10 @@ void drawBootFrame(uint32_t t) {
 // 开机动画：赛博战术终端唤醒序列 + 矩阵解密 + 能量轨道 + 合成音效。约 1.8s。
 void bootAnim() {
   uint32_t t0 = millis();
-  M5.Display.setBrightness(0);
+  // Le rétroéclairage reste allumé pendant le démarrage : aucun échec de rendu
+  // ne doit pouvoir laisser l'appareil visuellement éteint.
+  M5.Display.setBrightness(brightVal());
+  if (!canvasAvailable()) return;
   bool s1 = false, s2 = false, s3 = false, s4 = false, s5 = false;
   int vol = (bootSoundOn && volVal() > 0) ? volVal() : 0;
 
@@ -654,10 +676,6 @@ void bootAnim() {
 
     drawBootFrame(t);
     cv.pushSprite(0, 0);
-
-    // 背光平滑爬升
-    int targetB = brightVal();
-    M5.Display.setBrightness(t < 350 ? (int)(targetB * t / 350) : targetB);
 
     // 用户按键跳过
     M5.update();

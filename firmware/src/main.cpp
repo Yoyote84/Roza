@@ -1099,6 +1099,15 @@ void setup() {
   M5.Display.setBrightness(brightVal());
   SW = M5.Display.width();
   SH = M5.Display.height();
+
+  // Afficher immédiatement un état directement sur le LCD, sans dépendre de M5Canvas.
+  M5.Display.fillScreen(TFT_BLACK);
+  M5.Display.setFont(&fonts::Font0);
+  M5.Display.setTextSize(1);
+  M5.Display.setTextDatum(middle_center);
+  M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+  M5.Display.drawString("ROZA - DEMARRAGE", SW / 2, SH / 2);
+
   ramMark("M5.begin");
 
   // 画布+配色先建好，放在联网之前——先播开机动画，别被 WiFi 连接(可能阻塞十几秒)卡在黑屏
@@ -1132,7 +1141,19 @@ void setup() {
   bootSoundInit();                        // 恢复开机音效偏好
   sleepInit();                            // 恢复熄屏超时偏好
   M5.Speaker.setVolume(volVal());
-  bootAnim();
+  if (canvasAvailable()) {
+    bootAnim();
+  } else {
+    // Ne jamais laisser un échec d'allocation graphique se transformer en écran noir.
+    M5.Display.fillScreen(TFT_BLACK);
+    M5.Display.setFont(&fonts::Font0);
+    M5.Display.setTextSize(1);
+    M5.Display.setTextDatum(middle_center);
+    M5.Display.setTextColor(TFT_RED, TFT_BLACK);
+    M5.Display.drawString("ERREUR: MEMOIRE ECRAN", SW / 2, SH / 2 - 8);
+    M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+    M5.Display.drawString("Diagnostic sur USB", SW / 2, SH / 2 + 8);
+  }
   ramMark("bootAnim");
 
   Serial.begin(115200);
