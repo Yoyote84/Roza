@@ -336,13 +336,15 @@ void drawTz() {
     cv.setTextSize(3); cv.setTextColor(ACCENT,ROZA_INK); cv.drawString(timeBuf,SW/2,72);
     cv.setTextSize(1); cv.setTextColor(ROZA_OLIVE_LIGHT,ROZA_INK); cv.drawString(dayBuf,SW/2,91);
     cv.setTextColor(TFT_YELLOW,TFT_BLACK); cv.setTextDatum(bottom_center); cv.drawString(names[manualTimeField],SW/2,115);
-    cv.setTextColor(TFT_DARKGREY,TFT_BLACK); cv.drawString(", / champ  - / + valeur  Entree sauver",SW/2,SH-2);
+    cv.setTextColor(TFT_DARKGREY,TFT_BLACK); cv.setTextDatum(bottom_center);
+    cv.drawString(", / champ  - / + valeur",SW/2,SH-10);
+    cv.drawString("Entree sauver  retour annuler",SW/2,SH-2);
     return;
   }
 
   char pageBuf[16];
   snprintf(pageBuf, sizeof(pageBuf), "%d/%d", tzOptIdx + 1, TZ_OPT_COUNT);
-  drawPageHeader("Fuseau horaire", pageBuf, ACCENT);
+  drawPageHeader("Date/heure", pageBuf, ACCENT);
 
   const int cx = 10, cy = 18, cw = SW - 20, ch = 96;
   cv.fillRoundRect(cx, cy, cw, ch, 4, ROZA_INK);
@@ -360,7 +362,8 @@ void drawTz() {
 
   cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
   cv.setTextDatum(bottom_center); cv.setTextSize(1);
-  cv.drawString("; . fuseau   m: regler date/heure   ` retour", SW / 2, SH - 2);
+  cv.drawString("; . : fuseau horaire", SW / 2, SH - 10);
+  cv.drawString("m : regler date/heure   retour", SW / 2, SH - 2);
 }
 
 // 电池与电源仪表盘：双联硬件卡片

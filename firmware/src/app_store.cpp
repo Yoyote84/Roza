@@ -47,6 +47,7 @@ static char storeError[72] = "";
 
 static void setStoreError(const char* message) {
   snprintf(storeError, sizeof(storeError), "%s", message ? message : "");
+  dirty = true;
 }
 static bool copyField(char* dst, size_t cap, const char* src, bool allowEmpty) {
   if (!dst || cap == 0 || !src) return false;
@@ -473,10 +474,12 @@ void appStoreDraw() {
   }
   cv.setTextDatum(bottom_center);
   cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  if (removeConfirm) cv.drawString("Enter confirmer   retour annuler", SW / 2, SH - 2);
-  else cv.drawString("Enter installer/ouvrir  d maj  x retirer", SW / 2, SH - 2);
-  cv.setTextDatum(bottom_left);
-  cv.drawString("; . choisir  r actualiser", 6, SH - 2);
+  if (removeConfirm) {
+    cv.drawString("Entree confirmer  retour annuler", SW / 2, SH - 2);
+  } else {
+    cv.drawString("; . choisir  Entree installer/ouvrir", SW / 2, SH - 10);
+    cv.drawString("d maj  x retirer  r actualiser", SW / 2, SH - 2);
+  }
 }
 void appStoreKey(char k) {
   if (storeRunning && runtimePageCount > 0) {
