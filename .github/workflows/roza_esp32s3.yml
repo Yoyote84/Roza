@@ -84,6 +84,10 @@ jobs:
           done
           ls -lh "$BUILD_DIR/firmware.bin" "$BUILD_DIR/firmware.elf" "$BUILD_DIR/bootloader.bin" "$BUILD_DIR/partitions.bin"
 
+      - name: Tester les garde-fous de paquetage
+        run: |
+          python tools/package_flash_test.py
+
       - name: Préparer l'image unique à flasher
         run: |
           python tools/package_flash.py \

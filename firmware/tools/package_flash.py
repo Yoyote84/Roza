@@ -48,6 +48,59 @@ def check_partition_table(data: bytes) -> int:
     return factory_size
 
 
+EXPECTED_PARTITIONS = (
+    (0x01, 0x02, 0x9000, 0x5000, "nvs"),
+    (0x01, 0x01, 0xE000, 0x1000, "phy_init"),
+    (0x00, 0x00, 0x10000, 0x7E0000, "factory"),
+)
+ESP32S3_CHIP_ID = 9
+
+
+def validate_partition_table(data: bytes) -> int:
+    """Require the exact known ROZA Cardputer ADV partition layout."""
+    if not data or len(data) > PARTITION_TABLE_SIZE or len(data) % 32:
+        raise SystemExit("Invalid partition-table length")
+    entries = []
+    for offset in range(0, len(data) - 31, 32):
+        magic = struct.unpack_from("<H", data, offset)[0]
+        if magic == 0xEBEB:  # ESP-IDF partition-table MD5 marker
+            break
+        if data[offset:offset + 32] == b"\xff" * 32:
+            break
+        if magic != 0x50AA:
+            raise SystemExit(f"Invalid partition-table entry at 0x{offset:x}")
+        _magic, ptype, subtype, address, size, raw_label, _flags = struct.unpack_from(
+            "<HBBII16sI", data, offset
+        )
+        label = raw_label.split(b"\0", 1)[0].decode("ascii", errors="strict")
+        if size == 0 or address + size > FLASH_SIZE:
+            raise SystemExit(f"Invalid partition bounds for {label or 'unnamed'}")
+        entries.append((ptype, subtype, address, size, label))
+
+    if tuple(entries) != EXPECTED_PARTITIONS:
+        raise SystemExit(
+            "Unsupported partition table: expected the exact ROZA Cardputer ADV "
+            "NVS/PHY/factory layout"
+        )
+    ranges = sorted((address, address + size, label)
+                    for _ptype, _subtype, address, size, label in entries)
+    for previous, current in zip(ranges, ranges[1:]):
+        if previous[1] > current[0]:
+            raise SystemExit(f"Partitions overlap: {previous[2]} and {current[2]}")
+    return EXPECTED_PARTITIONS[-1][3]
+
+
+def validate_esp32s3_image(data: bytes) -> None:
+    """Reject truncated, malformed or non-ESP32-S3 application images."""
+    if len(data) < 24 or data[0] != 0xE9 or not 1 <= data[1] <= 16:
+        raise SystemExit("Invalid or truncated ESP firmware image header")
+    chip_id = struct.unpack_from("<H", data, 12)[0]
+    if chip_id != ESP32S3_CHIP_ID:
+        raise SystemExit(
+            f"Wrong firmware target: chip_id={chip_id}, expected ESP32-S3 (9)"
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--build-dir", required=True, type=Path)
@@ -72,8 +125,9 @@ def main() -> None:
         raise SystemExit("Partition table exceeds its reserved 4 KiB region")
     if PARTITION_TABLE_OFFSET + len(partition_data) > APP_OFFSET:
         raise SystemExit("Partition table overlaps the factory application")
-    app_capacity = check_partition_table(partition_data)
+    app_capacity = validate_partition_table(partition_data)
     app_data = files["firmware"].read_bytes()
+    validate_esp32s3_image(app_data)
     if len(app_data) > app_capacity:
         raise SystemExit(
             f"Firmware ({len(app_data)} bytes) exceeds factory partition ({app_capacity} bytes)"
@@ -98,6 +152,8 @@ def main() -> None:
     # without chip erase, and only over ROZA with this same partition layout.
     update_path = output / "ROZA_UPDATE.bin"
     update_path.write_bytes(app_data)
+    if image_path.read_bytes() != image or update_path.read_bytes() != app_data:
+        raise SystemExit("Package read-back verification failed")
 
     checksum = sha256(image_path)
     update_checksum = sha256(update_path)
@@ -114,6 +170,8 @@ def main() -> None:
         "Operation: write application partition only; DO NOT erase the chip\n"
         "Required: existing ROZA installation with the same factory partition layout\n"
         f"Required partition table SHA-256: {partition_checksum}\n"
+        f"Application SHA-256: {update_checksum}\n"
+        "Preflight: ESP32-S3 image header and exact partition layout validated.\n"
         f"Factory app partition: offset 0x{APP_OFFSET:05x}, size 0x{app_capacity:x} ({app_capacity} bytes)\n"
         "NVS/settings and microSD are outside this file and are not intentionally erased.\n"
         "Do not use on M5Launcher, another firmware, or a changed partition layout.\n"

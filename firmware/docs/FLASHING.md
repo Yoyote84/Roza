@@ -93,3 +93,12 @@ Après un flash réussi, vérifier d'abord :
 5. modules radio/GNSS uniquement lorsqu'ils sont présents et activés volontairement.
 
 Ne pas formater la microSD. Ne pas activer d'émission LoRa automatique. Les essais physiques ne sont pas simulés par la CI.
+
+
+## Contrôles anti-paquet invalide
+
+Avant publication, le paquetage vérifie que la table de partitions correspond exactement à la disposition ROZA Cardputer ADV, que l'en-tête applicatif cible l'ESP32-S3 et que l'application tient dans la partition factory. Les fichiers générés sont relus et comparés aux octets attendus. La CI exécute des tests négatifs pour vérifier le rejet d'une table modifiée, d'une cible incorrecte, d'un en-tête invalide et d'une image tronquée. Le fichier `UPDATE-INFO.txt` contient aussi l'empreinte SHA-256 de l'application.
+
+Ces contrôles vérifient la structure et la cible du binaire, pas son comportement sur le Cardputer. Ils ne peuvent pas garantir à eux seuls l'absence d'écran noir : un essai de démarrage sur le matériel reste indispensable.
+
+Le partitionnement actuel ne comporte qu'un seul emplacement applicatif factory. Il ne permet donc pas de revenir automatiquement à l'ancienne version après un échec de démarrage. Un vrai rollback exige une migration du partitionnement et du bootloader, qui n'est pas incluse dans cette mise à jour.
