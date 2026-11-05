@@ -4,6 +4,7 @@
 #include "tls_ca.h"
 #include "sd_files.h"
 #include "ui_common.h"
+#include "roza_theme.h"
 #include "weather.h"
 #include "stopwatch.h"
 #include <WiFi.h>
@@ -379,13 +380,11 @@ void appStoreDraw() {
     while (*p && lines < 5) {
       char line[38];
       int n = 0, lastSpace = -1;
-      while (p[n] && p[n] != '
-' && n < 35) {
+      while (p[n] && p[n] != '\n' && n < 35) {
         if (p[n] == ' ') lastSpace = n;
         ++n;
       }
-      if (p[n] && p[n] != '
-' && lastSpace > 0) n = lastSpace;
+      if (p[n] && p[n] != '\n' && lastSpace > 0) n = lastSpace;
       while (n > 0 && (((uint8_t)p[n] & 0xC0) == 0x80)) --n;
       if (n <= 0) n = (int)strlen(p) < 35 ? (int)strlen(p) : 35;
       memcpy(line, p, n);
@@ -394,8 +393,7 @@ void appStoreDraw() {
       cv.drawString(line, 14, y);
       p += n;
       while (*p == ' ') ++p;
-      if (*p == '
-') ++p;
+      if (*p == '\n') ++p;
       y += 12;
       ++lines;
     }
@@ -443,13 +441,11 @@ void appStoreDraw() {
     while (*p && lines < 3) {
       char line[38];
       int n = 0, lastSpace = -1;
-      while (p[n] && p[n] != '
-' && n < 35) {
+      while (p[n] && p[n] != '\n' && n < 35) {
         if (p[n] == ' ') lastSpace = n;
         ++n;
       }
-      if (p[n] && p[n] != '
-' && lastSpace > 0) n = lastSpace;
+      if (p[n] && p[n] != '\n' && lastSpace > 0) n = lastSpace;
       while (n > 0 && (((uint8_t)p[n] & 0xC0) == 0x80)) --n;
       if (n <= 0) n = (int)strlen(p) < 35 ? (int)strlen(p) : 35;
       memcpy(line, p, n);
@@ -458,8 +454,7 @@ void appStoreDraw() {
       cv.drawString(line, 14, y);
       p += n;
       while (*p == ' ') ++p;
-      if (*p == '
-') ++p;
+      if (*p == '\n') ++p;
       y += 11;
       ++lines;
     }
