@@ -772,7 +772,6 @@ void drawSetIcon(int cx, int cy, int r, uint16_t col, SetId id) {
     case SET_DEBUG:   icoTerminal(cx, cy, r, col); break;
     case SET_FORMAT:  icoTrash(cx, cy, r, col); break;
     case SET_ABOUT:   icoInfo(cx, cy, r, col); break;
-    case SET_UPDATE:  icoInfo(cx, cy, r, col); break;
     default: break;
   }
 }

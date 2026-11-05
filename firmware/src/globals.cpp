@@ -295,7 +295,6 @@ const SetDef SETTINGS[] = {
   {"Debug bar",  SET_DEBUG},
   {"Format SD",  SET_FORMAT},
   {"About",      SET_ABOUT},
-  {"Updates",     SET_UPDATE},
 };
 const int SET_COUNT = sizeof(SETTINGS) / sizeof(SETTINGS[0]);
 int settingsIndex = 0;

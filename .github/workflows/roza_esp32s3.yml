@@ -26,7 +26,7 @@ env:
   PLATFORMIO_VERSION: 6.1.6
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: roza-firmware-${{ github.ref }}
@@ -89,25 +89,6 @@ jobs:
           python tools/package_flash.py \
             --build-dir .pio/build/cardputer-adv \
             --output-dir .pio/build/cardputer-adv/flash-package
-      - name: Publier la dernière version dans GitHub Releases
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: roza-${{ github.sha }}
-          name: ROZA ${{ github.sha }}
-          target_commitish: ${{ github.sha }}
-          make_latest: true
-          generate_release_notes: false
-          body: |
-            Mise à jour ROZA pour M5Stack Cardputer ADV (ESP32-S3, flash 8 Mo).
-
-            Fichier `ROZA_UPDATE.bin` : mise à jour de l’application seule à l’adresse `0x10000`.
-            Ne pas activer Erase All / Chip Erase. Cette mise à jour USB ne s’installe pas directement depuis le menu ROZA.
-          files: |
-            firmware/.pio/build/cardputer-adv/flash-package/ROZA_UPDATE.bin
-            firmware/.pio/build/cardputer-adv/flash-package/UPDATE-INFO.txt
-            firmware/.pio/build/cardputer-adv/flash-package/SHA256SUMS.txt
-
       - name: Publier le paquet prêt à flasher
         uses: actions/upload-artifact@v4
         with:
