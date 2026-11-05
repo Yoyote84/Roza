@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Host-side tests for the firmware package safety checks."""
 import struct
+import tempfile
 import unittest
+from pathlib import Path
 
 import package_flash as package
 
@@ -31,6 +33,28 @@ def esp_image(chip_id=9, magic=0xE9):
 
 
 class PackageSafetyTests(unittest.TestCase):
+    def test_checksum_manifests_are_independent_and_self_contained(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            flash = root / "roza-cardputer-adv-8mb.bin"
+            update = root / "ROZA_UPDATE.bin"
+            flash.write_bytes(b"full image")
+            update.write_bytes(b"app only")
+            flash_manifest = root / "SHA256SUMS-flash.txt"
+            update_manifest = root / "SHA256SUMS-update.txt"
+
+            package.write_checksum_manifest(flash_manifest, [flash])
+            package.write_checksum_manifest(update_manifest, [update])
+
+            flash_lines = flash_manifest.read_text().splitlines()
+            update_lines = update_manifest.read_text().splitlines()
+            self.assertEqual(len(flash_lines), 1)
+            self.assertEqual(len(update_lines), 1)
+            self.assertIn(flash.name, flash_lines[0])
+            self.assertNotIn(update.name, flash_manifest.read_text())
+            self.assertIn(update.name, update_lines[0])
+            self.assertNotIn(flash.name, update_manifest.read_text())
+
     def test_accepts_exact_roza_layout(self):
         self.assertEqual(package.validate_partition_table(valid_table()), 0x7E0000)
 

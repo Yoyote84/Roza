@@ -22,6 +22,13 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def write_checksum_manifest(path: Path, files: list[Path]) -> None:
+    """Write a self-contained SHA-256 manifest for one downloadable artifact."""
+    path.write_text(
+        "".join(f"{sha256(file)}  {file.name}\\n" for file in files),
+        encoding="utf-8",
+    )
+
 def check_partition_table(data: bytes) -> int:
     factory_size = 0
     found_factory = False
@@ -158,10 +165,8 @@ def main() -> None:
     checksum = sha256(image_path)
     update_checksum = sha256(update_path)
     partition_checksum = hashlib.sha256(partition_data).hexdigest()
-    (output / "SHA256SUMS.txt").write_text(
-        f"{checksum}  {image_path.name}\n"
-        f"{update_checksum}  {update_path.name}\n", encoding="utf-8"
-    )
+    write_checksum_manifest(output / "SHA256SUMS-flash.txt", [image_path])
+    write_checksum_manifest(output / "SHA256SUMS-update.txt", [update_path])
     (output / "UPDATE-INFO.txt").write_text(
         "ROZA — M5Stack Cardputer ADV application-only update\n"
         "Target: ESP32-S3FN8 / 8 MiB flash / no PSRAM\n"
@@ -179,7 +184,7 @@ def main() -> None:
         encoding="utf-8",
     )
     (output / "FLASH-INFO.txt").write_text(
-        "РO3A — M5Stack Cardputer ADV\n"
+        "ROZA — M5Stack Cardputer ADV\n"
         "Chip: ESP32-S3FN8 / 8 MiB flash / no PSRAM\n"
         "Image: roza-cardputer-adv-8mb.bin\n"
         "Flash address: 0x0000 (single merged image)\n"

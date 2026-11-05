@@ -100,7 +100,7 @@ jobs:
           path: |
             firmware/.pio/build/cardputer-adv/flash-package/roza-cardputer-adv-8mb.bin
             firmware/.pio/build/cardputer-adv/flash-package/FLASH-INFO.txt
-            firmware/.pio/build/cardputer-adv/flash-package/SHA256SUMS.txt
+            firmware/.pio/build/cardputer-adv/flash-package/SHA256SUMS-flash.txt
           if-no-files-found: error
           retention-days: 14
 
@@ -111,7 +111,7 @@ jobs:
           path: |
             firmware/.pio/build/cardputer-adv/flash-package/ROZA_UPDATE.bin
             firmware/.pio/build/cardputer-adv/flash-package/UPDATE-INFO.txt
-            firmware/.pio/build/cardputer-adv/flash-package/SHA256SUMS.txt
+            firmware/.pio/build/cardputer-adv/flash-package/SHA256SUMS-update.txt
           if-no-files-found: error
           retention-days: 14
 
