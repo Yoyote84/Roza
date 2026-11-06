@@ -63,8 +63,6 @@ PATCHES = {
          '"Interface Web ROZA"'),
         ('tiny ? "SD->USB" : "SD->USB Interface"',
          'tiny ? "SD vers USB" : "Stockage microSD en USB"'),
-        ('"Partition Manager."',
-         '"Gestion des partitions"'),
         ('{tiny ? "PM" : "PMan", "Partition Manager.",',
          '{"PM", "Gestion partitions",'),
         ('tiny ? "Change Settings." : "Change Launcher Settings."',
