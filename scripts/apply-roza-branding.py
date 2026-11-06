@@ -57,14 +57,16 @@ PATCHES = {
     "src/main.cpp": [
         ('tiny ? "Launch from SDCard" : "Launch from or mng SDCard"',
          'tiny ? "Ouvrir carte SD" : "Fichiers et applis SD"'),
-        ('{"OTA", "Installation OTA",',
-         '{"OTA", "Installer un firmware",'),
+        ('{"OTA", "Online Installer",',
+         '{"OTA", "Installer en ligne",'),
         ('tiny ? "Start WebUI" : "Start Web User Interface"',
          '"Interface Web ROZA"'),
         ('tiny ? "SD->USB" : "SD->USB Interface"',
          'tiny ? "SD vers USB" : "Stockage microSD en USB"'),
         ('"Partition Manager."',
          '"Gestion des partitions"'),
+        ('{tiny ? "PM" : "PMan", "Partition Manager.",',
+         '{"PM", "Gestion partitions",'),
         ('tiny ? "Change Settings." : "Change Launcher Settings."',
          '"Reglages ROZA"'),
     ],
@@ -81,6 +83,10 @@ PATCHES = {
         (
             '    nvs_get_u16(h, "even_color", &even_color);',
             '    nvs_get_u16(h, "even_color", &even_color);\n    // Migrate only the untouched upstream default palette; preserve custom themes.\n    if (FGCOLOR == 0x07E0 && BGCOLOR == 0x0000 && ALCOLOR == 0xF800 &&\n        odd_color == 0x30c5 && even_color == 0x32e5) {\n        FGCOLOR = 0x2903;\n        BGCOLOR = 0xF75A;\n        ALCOLOR = 0x7947;\n        odd_color = 0xE6D8;\n        even_color = 0xFF9C;\n        launcherConsolePrintln("ROZA: palette papier et bordeaux activee.");\n    }'
+        ),
+        (
+            '    int count = applySettingsFromRoot(setting);',
+            '    int count = applySettingsFromRoot(setting);\n    // Apply the ROZA palette to untouched upstream defaults from SD config too.\n    if (FGCOLOR == 0x07E0 && BGCOLOR == 0x0000 && ALCOLOR == 0xF800 &&\n        odd_color == 0x30c5 && even_color == 0x32e5) {\n        FGCOLOR = 0x2903;\n        BGCOLOR = 0xF75A;\n        ALCOLOR = 0x7947;\n        odd_color = 0xE6D8;\n        even_color = 0xFF9C;\n        count++;\n    }'
         ),
     ],
     "src/onlineLauncher.cpp": [
