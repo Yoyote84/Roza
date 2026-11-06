@@ -126,6 +126,15 @@ static void removeGlobal(const char* name) {
   lua_setglobal(state, name);
 }
 
+static void removeStringFunction(const char* name) {
+  lua_getglobal(state, LUA_STRLIBNAME);
+  if (lua_istable(state, -1)) {
+    lua_pushnil(state);
+    lua_setfield(state, -2, name);
+  }
+  lua_pop(state, 1);
+}
+
 static int apiClear(lua_State* L) {
   const uint16_t color = (uint16_t)luaL_optinteger(L, 1, TFT_BLACK);
   cv.fillScreen(color);
@@ -138,7 +147,6 @@ static int apiText(lua_State* L) {
   const int y = (int)luaL_checkinteger(L, 3);
   const uint16_t color = (uint16_t)luaL_optinteger(L, 4, TFT_WHITE);
   cv.setTextDatum(top_left);
-  cv.setTextSize(1);
   cv.setTextColor(color, TFT_BLACK);
   cv.drawString(value, x, y);
   return 0;
@@ -218,6 +226,10 @@ static void prepareEnvironment() {
   removeGlobal("xpcall");
   removeGlobal("print");
   removeGlobal("warn");
+  removeStringFunction("find");
+  removeStringFunction("match");
+  removeStringFunction("gmatch");
+  removeStringFunction("gsub");
   registerApi();
 }
 
@@ -359,10 +371,9 @@ void rozaRuntimeKey(char key) {
   else {
     lastKey[0] = key;
     lastKey[1] = 0;
-    name = lastKey;
   }
-  copyText(lastKey, sizeof(lastKey), name);
-  callGlobal("on_key", name);
+  if (name) copyText(lastKey, sizeof(lastKey), name);
+  callGlobal("on_key", lastKey);
 }
 
 void rozaRuntimeUpdate() {
@@ -376,6 +387,8 @@ void rozaRuntimeDraw() {
   if (errorVisible) { drawError(); return; }
   if (!rozaRuntimeActive()) return;
   cv.fillScreen(TFT_BLACK);
+  cv.setTextDatum(top_left);
+  cv.setTextSize(1);
   callGlobal("draw");
   if (errorVisible) { drawError(); return; }
   if (rozaRuntimeActive()) {

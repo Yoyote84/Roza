@@ -61,6 +61,7 @@ Les couleurs sont en RGB565 : vert 0x07E0, blanc 0xFFFF.
 - Limite mémoire Lua de 64 Kio ; source maximale de 96 Kio.
 - Chaque callback est interrompu après environ 100 ms d'instructions continues.
 - Bibliothèques io, os, package, debug et coroutine non ouvertes.
+- Les fonctions string.find, match, gmatch et gsub sont retirées pour éviter les recherches de motifs trop coûteuses dans une fonction C non interruptible.
 - dofile, loadfile, load, collectgarbage, pcall et xpcall retirées de l'environnement.
 - Pas d'accès direct aux fichiers, au Wi-Fi, aux GPIO ou à la radio depuis les scripts.
 - Le retour système est réservé à ROZA.
