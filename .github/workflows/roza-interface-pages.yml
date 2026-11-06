@@ -4,7 +4,7 @@ on:
   push:
     branches: [migration/roza-chanina-launcher]
     paths:
-      - "web-preview/design.html"
+      - "docs/interface-roza.html"
       - ".github/workflows/roza-interface-pages.yml"
   workflow_dispatch:
 
@@ -26,7 +26,7 @@ jobs:
       - name: Prepare design-only site
         run: |
           mkdir -p site
-          cp web-preview/design.html site/index.html
+          cp docs/interface-roza.html site/index.html
           touch site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
