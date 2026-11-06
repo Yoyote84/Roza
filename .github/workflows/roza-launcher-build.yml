@@ -39,6 +39,9 @@ jobs:
       - name: Apply ROZA CHANINA branding
         run: python scripts/apply-roza-branding.py
 
+      - name: Apply ROZA Cardputer interface
+        run: python scripts/apply-roza-interface.py
+
       - name: Compile Cardputer ADV firmware
         run: pio run -d launcher -e m5stack-cardputer
 
