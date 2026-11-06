@@ -1,0 +1,45 @@
+name: ROZA Web Screen Viewer
+
+on:
+  push:
+    branches: [migration/roza-chanina-launcher]
+    paths:
+      - "web-preview/**"
+      - ".github/workflows/roza-web-viewer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: roza-web-viewer-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ROZA Web Screen Viewer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare static site
+        run: |
+          mkdir -p site
+          cp web-preview/index.html site/index.html
+          touch site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    name: Publish ROZA Web Screen Viewer
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
