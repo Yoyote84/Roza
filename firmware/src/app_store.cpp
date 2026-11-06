@@ -103,10 +103,10 @@ static bool hashFileSha256(const String& path, char output[65]) {
   mbedtls_sha256_free(&ctx);
   file.close();
   if (rc != 0) return false;
-  static const char HEX[] = "0123456789abcdef";
+  static const char ROZA_HEX_CHARS[] = "0123456789abcdef";
   for (int i = 0; i < 32; ++i) {
-    output[i * 2] = HEX[digest[i] >> 4];
-    output[i * 2 + 1] = HEX[digest[i] & 0x0f];
+    output[i * 2] = ROZA_HEX_CHARS[digest[i] >> 4];
+    output[i * 2 + 1] = ROZA_HEX_CHARS[digest[i] & 0x0f];
   }
   output[64] = 0;
   return true;
