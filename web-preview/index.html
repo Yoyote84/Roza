@@ -6,7 +6,7 @@
 <style>
 :root{color-scheme:light;--paper:#f2e8d5;--ink:#29231f;--muted:#796c60;--wine:#792b3a;--line:#cbbba4}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(145deg,#e6d9c2,#f8f1e5 55%,#e7d8c2);color:var(--ink);font:15px system-ui,sans-serif}
-header,main{max-width:1050px;margin:auto;padding:20px 16px}header small{letter-spacing:.18em;font-weight:800;color:var(--wine)}h1{font:clamp(26px,5vw,38px) Georgia,serif;margin:5px 0}header p{margin:0;color:var(--muted)}
+header,main{max-width:1050px;margin:auto;padding:20px 16px}header small{letter-spacing:.18em;font-weight:800;color:var(--wine)}h1{font:clamp(26px,5vw,38px) Georgia,serif;margin:5px 0}header p{margin:0;color:var(--muted)}\n.design-link{display:inline-block;margin-top:8px;color:var(--wine);font-weight:700;text-decoration:none;border-bottom:1px solid var(--wine);padding-bottom:2px}.design-link:hover{opacity:.75}
 .layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr);gap:16px;align-items:start}.panel{background:#f7f0e4;border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:0 12px 35px #50341b18}
 .device{background:#29231f;border:5px solid #3a302b;border-radius:18px;padding:10px}.screen{min-height:180px;aspect-ratio:16/9;background:#171411;border-radius:6px;display:grid;place-items:center;overflow:hidden}.screen img{width:100%;height:100%;object-fit:contain;image-rendering:auto}.empty{color:#e9ddca;text-align:center;padding:20px;line-height:1.6}.device-label{text-align:center;color:#e8d9c5;font:11px monospace;letter-spacing:.14em;padding-top:8px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}.btn,label.btn{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff9ef;color:var(--ink);font:inherit;cursor:pointer}.primary{background:var(--wine);border-color:var(--wine);color:#fff7eb}.btn:disabled{opacity:.4;cursor:not-allowed}input[type=file]{display:none}
@@ -15,7 +15,7 @@ h2{font:700 18px Georgia,serif;margin:0 0 10px}.muted,.note{color:var(--muted);f
 </style>
 </head>
 <body>
-<header><small>M5STACK CARDPUTER ADV · 240 × 135</small><h1>РОЗА — Web Screen Viewer</h1><p>Visionneuse de captures réelles du firmware ROZA / Launcher 3.0.0.</p></header>
+<header><small>M5STACK CARDPUTER ADV · 240 × 135</small><h1>РОЗА — Web Screen Viewer</h1><p>Visionneuse de captures réelles du firmware ROZA / Launcher 3.0.0.</p><p><a class="design-link" href="./design.html">Voir la maquette de l’interface ROZA →</a></p></header>
 <main><div class="layout">
 <section class="panel">
  <div class="device"><div class="screen" id="screen"><div class="empty">Aucune capture chargée.<br>Importe une image PNG, JPEG ou WebP du véritable écran du Cardputer.</div></div><div class="device-label">РОЗА · CARDPUTER ADV</div></div>
