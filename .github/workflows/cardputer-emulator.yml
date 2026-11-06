@@ -1,0 +1,59 @@
+name: ROZA Cardputer ADV emulator comparison
+
+on:
+  push:
+    branches:
+      - diagnostics/cardputer-adv-emulator
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  compare-firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v4
+
+      - name: Download full-flash artifact #104 (known-good)
+        uses: actions/download-artifact@v4
+        with:
+          name: roza-cardputer-adv-flash-dbc9e79c22bfa6757cd26243d1a7f1dae3dc29c5
+          run-id: 41937614500
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/roza-104
+
+      - name: Download full-flash artifact #118 (black-screen report)
+        uses: actions/download-artifact@v4
+        with:
+          name: roza-cardputer-adv-flash-f1159af46f1d0eafe6b4976e67f745f00161c8b3
+          run-id: 42133713223
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/roza-118
+
+      - name: Install Espressif ESP32 emulator
+        shell: bash
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/espressif/esp-emulator/main/install.sh | sh -s -- --version 0.45.0 --bin-dir "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/esp-emu" --version
+
+      - name: Run both firmware images on an ESP32-S3 model
+        shell: bash
+        run: |
+          mapfile -t image104 < <(find /tmp/roza-104 -type f -name 'roza-cardputer-adv-8mb.bin')
+          mapfile -t image118 < <(find /tmp/roza-118 -type f -name 'roza-cardputer-adv-8mb.bin')
+          test "${#image104[@]}" -eq 1
+          test "${#image118[@]}" -eq 1
+          bash firmware/tools/emulate_cardputer_boots.sh emulator-results "${image104[0]}" "${image118[0]}"
+
+      - name: Upload emulator logs and comparison summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cardputer-emulator-results
+          path: emulator-results/
+          if-no-files-found: warn
