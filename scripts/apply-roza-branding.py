@@ -71,7 +71,7 @@ PATCHES = {
     "src/settings.cpp": [
         (
             '{"Default",\n         [&]() {\n             FGCOLOR = 0x07E0;\n             BGCOLOR = 0x0000;\n             ALCOLOR = 0xF800;\n             odd_color = 0x30c5;\n             even_color = 0x32e5;\n         }, _CLR_(FGCOLOR, 0x07E0)},',
-            '{"ROZA - Papier",\n         [&]() {\n             FGCOLOR = 0x2903;\n             BGCOLOR = 0xF75A;\n             ALCOLOR = 0x7947;\n             odd_color = 0xE6D8;\n             even_color = 0xFF9C;\n         }, _CLR_(FGCOLOR, 0x2104)},',
+            '{"ROZA - Papier",\n         [&]() {\n             FGCOLOR = 0x2903;\n             BGCOLOR = 0xF75A;\n             ALCOLOR = 0x7947;\n             odd_color = 0xE6D8;\n             even_color = 0xFF9C;\n         }, _CLR_(FGCOLOR, 0x2903)},',
         ),
         (
             '    FGCOLOR = 0x07E0;\n    BGCOLOR = 0x0000;\n    ALCOLOR = 0xF800;\n    odd_color = 0x30c5;\n    even_color = 0x32e5;',
