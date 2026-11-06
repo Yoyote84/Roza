@@ -1,3 +1,0 @@
-# ROZA local/private configuration — never commit credentials
-/firmware/src/secrets.h
-/firmware/src/config_local.h

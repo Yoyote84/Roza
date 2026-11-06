@@ -1,0 +1,89 @@
+name: ROZA CHANINA - Cardputer ADV
+
+on:
+  push:
+    branches:
+      - migration/roza-chanina-launcher
+    paths:
+      - ".github/workflows/roza-launcher-build.yml"
+      - ".gitmodules"
+      - "scripts/**"
+      - "README.md"
+      - "launcher"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ROZA CHANINA for Cardputer ADV
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ROZA and all Launcher submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "platformio==6.1.19" esptool requests
+
+      - name: Apply ROZA CHANINA branding
+        run: python scripts/apply-roza-branding.py
+
+      - name: Compile Cardputer ADV firmware
+        run: pio run -d launcher -e m5stack-cardputer
+
+      - name: Prepare build information
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("launcher")
+          build = root / ".pio/build/m5stack-cardputer"
+          files = {
+              "merged": root / "Launcher-m5stack-cardputer.bin",
+              "application": build / "firmware.bin",
+              "bootloader": build / "bootloader.bin",
+              "partitions": build / "partitions.bin",
+              "partition_csv": root / "support_files/custom_8Mb.csv",
+          }
+          report = {}
+          for name, path in files.items():
+              if not path.is_file():
+                  raise SystemExit(f"Missing build output: {path}")
+              raw = path.read_bytes()
+              report[name] = {
+                  "path": str(path),
+                  "size": len(raw),
+                  "sha256": hashlib.sha256(raw).hexdigest(),
+              }
+          Path("ROZA-BUILD-INFO.json").write_text(
+              json.dumps(report, indent=2) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(report, indent=2))
+          PY
+
+      - name: Publish firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ROZA-CHANINA-Cardputer-ADV-${{ github.sha }}
+          path: |
+            launcher/Launcher-m5stack-cardputer.bin
+            launcher/.pio/build/m5stack-cardputer/firmware.bin
+            launcher/.pio/build/m5stack-cardputer/bootloader.bin
+            launcher/.pio/build/m5stack-cardputer/partitions.bin
+            launcher/support_files/custom_8Mb.csv
+            ROZA-BUILD-INFO.json
+          if-no-files-found: error
+          retention-days: 14

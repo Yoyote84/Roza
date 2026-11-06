@@ -1,42 +1,55 @@
-# РO3A — firmware autonome pour M5Stack Cardputer ADV
+# ROZA CHANINA — Cardputer ADV
 
-**Cible :** M5Stack Cardputer ADV — ESP32-S3FN8, 8 Mo Flash, sans PSRAM  
-**Extension :** M5Stack Cap LoRa-1262 — SX1262 + GNSS ATGM336H-6N / AT6668  
-**Stockage prévu :** microSD 128 Go (système de fichiers à identifier avant validation)  
-**Langue du projet :** français  
-**Philosophie :** hors ligne d'abord ; les fonctions radio et réseau doivent être activées volontairement.
+**ROZA CHANINA est désormais construit sur CardputerADV-Launcher.** Le moteur, les applications binaires, l'installation depuis microSD/GitHub, l'OTA, l'interface Web et le gestionnaire de partitions proviennent du projet Launcher ; ce dépôt porte la personnalisation ROZA et sa chaîne de compilation.
 
-## Projet firmware actif
+## Source du firmware
 
-Le firmware actif est dans [`firmware/`](firmware/). Il est fondé sur [Lewis-Peter/cardputer-adv-firmware](https://github.com/Lewis-Peter/cardputer-adv-firmware), importé depuis le commit `3671c86f7850bd0342f39b5befad5b0c02d33f5b`.
+Le dossier `launcher/` est un sous-module Git épinglé sur **AMasetti/CardputerADV-Launcher**, commit `cf4c594c0494a3d4175cf8542b27e10dc611f05c`. Ses trois sous-modules (ArduinoJson, Arduino_GFX et DisplayDrivers) sont récupérés récursivement.
 
-Le projet source utilise **PlatformIO + Arduino-ESP32**. Ce dépôt ne doit donc pas être compilé avec `idf.py` directement. Les anciens fichiers et documents historiques conservés à la racine ne sont pas la configuration de compilation active.
+La version exacte est volontairement épinglée : elle cible le Cardputer ADV et ne doit pas être remplacée automatiquement par une version destinée à d'autres cartes.
 
-## Compilation locale
+## Personnalisation ROZA
 
-Installer Python 3 et PlatformIO, puis :
+Le script `scripts/apply-roza-branding.py` adapte le firmware lors de chaque compilation : marque et écran de démarrage ROZA CHANINA, barre d'état et en-têtes ROZA, menus principaux en français, palette olive/encre/ivoire, libellés français pour la boutique d'applications.
+
+Le code du sous-module reste intact dans Git. Les modifications ROZA sont conservées ici et réappliquées à chaque build.
+
+## Fonctions conservées de CardputerADV-Launcher
+
+- APPS : dépôts GitHub, catalogue de versions, téléchargement et installation des applications ;
+- OTA : installation de firmwares en ligne ;
+- SD : explorateur, copie, déplacement, renommage et installation de binaires ;
+- WUI : interface d'administration depuis un navigateur ;
+- USB : stockage de la microSD via USB ;
+- CFG : configuration du lanceur ;
+- PMan : visualisation et gestion des partitions ;
+- raccourcis clavier et démarrage rapide des applications installées.
+
+Les applications sont des binaires autonomes prévus pour le système de partitions de Launcher. L'ancien runtime Lua et l'ancien catalogue ROZA ne font plus partie de cette nouvelle base.
+
+## Compilation
+
+Avec PlatformIO 6.1.19 et Python 3.12 :
 
 ```sh
-cd firmware
-pio run -e cardputer-adv
+git clone --recurse-submodules https://github.com/Yoyote84/Roza.git
+cd Roza
+git checkout migration/roza-chanina-launcher
+git submodule update --init --recursive
+python3 scripts/apply-roza-branding.py
+pio run -d launcher -e m5stack-cardputer
 ```
 
-La configuration cible un ESP32-S3 avec 8 Mo de Flash. La table de partitions dédiée `partitions_8MB.csv` réserve une seule partition applicative (pas de double slot OTA). La taille réelle du binaire et la mémoire disponible doivent être contrôlées à chaque compilation.
+Le workflow GitHub Actions de cette branche effectue ces étapes et publie un artefact contenant l'image fusionnée ainsi que les fichiers séparés de compilation.
 
-## Compilation continue
+## Installation matérielle — attention
 
-Le workflow [ROZA Firmware Build](.github/workflows/roza_esp32s3.yml) compile l'environnement PlatformIO `cardputer-adv` sur chaque changement pertinent de `main`, sur les pull requests vers `main` et sur déclenchement manuel. Il publie les binaires uniquement si les trois fichiers attendus sont produits.
+Cette migration remplace le système de partitions ROZA actuel par le schéma CardputerADV-Launcher. Le flash de l'image fusionnée au décalage `0x0` réinitialise la NVS : les paramètres Wi-Fi et réglages enregistrés ne sont pas garantis d'être conservés. Le flash n'est pas lancé automatiquement par le dépôt.
 
-## Contraintes matérielles et de sécurité
+Ne flashe pas une image issue d'une compilation non vérifiée. La première validation doit se faire après compilation CI, puis sur un appareil de test ou avec la procédure de récupération disponible.
 
-- Ne pas supposer la présence de PSRAM : la carte cible en est dépourvue.
-- Ne jamais formater automatiquement la microSD. Son système de fichiers doit être identifié avant toute opération d'écriture.
-- Le Wi-Fi et le Bluetooth doivent rester arrêtés au démarrage et ne démarrer qu'après une action explicite de l'utilisateur.
-- LoRa doit rester en réception/écoute par défaut ; aucune émission automatique.
-- Installer l'antenne adaptée avant d'alimenter le module Cap LoRa-1262. Ne jamais brancher/débrancher le module à chaud.
-- Les GPIO du bus SPI sont partagés entre la microSD et le module LoRa : l'accès doit être arbitré.
-- Aucun test matériel n'est revendiqué sans essai réel sur le Cardputer ADV et le Cap.
+## Provenance et licence
 
-## Licences et provenance
+Ce projet conserve CardputerADV-Launcher comme sous-module, avec ses licences et sous-modules d'origine. CardputerADV-Launcher est un fork du projet [bmorcelli/Launcher](https://github.com/bmorcelli/Launcher), lui-même issu de M5Launcher. Voir launcher/README.md et launcher/LICENSE pour les crédits et conditions détaillés.
 
-Voir [`firmware/LICENSE`](firmware/LICENSE) et [`firmware/UPSTREAMS.md`](firmware/UPSTREAMS.md). Le firmware amont est sous MIT, mais des composants tiers conservent leurs propres licences et avis de copyright.
+Le dépôt ROZA conserve également le script de personnalisation et sa documentation sous licence MIT.
