@@ -1371,6 +1371,8 @@ void loop() {
   // 音乐播放器：自动切歌、电平动效与状态维护
   if (screen == SCREEN_PLAYER) playerUpdate();
 
+  if (screen == SCREEN_APP_STORE) appStoreUpdate();
+
   // Bad Apple：按时间线推进播放（自己按帧号节流、读到新帧才翻 dirty，不用外面再限频）
   if (screen == SCREEN_BADAPPLE) badappleUpdate();
 

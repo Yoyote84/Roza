@@ -1,4 +1,5 @@
 #include "app_store.h"
+#include "roza_runtime.h"
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <WiFi.h>
@@ -469,6 +470,21 @@ static void startInstall() {
   setJobMessage("");
   bgFetchRun(installWorker);
 }
+static void startRun() {
+  if (!scanOk || installedCount == 0 || selected >= installedCount || bgFetchBusy()) return;
+  const InstalledApp app = installed[selected];
+  if (strcmp(app.runtime, "roza-lua") != 0) {
+    setJobMessage("Moteur d'application non compatible");
+    return;
+  }
+  detailMode = false;
+  confirmRemove = false;
+  setJobMessage("");
+  if (!rozaRuntimeStart(app.id, app.entry)) {
+    const char* error = rozaRuntimeLastError();
+    if (error && error[0]) setJobMessage(error);
+  }
+}
 static void startRemove() {
   if (!scanOk || installedCount == 0 || selected >= installedCount || bgFetchBusy()) return;
   copyField(jobId, sizeof(jobId), installed[selected].id);
@@ -499,6 +515,7 @@ static void drawFooter(const char* text) {
 }
 } // namespace
 void appStoreEnter() {
+  rozaRuntimeStop();
   setJobMessage("");
   scanInstalledApps();
   catalogMode = true;
@@ -513,6 +530,7 @@ void appStoreEnter() {
   dirty = true;
 }
 void appStoreExit() {
+  rozaRuntimeStop();
   installedCount = 0;
   catalogCount = 0;
   invalidCount = 0;
@@ -522,6 +540,16 @@ void appStoreExit() {
   confirmRemove = false;
 }
 void appStoreKey(char key) {
+  if (rozaRuntimeVisible()) {
+    if (key == 0x60) {
+      rozaRuntimeStop();
+      dirty = true;
+      return;
+    }
+    rozaRuntimeKey(key);
+    dirty = true;
+    return;
+  }
   if (bgFetchBusy()) return;
   if (key == 0x60) {
     if (confirmRemove) confirmRemove = false;
@@ -563,9 +591,15 @@ void appStoreKey(char key) {
     return;
   }
   if (detailMode) {
-    if (key == 10 || key == ' ') detailMode = false;
+    if ((key == 'l' || key == 'L') && !catalogMode) startRun();
+    else if (key == 10 || key == ' ') detailMode = false;
     else if ((key == 'i' || key == 'I') && catalogMode) startInstall();
     else if ((key == 'u' || key == 'U') && !catalogMode) confirmRemove = true;
+    dirty = true;
+    return;
+  }
+  if ((key == 'l' || key == 'L') && !catalogMode) {
+    startRun();
     dirty = true;
     return;
   }
@@ -580,7 +614,14 @@ void appStoreKey(char key) {
     dirty = true;
   }
 }
+void appStoreUpdate() {
+  if (rozaRuntimeActive()) {
+    dirty = true;
+    rozaRuntimeUpdate();
+  }
+}
 void drawAppStore() {
+  if (rozaRuntimeVisible()) { rozaRuntimeDraw(); return; }
   cv.fillScreen(TFT_BLACK);
   drawPageHeader("Apps", catalogMode ? "Catalogue" : "microSD");
   if (confirmRemove && installedCount > 0) {
@@ -613,7 +654,7 @@ void drawAppStore() {
       cv.setTextColor(isInstalled(app.id) ? TFT_GREEN : TFT_ORANGE, TFT_BLACK);
       cv.drawString(isInstalled(app.id) ? "Deja installee" : "Disponible au telechargement", 8, 96);
       cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
-      cv.drawString("Moteur Lua non actif dans cette version", 8, 110);
+      cv.drawString("Compatible Lua 5.4", 8, 110);
       drawFooter("i : installer   Entree : retour");
     } else {
       const InstalledApp& app = installed[selected];
@@ -629,8 +670,8 @@ void drawAppStore() {
       cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
       cv.drawString(desc, 8, 91);
       cv.setTextColor(TFT_ORANGE, TFT_BLACK);
-      cv.drawString("Paquet present sur microSD", 8, 108);
-      drawFooter("u : desinstaller   Entree : retour");
+      cv.drawString("Application executable", 8, 108);
+      drawFooter("l : lancer   u : desinstaller");
     }
     return;
   }
@@ -673,5 +714,5 @@ void drawAppStore() {
     }
   }
   if (catalogMode) drawFooter("t : microSD   ; . : choix   i : installer");
-  else drawFooter("t : catalogue   ; . : choix   u : supprimer");
+  else drawFooter("t : catalogue   ; . : choix   l : lancer   u : supprimer");
 }

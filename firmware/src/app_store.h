@@ -2,9 +2,9 @@
 
 #include "globals.h"
 
-// Gestionnaire de paquets ROZA stockés sur la microSD.
-// Cette première étape inspecte uniquement les manifestes : aucun code tiers n'est exécuté.
+// Gestionnaire d'applications ROZA installees sur la microSD.
 void appStoreEnter();
 void appStoreExit();
+void appStoreUpdate();
 void appStoreKey(char key);
 void drawAppStore();

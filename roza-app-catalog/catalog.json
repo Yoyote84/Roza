@@ -5,14 +5,14 @@
     {
       "id": "roza-hello",
       "name": "Hello ROZA",
-      "version": "1.0.0",
-      "description": "Exemple de paquet pour verifier le catalogue et l'installation microSD.",
+      "version": "1.1.0",
+      "description": "Application de demonstration du runtime Lua ROZA : ecran, boucle et clavier.",
       "runtime": "roza-lua",
       "entry": "main.lua",
-      "manifest_size": 258,
-      "manifest_sha256": "15c842ac9770c60e9b245994203f3db6bb09577ed9dc21a91c98abcbfdbd4135",
-      "entry_size": 213,
-      "entry_sha256": "9abd7489d4589db13b69743572abde1c1b4c31339a48d50447ca4ac5457fda0c"
+      "manifest_size": 263,
+      "manifest_sha256": "e60d15da38a35c0f030b8e4ddf4a337b87814b02db8f52fa53bff156b323d5c3",
+      "entry_size": 758,
+      "entry_sha256": "37a6d447c302fd1ea457cd6ecdaddf1ea357318b0b513bd013a611b6d2acf2be"
     }
   ]
 }

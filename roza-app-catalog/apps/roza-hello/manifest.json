@@ -3,8 +3,8 @@
   "format_version": 1,
   "id": "roza-hello",
   "name": "Hello ROZA",
-  "version": "1.0.0",
-  "description": "Exemple de paquet pour verifier le catalogue et l'installation microSD.",
+  "version": "1.1.0",
+  "description": "Application de demonstration du runtime Lua ROZA : ecran, boucle et clavier.",
   "runtime": "roza-lua",
   "entry": "main.lua"
 }

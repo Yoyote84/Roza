@@ -38,3 +38,10 @@ jobs:
       - name: Compiler ROZA
         working-directory: firmware
         run: platformio run -e cardputer-adv
+      - name: Publier le firmware compile
+        uses: actions/upload-artifact@v4
+        with:
+          name: ROZA-Cardputer-ADV-${{ github.sha }}
+          path: firmware/.pio/build/cardputer-adv/firmware.bin
+          if-no-files-found: error
+          retention-days: 14
