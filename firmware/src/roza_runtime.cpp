@@ -3,9 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
+#include <lua.hpp>  // En-tetes Lua sous extern "C" fourni par la bibliotheque PlatformIO.
 #include "globals.h"
 
 namespace {
