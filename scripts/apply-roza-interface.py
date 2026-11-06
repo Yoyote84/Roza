@@ -13,6 +13,7 @@ END = "\n/**********************************************************************
 REPLACEMENT = r'''// ROZA-INTERFACE-V1: compact 240x135 paper-and-burgundy list layout.
 void drawMainMenu(std::vector<MenuOptions> &opt, int index, bool forceFullRedraw) {
     static int lastIndex = -1;
+    static int lastFirst = -1;
     const int count = static_cast<int>(opt.size());
     if (count < 1) {
         displayRedStripe("Aucune option disponible");
@@ -32,9 +33,10 @@ void drawMainMenu(std::vector<MenuOptions> &opt, int index, bool forceFullRedraw
     int first = 0;
     if (index >= visibleRows) first = index - visibleRows + 1;
 
-    const bool fullRedraw = forceFullRedraw || lastIndex < 0;
+    const bool fullRedraw = forceFullRedraw || lastIndex < 0 || first != lastFirst;
     const int previous = lastIndex;
     lastIndex = index;
+    lastFirst = first;
 
     if (fullRedraw) {
         tft->fillScreen(BGCOLOR);
