@@ -2,6 +2,12 @@
 
 **ROZA CHANINA est construit sur Launcher 3.0.0**, la base officielle de bmorcelli. Ce dépôt conserve l'identité ROZA et sa personnalisation française.
 
+## Interface ROZA — direction visuelle
+
+[Ouvrir la maquette interactive ROZA](https://yoyote84.github.io/Roza/design.html).
+
+C'est la référence graphique retenue : écran papier/crème, encre sombre, bordeaux, bandeau **РОЗА**, accueil en tuiles et vues Applications, Wi-Fi, Réglages, OTA, carte SD, partitions et Web. Les données de cette page restent fictives ; les actions du firmware sur le Cardputer sont celles du vrai Launcher, pas celles de la maquette.
+
 ## ROZA Web Screen Viewer
 
 [Ouvrir ROZA Web Screen Viewer](https://yoyote84.github.io/Roza/).
@@ -29,7 +35,7 @@ Le sous-module `launcher/` est épinglé sur **bmorcelli/Launcher**, tag **3.0.0
 
 ## Personnalisation ROZA
 
-Le script `scripts/apply-roza-branding.py` applique l'identité ROZA : logo cyrillique **РОЗА**, libellés français, palette papier/encre/bordeaux, personnalisation WebUI, sélection Wi-Fi avant connexion et masquage des mots de passe dans les journaux série. Les fonctions natives de Launcher 3.0.0 sont conservées.
+Le script `scripts/apply-roza-branding.py` applique réellement au firmware le bandeau **РОЗА · CARNET**, les tuiles du menu principal en bordeaux, la palette papier/encre/bordeaux, les libellés français des fonctions principales et le thème correspondant dans la WebUI. Il migre vers la palette ROZA uniquement si l'appareil utilise encore la palette amont par défaut ; les thèmes personnalisés et les autres paramètres NVS ne sont pas réinitialisés. La sélection Wi-Fi reste explicite et les mots de passe ne sont pas écrits dans les logs. Les actions natives de Launcher 3.0.0 sont conservées.
 
 ## Fonctions conservées
 
@@ -51,7 +57,7 @@ python3 scripts/apply-roza-branding.py
 pio run -d launcher -e m5stack-cardputer
 ```
 
-Une compilation réussie ne prouve pas le démarrage ni tous les périphériques sur le Cardputer réel.
+Une compilation réussie ne prouve pas le démarrage ni tous les périphériques sur le Cardputer réel. La nouvelle interface doit encore être vérifiée physiquement sur l'écran 240 × 135.
 
 ## Installation matérielle
 
