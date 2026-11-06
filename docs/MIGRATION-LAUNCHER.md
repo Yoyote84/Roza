@@ -8,7 +8,7 @@ Les personnalisations sont appliquées par `scripts/apply-roza-branding.py`, pui
 
 ## Personnalisation
 
-La maquette de référence est disponible dans `web-preview/design.html`. Le firmware reprend maintenant réellement sa direction graphique :
+La maquette de référence est disponible dans `docs/interface-roza.html`. Le firmware reprend maintenant réellement sa direction graphique :
 
 - bandeau du menu principal **РОЗА · CARNET**, avec lettres cyrilliques dessinées en bitmap pour ne pas dépendre de la police embarquée ;
 - liste d'actions compacte adaptée à l'écran 240 × 135, avec sélection bordeaux et fond papier/crème ;
