@@ -46,7 +46,7 @@ PATCHES = {
          '    nvs_get_u16(h, "even_color", &even_color);\n    String rozaTheme = lnvs::getString(h, "roza_theme", 24);\n    if (rozaTheme != "po3a-paper-v1") {\n        FGCOLOR = 0x2104;\n        BGCOLOR = 0xEEF8;\n        ALCOLOR = 0xA145;\n        odd_color = 0xE6D4;\n        even_color = 0xDEB2;\n        lnvs::Handle themeStore("launcher", true);\n        if (themeStore) {\n            nvs_handle_t themeHandle = themeStore.raw();\n            nvs_set_u16(themeHandle, "FGCOLOR", FGCOLOR);\n            nvs_set_u16(themeHandle, "BGCOLOR", BGCOLOR);\n            nvs_set_u16(themeHandle, "ALCOLOR", ALCOLOR);\n            nvs_set_u16(themeHandle, "odd_color", odd_color);\n            nvs_set_u16(themeHandle, "even_color", even_color);\n            lnvs::setString(themeHandle, "roza_theme", "po3a-paper-v1");\n            themeStore.commit();\n        }\n    }\n    lnvs::getBool(h, "dev_mode", dev_mode);'),
         ('    JsonObject setting = settings[0];\n    int count = applySettingsFromRoot(setting);\n    getWifiFromNVS(true);',
          '    JsonObject setting = settings[0];\n    int count = applySettingsFromRoot(setting);\n    if (setting["roza_theme"] != "po3a-paper-v1") {\n        FGCOLOR = 0x2104;\n        BGCOLOR = 0xEEF8;\n        ALCOLOR = 0xA145;\n        odd_color = 0xE6D4;\n        even_color = 0xDEB2;\n        setting["roza_theme"] = "po3a-paper-v1";\n        ++count;\n    }\n    getWifiFromNVS(true);'),
-        ('    dev_mode = false;\\n    autoConnect = true;', '    dev_mode = false;\\n    autoConnect = false;'),
+        ('    dev_mode = false;\n    autoConnect = true;', '    dev_mode = false;\n    autoConnect = false;'),
     ],
     "src/appStore.cpp": [
         ('displayRedStripe("Getting app list");', 'displayRedStripe("Lecture du catalogue ROZA");'),
@@ -64,8 +64,8 @@ PATCHES = {
     ],
     "src/onlineLauncher.cpp": [
         ('keyboard(pwd, 63, "Network Password:")', 'keyboard(pwd, 63, "Mot de passe Wi-Fi :")'),
-        ('launcherConsolePrintf("wifiConnect: ssid->%s, pwd->%s\\n", ssid.c_str(), pwd.c_str());',
-         'launcherConsolePrintf("wifiConnect: saved SSID %s (password hidden)\\n", ssid.c_str());'),
+        ('launcherConsolePrintf("wifiConnect: ssid->%s, pwd->%s\n", ssid.c_str(), pwd.c_str());',
+         'launcherConsolePrintf("wifiConnect: saved SSID %s (password hidden)\n", ssid.c_str());'),
         ('tftprint("Connecting to: " + ssid + ".", 10);', 'tftprint("Connexion a : " + ssid + ".", 10);'),
         ('displayError("Wrong Password");', 'displayError("Mot de passe incorrect");'),
     ],
