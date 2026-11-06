@@ -45,16 +45,24 @@ PATCHES = {
             'tft->drawCentreString("ROZA / CARNET", tftWidth / 2, panelHeight() > 200 ? 20 : 10, 1);',
         ),
         ('"No options available"', '"Aucune option disponible"'),
+        (
+            '        // Draw Launcher version and battery value\n        // Short panels have no room for the version next to the battery gauge.\n        if (panelHeight() < 200) tft->drawString("Launcher", 12 + RES, 12);\n        else tft->drawString("Launcher " + String(LAUNCHER), 12 + RES, 12);',
+            '        // ROZA CHANINA identity: compact Cyrillic bitmap plus notebook label.\n        drawRozaWordmark(12 + RES, 8, ALCOLOR, 1);\n        tft->setTextColor(FGCOLOR, BGCOLOR);\n        tft->drawString("CARNET", 42 + RES, 12, 1);'
+        ),
+        (
+            '        uint16_t itemColor = opt[i].active ? opt[i].color : DARKGREY;\n        uint16_t selectedColor = opt[i].active ? opt[i].color : LIGHTGREY;',
+            '        uint16_t itemColor = opt[i].active ? ALCOLOR : DARKGREY;\n        uint16_t selectedColor = opt[i].active ? ALCOLOR : LIGHTGREY;'
+        ),
     ],
     "src/main.cpp": [
         ('tiny ? "Launch from SDCard" : "Launch from or mng SDCard"',
-         '"Fichiers microSD"'),
-        ('{"OTA", "Online Installer",',
+         'tiny ? "Ouvrir carte SD" : "Fichiers et applis SD"'),
+        ('{"OTA", "Installation OTA",',
          '{"OTA", "Installer un firmware",'),
         ('tiny ? "Start WebUI" : "Start Web User Interface"',
          '"Interface Web ROZA"'),
         ('tiny ? "SD->USB" : "SD->USB Interface"',
-         '"Stockage USB"'),
+         'tiny ? "SD vers USB" : "Stockage microSD en USB"'),
         ('"Partition Manager."',
          '"Gestion des partitions"'),
         ('tiny ? "Change Settings." : "Change Launcher Settings."',
@@ -63,13 +71,17 @@ PATCHES = {
     "src/settings.cpp": [
         (
             '{"Default",\n         [&]() {\n             FGCOLOR = 0x07E0;\n             BGCOLOR = 0x0000;\n             ALCOLOR = 0xF800;\n             odd_color = 0x30c5;\n             even_color = 0x32e5;\n         }, _CLR_(FGCOLOR, 0x07E0)},',
-            '{"ROZA - Papier",\n         [&]() {\n             FGCOLOR = 0x2104;\n             BGCOLOR = 0xEEF8;\n             ALCOLOR = 0xA145;\n             odd_color = 0xE6D4;\n             even_color = 0xDEB2;\n         }, _CLR_(FGCOLOR, 0x2104)},',
+            '{"ROZA - Papier",\n         [&]() {\n             FGCOLOR = 0x2903;\n             BGCOLOR = 0xF75A;\n             ALCOLOR = 0x7947;\n             odd_color = 0xE6D8;\n             even_color = 0xFF9C;\n         }, _CLR_(FGCOLOR, 0x2104)},',
         ),
         (
             '    FGCOLOR = 0x07E0;\n    BGCOLOR = 0x0000;\n    ALCOLOR = 0xF800;\n    odd_color = 0x30c5;\n    even_color = 0x32e5;',
-            '    FGCOLOR = 0x2104;\n    BGCOLOR = 0xEEF8;\n    ALCOLOR = 0xA145;\n    odd_color = 0xE6D4;\n    even_color = 0xDEB2;',
+            '    FGCOLOR = 0x2903;\n    BGCOLOR = 0xF75A;\n    ALCOLOR = 0x7947;\n    odd_color = 0xE6D8;\n    even_color = 0xFF9C;',
         ),
         ('    autoConnect = true;', '    autoConnect = false;'),
+        (
+            '    nvs_get_u16(h, "even_color", &even_color);',
+            '    nvs_get_u16(h, "even_color", &even_color);\n    // Migrate only the untouched upstream default palette; preserve custom themes.\n    if (FGCOLOR == 0x07E0 && BGCOLOR == 0x0000 && ALCOLOR == 0xF800 &&\n        odd_color == 0x30c5 && even_color == 0x32e5) {\n        FGCOLOR = 0x2903;\n        BGCOLOR = 0xF75A;\n        ALCOLOR = 0x7947;\n        odd_color = 0xE6D8;\n        even_color = 0xFF9C;\n        launcherConsolePrintln("ROZA: palette papier et bordeaux activee.");\n    }'
+        ),
     ],
     "src/onlineLauncher.cpp": [
         ('keyboard(pwd, 63, "Network Password:")',
