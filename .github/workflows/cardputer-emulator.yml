@@ -37,7 +37,7 @@ jobs:
       - name: Install Espressif ESP32 emulator
         shell: bash
         run: |
-          curl -fsSL https://raw.githubusercontent.com/espressif/esp-emulator/main/install.sh | sh -s -- --version 0.45.0 --bin-dir "$HOME/.local/bin"
+          curl -fsSL https://raw.githubusercontent.com/espressif/esp-emulator/main/install.sh | sh -s -- --version 0.51.0 --bin-dir "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/esp-emu" --version
 
