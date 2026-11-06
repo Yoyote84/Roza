@@ -36,6 +36,7 @@ run_one() {
     --chip esp32s3 \
     --firmware "$image" \
     --psram-size 0 \
+    --console usb-jtag \
     --i2c-dev 0:0x34,fill=0x00 \
     --i2c-dev 0:0x18,fill=0x00 \
     --i2c-dev 0:0x68,fill=0x00 \
