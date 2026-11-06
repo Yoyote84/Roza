@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ROZA — Aperçu Cardputer ADV</title>
+<meta name="description" content="Maquette interactive de l'interface ROZA pour M5Stack Cardputer ADV, basée sur Launcher 3.0.0.">
+<style>
+:root{--paper:#eee5d2;--paper2:#f8f1e1;--ink:#302522;--muted:#78695d;--wine:#7b2439;--wine2:#a04a58;--gold:#b98b4c;--line:#cabb9e;--case:#292624;--case2:#49413a;--shadow:rgba(31,22,19,.22)}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 50% 12%,#f7f0e2,#d8cdb7 75%);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.page{max-width:1050px;margin:0 auto;padding:26px 18px 40px}
+header{text-align:center;margin:0 auto 22px}
+.eyebrow{font-size:.76rem;letter-spacing:.22em;text-transform:uppercase;color:var(--wine);font-weight:800}
+h1{font-family:Georgia,serif;font-weight:600;font-size:clamp(2rem,5vw,3.15rem);margin:5px 0;color:#51202d}
+.sub{color:var(--muted);margin:0}
+.layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(240px,.8fr);gap:22px;align-items:center}
+.device{background:linear-gradient(145deg,#4a433e,#211f1e);border:1px solid #161514;border-radius:26px;padding:18px 18px 16px;box-shadow:0 24px 45px var(--shadow),inset 0 1px 1px #756c62}
+.brandline{height:20px;color:#d9cbb3;display:flex;justify-content:space-between;align-items:center;padding:0 4px 9px;font-size:10px;letter-spacing:.18em;text-transform:uppercase}
+.brandline b{color:#e4cda8}
+.screen{aspect-ratio:16/9;background:var(--paper);border:5px solid #171615;border-radius:5px;overflow:hidden;box-shadow:inset 0 0 0 1px #fff4d8;position:relative;padding:2.8%;font-family:"Courier New",monospace}
+.hud{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #c6b699;padding:0 0 2%;height:15%;font-size:clamp(8px,1.05vw,12px);font-weight:bold;color:var(--wine);letter-spacing:.08em}
+.hud-left{display:flex;align-items:center;gap:7px}
+.logo{font-weight:900;letter-spacing:.12em;font-size:clamp(12px,2.1vw,23px);color:var(--wine);text-shadow:1px 1px 0 #d1bfa0}
+.hud-right{display:flex;gap:8px;color:var(--ink);font-size:clamp(7px,.9vw,10px);letter-spacing:0}
+.content{height:75%;padding-top:2.3%}
+.tiles{height:100%;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:2.2%}
+.tile{border:1px solid #cabb9e;border-radius:3px;background:#f7f0df;display:flex;flex-direction:column;justify-content:center;align-items:center;color:var(--ink);min-width:0}
+.tile.selected{background:var(--wine);border-color:var(--wine);color:#fff5e4;box-shadow:inset 0 0 0 1px #d18b92}
+.tile .ico{font-size:clamp(14px,2.7vw,26px);line-height:1.1}
+.tile b{font-size:clamp(8px,1.15vw,12px);margin-top:4px;letter-spacing:.08em}
+.tile small{font-size:clamp(6px,.8vw,9px);opacity:.78;margin-top:2px}
+.footerline{position:absolute;bottom:2.2%;left:3%;right:3%;display:flex;justify-content:space-between;border-top:1px solid #cabb9e;padding-top:1%;font-size:clamp(6px,.8vw,9px);color:#75665a}
+.keyboard{padding:15px 5px 0;display:grid;grid-template-columns:repeat(12,1fr);gap:5px}
+.key{height:22px;border-radius:4px;background:linear-gradient(#635950,#39332f);box-shadow:0 2px 0 #151413;color:#e7d9c5;font:9px "Courier New",monospace;display:grid;place-items:center}
+.key.space{grid-column:span 4}
+.key.wide{grid-column:span 2}
+.device-foot{display:flex;justify-content:space-between;color:#b4a48c;font-size:9px;letter-spacing:.12em;margin:12px 5px 0;text-transform:uppercase}
+.info{background:rgba(248,241,225,.72);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 12px 28px rgba(45,33,28,.08)}
+.info h2{font:600 1.2rem Georgia,serif;margin:0 0 8px;color:#51202d}
+.info p{font-size:.91rem;line-height:1.5;color:var(--muted);margin:0 0 14px}
+.views{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
+.views button{border:1px solid var(--line);border-radius:9px;padding:9px;background:#f7f0df;color:var(--ink);font-weight:650;cursor:pointer}
+.views button.active,.views button:hover{background:var(--wine);border-color:var(--wine);color:#fff5e4}
+.screen-detail{display:none;height:100%;color:var(--ink);font-size:clamp(8px,1.1vw,12px)}
+.screen-detail.active{display:block}
+.screen-title{font-weight:bold;color:var(--wine);font-size:1.25em;border-bottom:1px solid #c6b699;padding-bottom:5px;margin-bottom:7px}
+.net,.setting,.webrow{display:flex;justify-content:space-between;border-bottom:1px dotted #cabb9e;padding:5px 3px}
+.net b,.setting b,.webrow b{color:var(--wine)}
+.net span,.setting span,.webrow span{color:#63574d}
+.note{font-size:.8rem;color:var(--muted);margin:14px 0 0;line-height:1.5}
+.pill{display:inline-block;border:1px solid var(--gold);border-radius:50px;padding:2px 7px;font-size:.72rem;color:#77552a}
+@media(max-width:760px){.layout{grid-template-columns:1fr}.page{padding:18px 12px 28px}.info{order:-1}.device{padding:13px 12px 12px}.keyboard{gap:3px}.key{height:18px;font-size:7px}.device-foot{font-size:8px}}
+</style>
+</head>
+<body>
+<div class="page">
+<header>
+<div class="eyebrow">M5Stack Cardputer ADV · Launcher 3.0.0</div>
+<h1>РОЗА — carnet de mémoire</h1>
+<p class="sub">Aperçu interactif de l'interface ROZA CHANINA</p>
+</header>
+<div class="layout">
+<section class="device" aria-label="Maquette du Cardputer ADV">
+<div class="brandline"><span><b>ROZA</b> CHANINA</span><span>ESP32-S3 · 8 MB</span></div>
+<div class="screen">
+<div class="hud"><div class="hud-left"><span class="logo">РОЗА</span><span>· CARNET</span></div><div class="hud-right"><span id="wifiStatus">◉ Wi-Fi</span><span>▰ 82%</span></div></div>
+<div class="content">
+<div id="home" class="screen-detail active">
+<div class="tiles">
+<div class="tile"><span class="ico">▤</span><b>SD</b><small>Fichiers</small></div>
+<div class="tile selected"><span class="ico">⇧</span><b>OTA</b><small>Installer</small></div>
+<div class="tile"><span class="ico">⌘</span><b>WEB</b><small>Interface</small></div>
+<div class="tile"><span class="ico">▣</span><b>USB</b><small>Stockage</small></div>
+<div class="tile"><span class="ico">▥</span><b>PM</b><small>Partitions</small></div>
+<div class="tile"><span class="ico">⚙</span><b>CFG</b><small>Réglages</small></div>
+</div>
+</div>
+<div id="wifi" class="screen-detail">
+<div class="screen-title">Réseaux Wi-Fi détectés</div>
+<div class="net"><b>Maison-5G</b><span>Enregistré · -42 dBm</span></div>
+<div class="net"><b>Partage téléphone</b><span>-58 dBm</span></div>
+<div class="net"><b>FreeWifi</b><span>-71 dBm</span></div>
+<div class="net"><b>Réseau masqué…</b><span>Saisie manuelle</span></div>
+</div>
+<div id="settings" class="screen-detail">
+<div class="screen-title">Paramètres ROZA</div>
+<div class="setting"><b>Thème</b><span>ROZA · Papier</span></div>
+<div class="setting"><b>Langue</b><span>Français</span></div>
+<div class="setting"><b>Connexion auto</b><span>Désactivée</span></div>
+<div class="setting"><b>Luminosité</b><span>100 %</span></div>
+</div>
+<div id="web" class="screen-detail">
+<div class="screen-title">Administration Web</div>
+<div class="webrow"><b>Fichiers microSD</b><span>Explorer · gérer</span></div>
+<div class="webrow"><b>Mise à jour OTA</b><span>Installer un .bin</span></div>
+<div class="webrow"><b>Partitions</b><span>Afficher · gérer</span></div>
+<div class="webrow"><b>Paramètres NVS</b><span>Voir · sauvegarder</span></div>
+</div>
+</div>
+<div class="footerline"><span id="screenHint">←/→ naviguer · Entrée ouvrir</span><span>ROZA v3.0.0</span></div>
+</div>
+<div class="keyboard" aria-hidden="true">
+<span class="key">Esc</span><span class="key">1</span><span class="key">2</span><span class="key">3</span><span class="key">4</span><span class="key">5</span><span class="key">6</span><span class="key">7</span><span class="key">8</span><span class="key">9</span><span class="key">0</span><span class="key">⌫</span>
+<span class="key">Tab</span><span class="key">Q</span><span class="key">W</span><span class="key">E</span><span class="key">R</span><span class="key">T</span><span class="key">Y</span><span class="key">U</span><span class="key">I</span><span class="key">O</span><span class="key">P</span><span class="key">↵</span>
+<span class="key">Fn</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="key">F</span><span class="key">G</span><span class="key">H</span><span class="key">J</span><span class="key">K</span><span class="key">L</span><span class="key">;</span><span class="key">Shift</span>
+<span class="key">⇧</span><span class="key">Z</span><span class="key">X</span><span class="key">C</span><span class="key">V</span><span class="key">B</span><span class="key">N</span><span class="key">M</span><span class="key">,</span><span class="key">.</span><span class="key">/</span><span class="key">Ctrl</span>
+<span class="key wide">Alt</span><span class="key space">ESPACE</span><span class="key wide">◀</span><span class="key">▼</span><span class="key">▲</span><span class="key wide">▶</span>
+</div>
+<div class="device-foot"><span>M5Stack Cardputer ADV</span><span>ROZA CHANINA</span></div>
+</section>
+<aside class="info">
+<h2>Explorer l'interface</h2>
+<p>Choisis un écran pour voir la maquette de ROZA sur le Cardputer. Le thème papier, l'encre sombre et le bordeaux reprennent l'identité ROZA.</p>
+<div class="views">
+<button class="active" data-view="home">Accueil</button>
+<button data-view="wifi">Wi-Fi</button>
+<button data-view="settings">Réglages</button>
+<button data-view="web">WebUI</button>
+</div>
+<p class="note"><span class="pill">Maquette visuelle</span><br>Ce rendu est un aperçu de conception, pas une capture du firmware exécuté. Les menus et fonctions doivent encore être validés sur le Cardputer réel.</p>
+</aside>
+</div>
+</div>
+<script>
+const buttons=[...document.querySelectorAll("[data-view]")];
+const panels=[...document.querySelectorAll(".screen-detail")];
+const hint=document.getElementById("screenHint");
+const hints={home:"←/→ naviguer · Entrée ouvrir",wifi:"Choisir un réseau · mot de passe si nécessaire",settings:"Thème ROZA · options du lanceur",web:"Administration locale depuis un navigateur"};
+buttons.forEach(button=>button.addEventListener("click",()=>{
+ const view=button.dataset.view;
+ buttons.forEach(b=>b.classList.toggle("active",b===button));
+ panels.forEach(panel=>panel.classList.toggle("active",panel.id===view));
+ hint.textContent=hints[view];
+}));
+</script>
+</body>
+</html>

@@ -1,31 +1,41 @@
 # ROZA CHANINA — Cardputer ADV
 
-**ROZA CHANINA est désormais construit sur CardputerADV-Launcher.** Le moteur, les applications binaires, l'installation depuis microSD/GitHub, l'OTA, l'interface Web et le gestionnaire de partitions proviennent du projet Launcher ; ce dépôt porte la personnalisation ROZA et sa chaîne de compilation.
+**ROZA CHANINA est maintenant construit sur Launcher 3.0.0**, la base officielle de bmorcelli. Ce dépôt conserve l'identité ROZA, sa personnalisation française et sa chaîne de compilation.
+
+## Aperçu web de l'interface
+
+[Ouvrir la maquette interactive ROZA](https://htmlpreview.github.io/?https://raw.githubusercontent.com/Yoyote84/Roza/migration/roza-chanina-launcher/web-preview/index.html).
+
+La maquette présente l'accueil, le choix des réseaux Wi-Fi, les réglages et l'administration Web. C'est un aperçu de conception, pas une capture du firmware exécuté.
 
 ## Source du firmware
 
-Le dossier `launcher/` est un sous-module Git épinglé sur **AMasetti/CardputerADV-Launcher**, commit `cf4c594c0494a3d4175cf8542b27e10dc611f05c`. Ses trois sous-modules (ArduinoJson, Arduino_GFX et DisplayDrivers) sont récupérés récursivement.
+Le sous-module `launcher/` est maintenant épinglé sur **bmorcelli/Launcher**, tag **3.0.0**, commit `4b06de691df15b0fe6a9f09f56d1d107bbf32b12`. Les sous-modules des bibliothèques amont sont récupérés récursivement.
 
-La version exacte est volontairement épinglée : elle cible le Cardputer ADV et ne doit pas être remplacée automatiquement par une version destinée à d'autres cartes.
+La version amont est épinglée volontairement : les changements futurs ne seront intégrés qu'après adaptation de la personnalisation ROZA et validation de la compilation.
 
 ## Personnalisation ROZA
 
-Le script `scripts/apply-roza-branding.py` adapte le firmware lors de chaque compilation : marque et écran de démarrage ROZA CHANINA, barre d'état et en-têtes ROZA, menus principaux en français, palette olive/encre/ivoire, libellés français pour la boutique d'applications.
+Le script `scripts/apply-roza-branding.py` applique l'identité ROZA à la compilation :
+- logo bitmap cyrillique **РОЗА** sur l'écran de démarrage ;
+- libellés essentiels du menu principal en français ;
+- palette papier, encre et bordeaux proposée comme thème ROZA ;
+- page d'accueil et écran de connexion de l'interface Web aux couleurs ROZA ;
+- liste Wi-Fi affichée avant la connexion, avec réseaux enregistrés identifiés et connexion automatique comme action explicite ;
+- mot de passe Wi-Fi masqué dans les journaux série.
 
-Le code du sous-module reste intact dans Git. Les modifications ROZA sont conservées ici et réappliquées à chaque build.
+Le code amont reste intact dans Git : les adaptations ROZA sont conservées ici et réappliquées à chaque build. Les fonctions natives de Launcher 3.0.0 sont gardées.
 
-## Fonctions conservées de CardputerADV-Launcher
+## Fonctions de Launcher 3.0.0 conservées
 
-- APPS : dépôts GitHub, catalogue de versions, téléchargement et installation des applications ;
-- OTA : installation de firmwares en ligne ;
-- SD : explorateur, copie, déplacement, renommage et installation de binaires ;
-- WUI : interface d'administration depuis un navigateur ;
-- USB : stockage de la microSD via USB ;
-- CFG : configuration du lanceur ;
-- PMan : visualisation et gestion des partitions ;
-- raccourcis clavier et démarrage rapide des applications installées.
+- lancement et gestion des applications installées ;
+- installation OTA depuis les sources compatibles du Launcher ;
+- gestion des fichiers et installation depuis microSD ;
+- interface d'administration Web ;
+- stockage USB de la microSD ;
+- réglages du lanceur et gestionnaire de partitions.
 
-Les applications sont des binaires autonomes prévus pour le système de partitions de Launcher. L'ancien runtime Lua et l'ancien catalogue ROZA ne font plus partie de cette nouvelle base.
+Le catalogue d'applications tiers dépend des dépôts et firmwares publiés en amont. Cette branche n'ajoute pas encore un catalogue ROZA indépendant.
 
 ## Compilation
 
@@ -40,16 +50,14 @@ python3 scripts/apply-roza-branding.py
 pio run -d launcher -e m5stack-cardputer
 ```
 
-Le workflow GitHub Actions de cette branche effectue ces étapes et publie un artefact contenant l'image fusionnée ainsi que les fichiers séparés de compilation.
+Le workflow GitHub Actions de cette branche compile le firmware et publie les fichiers de build en artefact. Une compilation réussie ne prouve pas encore le démarrage ni tous les périphériques sur le Cardputer réel.
 
-## Installation matérielle — attention
+## Installation matérielle — prudence
 
-Cette migration remplace le système de partitions ROZA actuel par le schéma CardputerADV-Launcher. Le flash de l'image fusionnée au décalage `0x0` réinitialise la NVS : les paramètres Wi-Fi et réglages enregistrés ne sont pas garantis d'être conservés. Le flash n'est pas lancé automatiquement par le dépôt.
+Le schéma amont 8 MB conserve une NVS à `0x9000` (taille `0x5000`), une zone OTA data à `0xE000` et l'application à `0x10000`. Cela ne dispense pas de vérifier la table de partitions présente sur l'appareil avant toute mise à jour. Ne pas effacer la flash complète ; sauvegarder la NVS reste recommandé.
 
-Ne flashe pas une image issue d'une compilation non vérifiée. La première validation doit se faire après compilation CI, puis sur un appareil de test ou avec la procédure de récupération disponible.
+Aucun flash matériel n'est déclenché par ce dépôt ou par la CI. **Ne flashe pas de binaire tant que la compilation CI et les contrôles du package ne sont pas verts.**
 
 ## Provenance et licence
 
-Ce projet conserve CardputerADV-Launcher comme sous-module, avec ses licences et sous-modules d'origine. CardputerADV-Launcher est un fork du projet [bmorcelli/Launcher](https://github.com/bmorcelli/Launcher), lui-même issu de M5Launcher. Voir launcher/README.md et launcher/LICENSE pour les crédits et conditions détaillés.
-
-Le dépôt ROZA conserve également le script de personnalisation et sa documentation sous licence MIT.
+Le firmware amont est [bmorcelli/Launcher](https://github.com/bmorcelli/Launcher), distribué sous sa licence d'origine. Voir `launcher/LICENSE` et les licences des sous-modules pour les conditions détaillées. Le script de personnalisation ROZA et sa documentation restent sous licence MIT.
