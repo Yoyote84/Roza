@@ -6,9 +6,22 @@
 
 [Ouvrir ROZA Web Screen Viewer](https://yoyote84.github.io/Roza/).
 
-Le Viewer est adapté à Launcher 3.0.0 : accueil, applications, Wi-Fi, réglages, installateur OTA, carte SD, partitions et interface Web. Il présente un écran 240 × 135, une navigation tactile et clavier ainsi qu'un filtre par catégorie.
+Le Viewer est désormais une **visionneuse de captures réelles importées** : PNG, JPEG et WebP, navigation entre plusieurs captures, dimensions natives, affichage sans redessiner les pixels. Les fichiers sont traités localement dans le navigateur et ne sont pas téléversés.
 
-**Limite importante :** cette version est un aperçu graphique interactif dessiné dans le navigateur, pas une capture du firmware exécuté sur le Cardputer. Les statuts et actions sont simulés ; le Viewer ne pilote pas l'appareil. Le workflow GitHub Pages publie depuis `migration/roza-chanina-launcher`.
+### Utilisation
+
+1. Démarrer le firmware ROZA sur le Cardputer ADV.
+2. Obtenir une image du véritable écran (capture depuis un outil externe ou photographie).
+3. Ouvrir le Viewer et importer le fichier image.
+4. Parcourir les captures dans la liste.
+
+Pour une capture sans mise à l'échelle, utiliser une image de 240 × 135 pixels. Une photographie est également acceptée, mais elle conserve les reflets et la perspective.
+
+### Limite technique explicite
+
+Le Viewer ne prétend plus simuler les écrans du firmware. **La capture automatique du framebuffer depuis Launcher 3.0.0 n'est pas encore implémentée ni validée sur le Cardputer ADV.** Le code amont consulté expose l'objet d'affichage et une console série de commandes, mais aucune commande de capture d'écran prête à l'emploi n'a été trouvée. Une lecture matérielle du panneau ne doit pas être supposée possible sans vérifier le câblage et les capacités du contrôleur. Il faut développer et tester une voie de capture adaptée au matériel avant de promettre un transfert automatique USB/Wi-Fi.
+
+Le workflow GitHub Pages publie le Viewer depuis la branche `migration/roza-chanina-launcher`.
 
 ## Source du firmware
 
