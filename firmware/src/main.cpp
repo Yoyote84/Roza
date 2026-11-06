@@ -46,6 +46,7 @@ SET_LOOP_TASK_STACK_SIZE(12 * 1024);
 #include "ui_common.h"
 #include "clock.h"
 #include "sd_files.h"
+#include "app_store.h"
 #include "reader.h"
 #include "wifi_net.h"
 #include "wifi_chan.h"
@@ -241,6 +242,7 @@ void render() {
     case SCREEN_COMPASS:    drawCompass(); break;
     case SCREEN_COMPASS_DETAIL: drawImuDetail(); break;
     case SCREEN_FILES:      drawFiles(); break;
+    case SCREEN_APP_STORE:  drawAppStore(); break;
     case SCREEN_READER:     drawReader(); break;
     case SCREEN_READER_SHELF: drawReaderShelf(); break;
     case SCREEN_GNSS:       drawGnss(); break;
@@ -324,6 +326,7 @@ void cleanupApp(Screen s) {
   }   // 关 BLE 控制器并释放
   switch (s) {
     case SCREEN_FILES:            filesExit(); break;                              // 释放文件列表
+    case SCREEN_APP_STORE:        appStoreExit(); break;
     case SCREEN_READER_SHELF:     readerShelfExit(); break;                        // 释放书架列表
     case SCREEN_READER:
       readerSaveProgress(); readerFile.close(); readerShelfExit();
@@ -479,6 +482,7 @@ static void handleKeyAction(char k) {
           case APP_SATS:     screen = SCREEN_SATS; satsEnter(); break;
           case APP_ROUTER:   screen = SCREEN_ROUTER; routerEnter(); break;
           case APP_GITHUB:   screen = SCREEN_GITHUB; githubEnter(); break;
+          case APP_STORE:    screen = SCREEN_APP_STORE; appStoreEnter(); break;
           case APP_SSH:      screen = SCREEN_SSH; sshEnter(); break;
           case APP_READER:   readerEnter(); break;
           case APP_SETTINGS: screen = SCREEN_SETTINGS; settingsIndex = 0; break;
@@ -548,6 +552,10 @@ static void handleKeyAction(char k) {
     case SCREEN_COMPASS: case SCREEN_COMPASS_DETAIL:
       if (k == '`') { screen = SCREEN_MENU; dirty = true; }
       else if (k == '\n' || k == ' ') { imuTare(); dirty = true; }
+      return;
+
+    case SCREEN_APP_STORE:
+      appStoreKey(k);
       return;
 
     case SCREEN_FILES:

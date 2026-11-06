@@ -191,7 +191,7 @@ const AppDef APPS[] = {
   {"BLE Scan",  APP_BTSCAN},
   // --- NET：主动收发，要真连上（或自己当 AP）才有意义 ---
   {"Hotspot",   APP_HOTSPOT},  {"LAN Scan", APP_LANSCAN},  {"NetProbe", APP_NETPROBE},
-  {"Router",    APP_ROUTER},   {"SSH",      APP_SSH},
+  {"Router",    APP_ROUTER},   {"SSH",      APP_SSH},     {"GitHub",   APP_GITHUB},
   // --- SIGNAL：Wi-Fi 以外的收发通道。叫 SIGNAL 不叫 RADIO 是因为红外是光不是射频，
   //     而这四个的共同点是"隔空收发信号"（LoRa/BLE 收发、GNSS 只收、IR 只发）。
   //     Drone ID 曾经也塞在这一组，但它是靠 esp_wifi_set_promiscuous 蹭 Wi-Fi 扫的，
@@ -219,18 +219,18 @@ const AppDef APPS[] = {
   //     纯属分类错误。Router 是路由器网络监控，已归入 NET 组 ---
   //     FX 也归这里：它跟 GitHub/Router 一样是"盯一个外部数字"的个人仪表盘，
   //     不是网络工具。Settings 永远排最后。
-  {"ChatGPT",   APP_CHAT},     {"GitHub",   APP_GITHUB},    {"Radio",    APP_RADIO},
+  {"ChatGPT",   APP_CHAT},     {"Radio",    APP_RADIO},
   {"FX",        APP_FX},       {"OKX",      APP_OKX},       {"Reader",   APP_READER},
-  {"BadApple",  APP_BADAPPLE}, {"Settings",  APP_SETTINGS},
+  {"BadApple",  APP_BADAPPLE}, {"Apps",      APP_STORE},    {"Settings",  APP_SETTINGS},
 };
 const int APP_COUNT = sizeof(APPS) / sizeof(APPS[0]);
 
 // ⚠️ 组名最多 6 个字符：tab 条是 SW/GROUP_COUNT 平分屏宽，6 组时每格 240/6 = 40px，
 // 而 Font0 是 6px/字符——"SIGNAL" 已经占到 36px，只剩 2px 边距。再加组或起更长的名字之前
 // 先算这笔账（ui_common.cpp 的 drawGroupTabs）。
-constexpr GroupDef GROUPS[] = { {"TOOLS", 0, 8}, {"SCAN", 8, 5}, {"NET", 13, 5},
-                                {"HID", 18, 3}, {"SIG", 21, 4}, {"SKY", 25, 6},
-                                {"MORE", 31, 8} };
+constexpr GroupDef GROUPS[] = { {"TOOLS", 0, 8}, {"SCAN", 8, 5}, {"NET", 13, 6},
+                                {"HID", 19, 3}, {"SIG", 22, 4}, {"SKY", 26, 6},
+                                {"MORE", 32, 8} };
 const int GROUP_COUNT = sizeof(GROUPS) / sizeof(GROUPS[0]);
 
 const int MENU_COLS = 4;
