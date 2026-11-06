@@ -1062,17 +1062,33 @@ void bootSelfTest() {
 
 // =============================================================================
 void setup() {
+  // Le port USB série doit être actif avant toute initialisation matérielle :
+  // un blocage avant M5.begin() doit rester observable depuis le moniteur série.
+  Serial.begin(115200);
+  delay(150);
+  const auto bootMark = [](const char* stage) {
+    Serial.printf("[boot-diag] %s | heap=%u | largest=%u\\n",
+                  stage,
+                  (unsigned)ESP.getFreeHeap(),
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+    Serial.flush();
+  };
+  bootMark("setup-enter");
+
   // GPIO5 不接是浮空的：平时没插扩展模块偏巧浮到能用的电平，一接上 GNSS/LoRa
   // Cap 模块（占用扩展总线）就被带偏，SD 卡 SPI 直接检测不到。Bruce 固件的
   // _setup_gpio() 里也专门注了这条「Set GPIO5 HIGH for SD card compatibility」。
   pinMode(5, OUTPUT);
   digitalWrite(5, HIGH);
+  bootMark("gpio5-ready");
 
   // ROZA : Wi-Fi et Bluetooth désactivés par défaut au démarrage
   // L'utilisateur peut les activer volontairement via l'interface paramètres.
   // On les désactive ici pour respecter la politique "non négociable" de ROZA.
+  bootMark("wifi-shutdown-begin");
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
+  bootMark("wifi-shutdown-done");
   // M5Unified 0.2.20 ne fournit pas d'API M5.Bt. Le Bluetooth BLE
   // n'est initialisé que par bt.cpp lors d'une action explicite de l'utilisateur ;
   // ne pas appeler BLEDevice::init() au démarrage.
@@ -1093,12 +1109,15 @@ void setup() {
   ramMark("boot");
 
   auto cfg = M5.config();
+  bootMark("m5-begin-call");
   M5.begin(cfg);
+  bootMark("m5-begin-done");
   M5.Display.setRotation(1);
   brightInit();                           // 从 NVS 恢复屏幕亮度偏好
   M5.Display.setBrightness(brightVal());
   SW = M5.Display.width();
   SH = M5.Display.height();
+  bootMark("display-ready");
 
   // Afficher immédiatement un état directement sur le LCD, sans dépendre de M5Canvas.
   M5.Display.fillScreen(TFT_BLACK);
@@ -1111,7 +1130,9 @@ void setup() {
   ramMark("M5.begin");
 
   // 画布+配色先建好，放在联网之前——先播开机动画，别被 WiFi 连接(可能阻塞十几秒)卡在黑屏
+  bootMark("canvas-alloc-begin");
   canvasRestore();          // 画布缓冲的申请方式有讲究（TLSF 档位），统一走 globals.cpp
+  bootMark(canvasAvailable() ? "canvas-ready" : "canvas-failed");
   ramMark("canvas");        // 这一步就是那 64KB（240×135×2），全项目最大的单笔分配
   ACCENT     = cv.color565(0, 230, 120);
   CARD_BG    = cv.color565(10, 34, 22);
@@ -1131,9 +1152,11 @@ void setup() {
   }
   M5.Speaker.begin();
   M5.Speaker.setVolume(volVal());
+  bootMark("speaker-ready");
   ramMark("speaker");
 
   kbd::begin();                           // 提前初始化键盘：开机动画期间敲任意键可瞬间跳过
+  bootMark("keyboard-ready");
   ramMark("kbd");
 
   debugInit();                            // 提前读取调试开关：调试模式下开机全机静音
@@ -1155,8 +1178,7 @@ void setup() {
     M5.Display.drawString("Diagnostic sur USB", SW / 2, SH / 2 + 8);
   }
   ramMark("bootAnim");
-
-  Serial.begin(115200);
+  bootMark("boot-animation-done");
   // 先回放上一轮的面包屑：如果上次是卡死后手动复位的，轨迹还在 RTC 里，这是唯一
   // 能看到"卡在哪一步"的机会（见 bctrail.h / docs/ble-teardown.md）。
   bcTrailInit();
@@ -1165,20 +1187,25 @@ void setup() {
   ramMark("serial");        // 到这儿串口才活；上面四枪全靠攒着才看得到（见 ram_profile.h）
 
   tzInit();                             // 时区：从 NVS 恢复并立即应用
+  bootMark("timezone-ready");
   clockInit();                          // 时钟表盘风格：从 NVS 恢复
   // 停滞看门狗要付 3KB 常驻栈，所以跟着 Debug 走，不白占（理由见 bctrail.cpp）
   if (debugOn) bcTrailStartWatchdog();
   ledInit();                            // 板载 RGB LED：恢复上次开/关状态
   weatherUnitsInit();                   // 天气单位：恢复上次公制/英制选择
   ramMark("kbd+nvs");
+  bootMark("sd-init-begin");
   sdInit();                             // 挂载 TF 卡（失败也不影响其它功能）
+  bootMark(sdMounted ? "sd-mounted" : "sd-not-mounted");
   Serial.printf("[boot] sd mounted=%d size=%lluMB\n", sdMounted, sdSizeMB);
   ramMark("sd");            // 挂上卡才有 FAT 缓冲；没插卡时这一行的 Δ 应该接近 0
   gnssInit();                            // 打开 GPS 天线开关 + 串口（没插 Cap 模块也不影响其它功能）
+  bootMark("gnss-init-done");
   Serial.printf("[boot] gnss io=%d antenna=%d\n", gnssIoOk, gnssAntennaOn);
   ramMark("gnss");
 
   bootSelfTest();                        // 开机自检：屏上打硬件检测日志（动画之后、联网之前）
+  bootMark("post-complete");
   ramMark("selftest");
 
   // ROZA : aucun démarrage réseau au boot, même si des identifiants sont mémorisés.
