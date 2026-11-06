@@ -1,63 +1,59 @@
-# Format des applications ROZA
+# Catalogue et installation des applications ROZA
 
-## Objectif
+## Fonctionnement
 
-Les applications ROZA sont des paquets de données et de scripts stockés sur la microSD. Elles ne remplacent pas le firmware système et ne nécessitent pas de reflashage pour être ajoutées ou retirées.
+Le gestionnaire Apps consulte un catalogue JSON public du dépôt GitHub ROZA et télécharge les paquets en HTTPS directement sur la microSD. Le firmware principal reste dans la Flash interne : installer ou supprimer un paquet ne reflashe jamais le Cardputer.
 
-Le répertoire réservé est :
+Catalogue utilisé par cette branche :
+https://raw.githubusercontent.com/Yoyote84/Roza/feature/roza-sd-app-manager/roza-app-catalog/catalog.json
 
-```
-/ROZA/
-  apps/
-    identifiant-application/
-      manifest.json
-      main.lua
-```
+Les URL de fichiers ne sont pas fournies librement par le catalogue. Le firmware les reconstruit à partir de l'identifiant validé, sur l'hôte raw.githubusercontent.com et dans le répertoire du catalogue ROZA. Les paquets sont limités à un manifeste de 1 024 octets et un fichier d'entrée de 96 Kio au maximum.
 
-ROZA ne doit jamais formater la carte pour installer une application. Le gestionnaire ne supprime aucun fichier. Il ne parcourt que les sous-dossiers de `/ROZA/apps`.
+## Utilisation sur le Cardputer ADV
 
-## Manifeste version 1
+1. Insérer une microSD montée par ROZA.
+2. Connecter le Cardputer à un réseau Wi-Fi depuis Settings.
+3. Vérifier que l'heure est synchronisée (NTP), nécessaire à la validation des certificats HTTPS.
+4. Ouvrir Apps. Le catalogue est chargé automatiquement si le Wi-Fi est connecté.
+5. Appuyer sur t pour basculer entre le catalogue et les applications installées.
+6. Dans le catalogue, sélectionner une application puis appuyer sur i. Le manifeste et le fichier d'entrée sont téléchargés en fichiers temporaires et chacun est vérifié par SHA-256 avant installation.
+7. Dans l'onglet microSD, sélectionner une application et appuyer sur u, puis Entrée pour confirmer sa suppression.
 
-Exemple prévu pour le futur moteur de scripts :
+Navigation : ; ou , vers le haut ; . ou / vers le bas ; Entrée pour les détails ; touche retour pour quitter.
 
-```json
+## Installation sûre
+
+- Aucun formatage de carte et aucune suppression hors de /ROZA/apps/<id>.
+- Les identifiants et noms de fichier sont validés avant de construire un chemin.
+- Le catalogue, les manifestes et les fichiers sont limités en taille.
+- TLS utilise le bundle de certificats racines intégré et refuse les téléchargements si l'horloge n'est pas réglée.
+- Les fichiers sont téléchargés dans un dossier temporaire masqué. Les deux SHA-256 doivent correspondre et le manifeste doit correspondre aux métadonnées du catalogue avant publication.
+- Une mise à jour renomme l'ancienne version en sauvegarde, publie le nouveau dossier, puis supprime la sauvegarde. En cas d'échec du renommage final, le retour arrière est tenté.
+- Un téléchargement partiel ou invalide est supprimé ; l'ancienne version est conservée.
+
+Le SHA-256 fourni dans le catalogue vérifie l'intégrité des fichiers par rapport au catalogue HTTPS. Il ne constitue pas une signature indépendante de l'éditeur : la confiance repose aussi sur TLS et sur le dépôt ROZA qui publie le catalogue.
+
+## Format du catalogue
+
+Le fichier catalog.json porte format = roza-app-catalog et format_version = 1. Chaque entrée contient id, name, version, description, runtime, entry, manifest_size, manifest_sha256, entry_size et entry_sha256.
+
+Le firmware prend actuellement en charge le runtime déclaré roza-lua et un seul fichier d'entrée par paquet. Exemple de manifeste :
+
+~~~json
 {
   "format": "roza-app",
   "format_version": 1,
   "id": "exemple",
   "name": "Application exemple",
   "version": "1.0.0",
-  "description": "Exemple de paquet ROZA.",
+  "description": "Description.",
   "runtime": "roza-lua",
   "entry": "main.lua"
 }
-```
+~~~
 
-Contraintes :
-- `id` correspond exactement au nom du dossier et contient uniquement des lettres minuscules, chiffres, tirets ou caractères soulignés.
-- `name` fait au maximum 24 caractères.
-- `manifest.json` fait au maximum 1 024 octets.
-- `entry` doit être un nom de fichier simple, sans chemin absolu, séparateur ou séquence de remontée de dossier.
-- Le fichier d'entrée doit exister dans le même dossier que le manifeste.
-- Le format accepté est `roza-app`, version 1.
+## Limite actuelle importante
 
-## État de l'implémentation
+Le téléchargement, la vérification, l'installation, la mise à jour et la désinstallation sont implémentés. L'exécution des scripts Lua n'est pas encore intégrée. Les applications peuvent donc être installées et stockées sur la carte, mais pas lancées depuis ROZA dans cette version. Le paquet d'exemple du catalogue sert à tester le parcours d'installation et n'exécute aucun code.
 
-La première étape ajoute un écran « Apps » qui :
-- crée uniquement `/ROZA` et `/ROZA/apps` lorsque la carte est montée et que ces dossiers manquent ;
-- lit les manifestes en lecture seule ;
-- vérifie les identifiants, les champs obligatoires et le fichier d'entrée ;
-- limite l'index mémoire à 12 paquets et trie le résultat ;
-- ne lance aucun script, ne télécharge rien et ne supprime rien.
-
-L'exécution des scripts n'est pas encore activée. Le Cardputer ADV ciblé dispose de 8 Mo de Flash et n'a pas de PSRAM ; le moteur devra être choisi et mesuré avec la mémoire réellement disponible avant d'autoriser l'exécution d'applications tierces.
-
-## Étapes suivantes
-
-1. Évaluer un interpréteur Lua compatible avec le compilateur C++11 et les dépendances actuellement verrouillées.
-2. Mesurer l'empreinte Flash, le tas libre et le plus grand bloc contigu, sans dégrader l'interface de base.
-3. Définir une API ROZA restreinte pour l'affichage, les entrées et le stockage de l'application.
-4. Ajouter le catalogue GitHub et les téléchargements HTTPS vers un répertoire temporaire, vérifier SHA-256 et manifeste, puis publier le paquet dans `/ROZA/apps/<id>` uniquement après validation complète.
-5. Étudier séparément le mode firmware invité. Un fichier ESP32 `.bin` ordinaire ne doit jamais être traité comme une application microSD.
-
-Les paquets téléchargés devront être considérés comme du code non fiable : aucune API brute GPIO, radio, stockage global ou commande système ne sera exposée automatiquement au moteur.
+Le Cardputer ADV ciblé utilise un ESP32-S3 avec 8 Mo de Flash et sans PSRAM. Le moteur d'applications devra être ajouté et mesuré séparément avant d'autoriser l'exécution de code tiers. Un firmware ESP32 .bin n'est pas une application microSD et ne doit pas être installé par ce gestionnaire.

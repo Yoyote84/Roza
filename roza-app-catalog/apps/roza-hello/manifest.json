@@ -1,0 +1,10 @@
+{
+  "format": "roza-app",
+  "format_version": 1,
+  "id": "roza-hello",
+  "name": "Hello ROZA",
+  "version": "1.0.0",
+  "description": "Exemple de paquet pour verifier le catalogue et l'installation microSD.",
+  "runtime": "roza-lua",
+  "entry": "main.lua"
+}
