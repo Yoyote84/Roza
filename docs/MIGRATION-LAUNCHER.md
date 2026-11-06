@@ -8,12 +8,17 @@ Les personnalisations sont appliquées par `scripts/apply-roza-branding.py`. Le 
 
 ## Personnalisation
 
-- logo bitmap cyrillique ROZA dans l'écran de démarrage ;
-- libellés essentiels du menu principal en français ;
-- palette ROZA papier/encre/bordeaux ;
-- interface Web intégrée rebrandée et traduite pour les commandes principales ;
-- choix du réseau Wi-Fi avant la connexion, connexion auto proposée comme action et non exécutée en silence ;
-- mot de passe masqué dans les logs série.
+La maquette de référence est disponible dans `web-preview/design.html`. Le firmware reprend maintenant réellement sa direction graphique :
+
+- bandeau du menu principal **РОЗА · CARNET**, avec lettres cyrilliques dessinées en bitmap pour ne pas dépendre de la police embarquée ;
+- grille d'actions native de Launcher, avec sélection bordeaux et fond papier/crème ;
+- libellés français pour microSD, OTA, WebUI, USB, partitions et réglages ;
+- thème **ROZA - Papier** disponible dans les thèmes et utilisé par défaut pour les nouvelles configurations ;
+- migration automatique uniquement si l'ancienne palette amont par défaut est détectée ; tout thème personnalisé reste inchangé ;
+- WebUI intégrée assortie à la palette ROZA ;
+- choix explicite du réseau Wi-Fi et mot de passe masqué dans les logs série.
+
+La maquette HTML reste une référence graphique, pas une interface de contrôle. Les actions embarquées sont celles du firmware Launcher.
 
 Le système natif d'applications, l'OTA, le gestionnaire de partitions, le stockage USB et les fonctions microSD de Launcher 3.0.0 restent la base. Le catalogue séparé d'applications ROZA n'est pas ajouté dans cette étape.
 
@@ -29,4 +34,4 @@ Ne jamais supposer que la table de partitions présente sur un appareil est iden
 
 ## Installation et validation
 
-Aucun flash matériel n'est lancé par ce dépôt ou par la CI. La CI vérifie la compilation et génère les binaires. Elle ne prouve pas le démarrage, le Wi-Fi, le clavier, l'écran, l'OTA ni l'interface Web sur un appareil réel. Ces essais doivent être réalisés et documentés séparément avant de déclarer la version stable.
+Aucun flash matériel n'est lancé par ce dépôt ou par la CI. La CI vérifie la compilation et génère les binaires. Elle ne prouve pas le démarrage, le rendu exact du bandeau, les couleurs, le Wi-Fi, le clavier, l'écran, l'OTA ni l'interface Web sur un appareil réel. Ces essais doivent être réalisés et documentés séparément avant de déclarer la version stable.
