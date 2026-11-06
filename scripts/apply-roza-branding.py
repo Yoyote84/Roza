@@ -64,8 +64,8 @@ PATCHES = {
     ],
     "src/onlineLauncher.cpp": [
         ('keyboard(pwd, 63, "Network Password:")', 'keyboard(pwd, 63, "Mot de passe Wi-Fi :")'),
-        ('launcherConsolePrintf("wifiConnect: ssid->%s, pwd->%s\n", ssid.c_str(), pwd.c_str());',
-         'launcherConsolePrintf("wifiConnect: saved SSID %s (password hidden)\n", ssid.c_str());'),
+        ('launcherConsolePrintf("wifiConnect: ssid->%s, pwd->%s\\n", ssid.c_str(), pwd.c_str());',
+         'launcherConsolePrintf("wifiConnect: saved SSID %s (password hidden)\\n", ssid.c_str());'),
         ('tftprint("Connecting to: " + ssid + ".", 10);', 'tftprint("Connexion a : " + ssid + ".", 10);'),
         ('displayError("Wrong Password");', 'displayError("Mot de passe incorrect");'),
     ],
