@@ -35,6 +35,7 @@ PATCHES = {
         ('"Partition Manager."', '"Gestion des partitions"'),
         ('tiny ? "Change Settings." : "Change Launcher Settings."',
          'tiny ? "Reglages" : "Parametres ROZA"'),
+        ('bool autoConnect = true;', 'bool autoConnect = false;'),
     ],
     "src/settings.cpp": [
         ('{"Default",\n         [&]() {\n             FGCOLOR = 0x07E0;\n             BGCOLOR = 0x0000;\n             ALCOLOR = 0xF800;\n             odd_color = 0x30c5;\n             even_color = 0x32e5;\n         }, _CLR_(FGCOLOR, 0x07E0)},',
@@ -45,6 +46,7 @@ PATCHES = {
          '    nvs_get_u16(h, "even_color", &even_color);\n    String rozaTheme = lnvs::getString(h, "roza_theme", 24);\n    if (rozaTheme != "po3a-paper-v1") {\n        FGCOLOR = 0x2104;\n        BGCOLOR = 0xEEF8;\n        ALCOLOR = 0xA145;\n        odd_color = 0xE6D4;\n        even_color = 0xDEB2;\n        lnvs::Handle themeStore("launcher", true);\n        if (themeStore) {\n            nvs_handle_t themeHandle = themeStore.raw();\n            nvs_set_u16(themeHandle, "FGCOLOR", FGCOLOR);\n            nvs_set_u16(themeHandle, "BGCOLOR", BGCOLOR);\n            nvs_set_u16(themeHandle, "ALCOLOR", ALCOLOR);\n            nvs_set_u16(themeHandle, "odd_color", odd_color);\n            nvs_set_u16(themeHandle, "even_color", even_color);\n            lnvs::setString(themeHandle, "roza_theme", "po3a-paper-v1");\n            themeStore.commit();\n        }\n    }\n    lnvs::getBool(h, "dev_mode", dev_mode);'),
         ('    JsonObject setting = settings[0];\n    int count = applySettingsFromRoot(setting);\n    getWifiFromNVS(true);',
          '    JsonObject setting = settings[0];\n    int count = applySettingsFromRoot(setting);\n    if (setting["roza_theme"] != "po3a-paper-v1") {\n        FGCOLOR = 0x2104;\n        BGCOLOR = 0xEEF8;\n        ALCOLOR = 0xA145;\n        odd_color = 0xE6D4;\n        even_color = 0xDEB2;\n        setting["roza_theme"] = "po3a-paper-v1";\n        ++count;\n    }\n    getWifiFromNVS(true);'),
+        ('    dev_mode = false;\\n    autoConnect = true;', '    dev_mode = false;\\n    autoConnect = false;'),
     ],
     "src/appStore.cpp": [
         ('displayRedStripe("Getting app list");', 'displayRedStripe("Lecture du catalogue ROZA");'),
@@ -59,6 +61,13 @@ PATCHES = {
         ('{"Install v" + versionStr(chosen),', '{"Installer v" + versionStr(chosen),'),
         ('{"Back", [&]() { back = true; }}', '{"Retour", [&]() { back = true; }}'),
         ('displayError("Use owner/repo");', 'displayError("Format attendu : proprietaire/depot");'),
+    ],
+    "src/onlineLauncher.cpp": [
+        ('keyboard(pwd, 63, "Network Password:")', 'keyboard(pwd, 63, "Mot de passe Wi-Fi :")'),
+        ('launcherConsolePrintf("wifiConnect: ssid->%s, pwd->%s\\n", ssid.c_str(), pwd.c_str());',
+         'launcherConsolePrintf("wifiConnect: saved SSID %s (password hidden)\\n", ssid.c_str());'),
+        ('tftprint("Connecting to: " + ssid + ".", 10);', 'tftprint("Connexion a : " + ssid + ".", 10);'),
+        ('displayError("Wrong Password");', 'displayError("Mot de passe incorrect");'),
     ],
 }
 
@@ -84,6 +93,106 @@ def apply_file(relative: str, replacements: list[tuple[str, str]]) -> int:
     if changed:
         path.write_text(text, encoding="utf-8")
     return changed
+
+def apply_wifi_picker() -> int:
+    """Show scanned access points first; saved-network auto-connect is an explicit choice."""
+    path = LAUNCHER / "src/onlineLauncher.cpp"
+    if not path.is_file():
+        raise SystemExit(f"Fichier Launcher absent : {path}")
+    source = path.read_text(encoding="utf-8")
+    start_marker = "bool connectWifi() {"
+    end_marker = "\nbool ensureWifiConnected("
+    if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+        raise SystemExit("Fonction connectWifi introuvable ou ambigue; revue requise.")
+    start = source.index(start_marker)
+    end = source.index(end_marker, start)
+    current = source[start:end]
+    if "ROZA-WIFI-PICKER-V1" in current:
+        return 0
+    if "launcherWifiScan(networks)" not in current or "if (!autoConnect) continue;" not in current:
+        raise SystemExit("Source Wi-Fi inattendue; refus du patch automatique.")
+
+    replacement = r"""
+// ROZA-WIFI-PICKER-V1: user chooses an access point before any connection attempt.
+bool connectWifi() {
+    RAM_LOG("connectWifi-start");
+    returnToMenu = false;
+    displayRedStripe("Recherche des reseaux Wi-Fi...");
+    std::vector<LauncherWifiAp> networks;
+    int nets = launcherWifiScan(networks);
+    if (nets < 0) {
+        displayError("Echec du scan Wi-Fi");
+        return false;
+    }
+
+    // Strongest access point first; show one entry per SSID.
+    std::sort(networks.begin(), networks.end(), [](const LauncherWifiAp &a, const LauncherWifiAp &b) {
+        return a.rssi > b.rssi;
+    });
+    std::vector<LauncherWifiAp> uniqueNetworks;
+    for (const LauncherWifiAp &ap : networks) {
+        if (ap.ssid.empty()) continue;
+        bool seen = false;
+        for (const LauncherWifiAp &existing : uniqueNetworks) {
+            if (existing.ssid == ap.ssid) {
+                seen = true;
+                break;
+            }
+        }
+        if (!seen) uniqueNetworks.push_back(ap);
+    }
+
+    options.clear();
+
+    // Keep automatic connection available as an explicit action only.
+    bool hasVisibleSavedNetwork = false;
+    if (autoConnect) {
+        for (const LauncherWifiAp &ap : uniqueNetworks) {
+            String candidate = ap.ssid.c_str();
+            String knownPwd;
+            if (getWifiCredential(candidate, knownPwd)) {
+                hasVisibleSavedNetwork = true;
+                break;
+            }
+        }
+    }
+    if (hasVisibleSavedNetwork) {
+        options.push_back({"Connexion auto (reseaux enregistres)", [&]() {
+            for (const LauncherWifiAp &ap : uniqueNetworks) {
+                String candidate = ap.ssid.c_str();
+                String knownPwd;
+                if (!getWifiCredential(candidate, knownPwd)) continue;
+                launcherConsolePrintf("Wi-Fi: tentative automatique sur %s\n", candidate.c_str());
+                if (wifiConnect(candidate, static_cast<int>(ap.authmode))) break;
+                if (returnToMenu) break;
+            }
+        }});
+    }
+
+    for (const LauncherWifiAp &ap : uniqueNetworks) {
+        String networkSsid = ap.ssid.c_str();
+        int authMode = static_cast<int>(ap.authmode);
+        String label = networkSsid;
+        String knownPwd;
+        if (getWifiCredential(networkSsid, knownPwd)) label += " [enregistre]";
+        label += " (" + String(static_cast<int>(ap.rssi)) + " dBm)";
+        options.push_back({label, [=]() { wifiConnect(networkSsid, authMode); }});
+    }
+
+    options.push_back({"Reseau masque", [=]() {
+        String hiddenSsid = keyboard("", 32, "Nom du reseau Wi-Fi :");
+        if (hiddenSsid != String(KEY_ESCAPE)) wifiConnect(hiddenSsid, 8);
+    }});
+    options.push_back({"Menu principal", [=]() { returnToMenu = true; }});
+
+    if (uniqueNetworks.empty()) displayError("Aucun reseau Wi-Fi detecte", false);
+    loopOptions(options);
+    return launcherWifiIsConnected();
+}
+"""
+    source = source[:start] + replacement.strip() + "\n" + source[end:]
+    path.write_text(source, encoding="utf-8")
+    return 1
 
 def apply_main_menu() -> int:
     path = LAUNCHER / "src/display.cpp"
@@ -198,7 +307,10 @@ def main() -> int:
         total += count
     menu_changes = apply_main_menu()
     total += menu_changes
-    print("Identite PO3A deja appliquee." if total == 0 else f"Identite PO3A appliquee ({total} modifications).")
+    wifi_changes = apply_wifi_picker()
+    total += wifi_changes
+    print(f"Parcours Wi-Fi ROZA: {wifi_changes} personnalisation(s)")
+    print("Identite ROZA deja appliquee." if total == 0 else f"Identite ROZA appliquee ({total} modifications).")
     return 0
 
 if __name__ == "__main__":
