@@ -4,14 +4,15 @@
 
 Le sous-module `launcher` pointe sur **bmorcelli/Launcher**, tag `3.0.0`, commit `4b06de691df15b0fe6a9f09f56d1d107bbf32b12`. La version précédente utilisait un fork et des marqueurs de code qui ne correspondaient plus au code 3.0.0.
 
-Les personnalisations sont appliquées par `scripts/apply-roza-branding.py`. Le script vérifie le SHA amont attendu, contrôle les marqueurs de remplacement et s'arrête si la source change de façon inattendue. Il est idempotent.
+Les personnalisations sont appliquées par `scripts/apply-roza-branding.py`, puis `scripts/apply-roza-interface.py`. Le premier vérifie le SHA amont attendu et contrôle les marqueurs de remplacement ; le second remplace le menu principal après avoir vérifié les marqueurs attendus. Les deux scripts sont idempotents.
 
 ## Personnalisation
 
 La maquette de référence est disponible dans `web-preview/design.html`. Le firmware reprend maintenant réellement sa direction graphique :
 
 - bandeau du menu principal **РОЗА · CARNET**, avec lettres cyrilliques dessinées en bitmap pour ne pas dépendre de la police embarquée ;
-- grille d'actions native de Launcher, avec sélection bordeaux et fond papier/crème ;
+- liste d'actions compacte adaptée à l'écran 240 × 135, avec sélection bordeaux et fond papier/crème ;
+- pied d'écran indiquant l'état Wi-Fi et le niveau de batterie lorsque celui-ci est disponible ;
 - libellés français pour microSD, OTA, WebUI, USB, partitions et réglages ;
 - thème **ROZA - Papier** disponible dans les thèmes et utilisé par défaut pour les nouvelles configurations ;
 - migration automatique uniquement si l'ancienne palette amont par défaut est détectée ; tout thème personnalisé reste inchangé ;
@@ -20,7 +21,7 @@ La maquette de référence est disponible dans `web-preview/design.html`. Le fir
 
 La maquette HTML reste une référence graphique, pas une interface de contrôle. Les actions embarquées sont celles du firmware Launcher.
 
-Le système natif d'applications, l'OTA, le gestionnaire de partitions, le stockage USB et les fonctions microSD de Launcher 3.0.0 restent la base. Le catalogue séparé d'applications ROZA n'est pas ajouté dans cette étape.
+Le Web Screen Viewer a été supprimé : la page GitHub Pages sert uniquement de référence graphique. Le système natif d'applications, l'OTA, le gestionnaire de partitions, le stockage USB et les fonctions microSD de Launcher 3.0.0 restent la base. Le catalogue séparé d'applications ROZA n'est pas ajouté dans cette étape.
 
 ## Schéma 8 MB
 
