@@ -191,7 +191,9 @@ def main() -> int:
         count = apply_file(relative, replacements)
         print(f"{relative}: {count} personnalisation(s)")
         total += count
-    menu_changes = apply_main_menu()\n    total += menu_changes\n    print("Identite PO3A deja appliquee." if total == 0 else f"Identite PO3A appliquee ({total} modifications).")
+    menu_changes = apply_main_menu()
+    total += menu_changes
+    print("Identite PO3A deja appliquee." if total == 0 else f"Identite PO3A appliquee ({total} modifications).")
     return 0
 
 if __name__ == "__main__":
