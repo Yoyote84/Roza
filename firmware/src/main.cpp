@@ -1067,7 +1067,7 @@ void setup() {
   Serial.begin(115200);
   delay(150);
   const auto bootMark = [](const char* stage) {
-    Serial.printf("[boot-diag] %s | heap=%u | largest=%u\\n",
+    Serial.printf("[boot-diag] %s | heap=%u | largest=%u\n",
                   stage,
                   (unsigned)ESP.getFreeHeap(),
                   (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
