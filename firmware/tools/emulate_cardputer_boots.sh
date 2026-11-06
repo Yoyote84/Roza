@@ -13,6 +13,7 @@ FOUND_PANIC=0
 run_one() {
   local label="$1"
   local image="$2"
+  local exit_marker="$3"
   local log="$OUT_DIR/$label.log"
   local rc=0
   local state="UNKNOWN"
@@ -37,6 +38,7 @@ run_one() {
     --firmware "$image" \
     --psram-size 0 \
     --console usb-jtag \
+    --exit-on "$exit_marker" \
     --i2c-dev 0:0x34,fill=0x00 \
     --i2c-dev 0:0x18,fill=0x00 \
     --i2c-dev 0:0x68,fill=0x00 \
@@ -76,8 +78,8 @@ run_one() {
 }
 
 set -e
-run_one "firmware-104" "$IMAGE_104"
-run_one "firmware-118" "$IMAGE_118"
+run_one "firmware-104" "$IMAGE_104" "[boot] gnss io="
+run_one "firmware-118" "$IMAGE_118" "[boot-diag] post-complete"
 
 echo
 echo "Interpretation limits:" | tee -a "$SUMMARY"
