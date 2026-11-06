@@ -27,6 +27,7 @@ jobs:
         run: |
           mkdir -p site
           cp web-preview/index.html site/index.html
+          cp web-preview/design.html site/design.html
           touch site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
