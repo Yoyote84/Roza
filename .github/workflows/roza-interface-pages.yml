@@ -1,0 +1,45 @@
+name: ROZA Interface Design
+
+on:
+  push:
+    branches: [migration/roza-chanina-launcher]
+    paths:
+      - "web-preview/design.html"
+      - ".github/workflows/roza-interface-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: roza-interface-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Publish ROZA design reference
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare design-only site
+        run: |
+          mkdir -p site
+          cp web-preview/design.html site/index.html
+          touch site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    name: Deploy ROZA design reference
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
