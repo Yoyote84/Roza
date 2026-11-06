@@ -1,50 +1,29 @@
 # ROZA CHANINA — Cardputer ADV
 
-**ROZA CHANINA est construit sur Launcher 3.0.0**, la base officielle de bmorcelli. Ce dépôt conserve l'identité ROZA et sa personnalisation française.
+**ROZA CHANINA** est un firmware pour M5Stack Cardputer ADV construit sur [Launcher 3.0.0](https://github.com/bmorcelli/Launcher), avec une identité visuelle ROZA et une interface française.
 
-## Interface ROZA — direction visuelle
+## Interface ROZA
 
-[Ouvrir la maquette interactive ROZA](https://yoyote84.github.io/Roza/design.html).
+[Ouvrir la référence graphique ROZA](https://yoyote84.github.io/Roza/).
 
-C'est la référence graphique retenue : écran papier/crème, encre sombre, bordeaux, bandeau **РОЗА**, accueil en tuiles et vues Applications, Wi-Fi, Réglages, OTA, carte SD, partitions et Web. Les données de cette page restent fictives ; les actions du firmware sur le Cardputer sont celles du vrai Launcher, pas celles de la maquette.
+La référence définit le langage visuel à retrouver sur le Cardputer : papier crème, encre brun-noir, accents bordeaux, bandeau **РОЗА**, navigation compacte et libellés français. La maquette Web est uniquement une référence de conception ; les actions doivent être exécutées par le vrai firmware.
 
-## ROZA Web Screen Viewer
-
-[Ouvrir ROZA Web Screen Viewer](https://yoyote84.github.io/Roza/).
-
-Le Viewer est désormais une **visionneuse de captures réelles importées** : PNG, JPEG et WebP, navigation entre plusieurs captures, dimensions natives, affichage sans redessiner les pixels. Les fichiers sont traités localement dans le navigateur et ne sont pas téléversés.
-
-### Utilisation
-
-1. Démarrer le firmware ROZA sur le Cardputer ADV.
-2. Obtenir une image du véritable écran (capture depuis un outil externe ou photographie).
-3. Ouvrir le Viewer et importer le fichier image.
-4. Parcourir les captures dans la liste.
-
-Pour une capture sans mise à l'échelle, utiliser une image de 240 × 135 pixels. Une photographie est également acceptée, mais elle conserve les reflets et la perspective.
-
-### Limite technique explicite
-
-Le Viewer ne prétend plus simuler les écrans du firmware. **La capture automatique du framebuffer depuis Launcher 3.0.0 n'est pas encore implémentée ni validée sur le Cardputer ADV.** Le code amont consulté expose l'objet d'affichage et une console série de commandes, mais aucune commande de capture d'écran prête à l'emploi n'a été trouvée. Une lecture matérielle du panneau ne doit pas être supposée possible sans vérifier le câblage et les capacités du contrôleur. Il faut développer et tester une voie de capture adaptée au matériel avant de promettre un transfert automatique USB/Wi-Fi.
-
-Le workflow GitHub Pages publie le Viewer depuis la branche `migration/roza-chanina-launcher`.
-
-## Source du firmware
-
-Le sous-module `launcher/` est épinglé sur **bmorcelli/Launcher**, tag **3.0.0**, commit `4b06de691df15b0fe6a9f09f56d1d107bbf32b12`. Les sous-modules des bibliothèques amont sont récupérés récursivement.
-
-## Personnalisation ROZA
-
-Le script `scripts/apply-roza-branding.py` applique réellement au firmware le bandeau **РОЗА · CARNET**, les tuiles du menu principal en bordeaux, la palette papier/encre/bordeaux, les libellés français des fonctions principales et le thème correspondant dans la WebUI. Il migre vers la palette ROZA uniquement si l'appareil utilise encore la palette amont par défaut ; les thèmes personnalisés et les autres paramètres NVS ne sont pas réinitialisés. La sélection Wi-Fi reste explicite et les mots de passe ne sont pas écrits dans les logs. Les actions natives de Launcher 3.0.0 sont conservées.
+Le menu principal du firmware est personnalisé pour l'écran 240 × 135 : liste compacte, sélection bordeaux, état Wi-Fi et indication de batterie. Les autres fonctions natives de Launcher restent la base des écrans secondaires.
 
 ## Fonctions conservées
 
-- applications installées et leurs actions ;
-- installation OTA depuis les sources compatibles ;
+- applications et lancement des applications ;
+- installateur OTA et catalogue compatible ;
 - gestion des fichiers et installation depuis microSD ;
-- interface d'administration Web ;
+- interface d'administration Web intégrée au firmware ;
 - stockage USB de la microSD ;
 - réglages et gestionnaire de partitions.
+
+## Source et versions
+
+Le sous-module `launcher/` est épinglé sur **bmorcelli/Launcher 3.0.0**, commit `4b06de691df15b0fe6a9f09f56d1d107bbf32b12`.
+
+Le script `scripts/apply-roza-branding.py` applique l'identité ROZA, la palette papier/bordeaux, les libellés français, le thème WebUI et la personnalisation du parcours Wi-Fi. Le script `scripts/apply-roza-interface.py` remplace le menu principal en grille par une liste adaptée au format 240 × 135. Les deux scripts sont appliqués par le workflow de compilation.
 
 ## Compilation
 
@@ -54,15 +33,16 @@ cd Roza
 git checkout migration/roza-chanina-launcher
 git submodule update --init --recursive
 python3 scripts/apply-roza-branding.py
+python3 scripts/apply-roza-interface.py
 pio run -d launcher -e m5stack-cardputer
 ```
 
-Une compilation réussie ne prouve pas le démarrage ni tous les périphériques sur le Cardputer réel. La nouvelle interface doit encore être vérifiée physiquement sur l'écran 240 × 135.
+Une compilation réussie ne prouve pas le démarrage ni le fonctionnement de tous les périphériques sur le Cardputer réel. La nouvelle interface doit encore être vérifiée physiquement sur l'écran 240 × 135 avant de déclarer la mise à jour validée.
 
-## Installation matérielle
+## Mise à jour matérielle
 
-Le schéma amont 8 MB conserve une NVS à `0x9000` (taille `0x5000`), une zone OTA data à `0xE000` et l'application à `0x10000`. Vérifier la table de partitions présente sur l'appareil avant toute mise à jour. Ne pas effacer la flash complète ; sauvegarder la NVS reste recommandé.
+Le schéma amont 8 MB utilise une NVS à `0x9000` (taille `0x5000`), une zone OTA data à `0xE000` et l'application à `0x10000`. Vérifier la table de partitions de l'image avant toute mise à jour. Ne pas effacer la flash complète ; sauvegarder la NVS reste recommandé.
 
-## Provenance et licence
+## Licence
 
 Le firmware amont est [bmorcelli/Launcher](https://github.com/bmorcelli/Launcher), distribué sous sa licence d'origine. Voir `launcher/LICENSE` et les licences des sous-modules.
