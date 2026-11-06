@@ -37,7 +37,7 @@ for app in apps:
     if not ID_RE.fullmatch(app_id) or app_id in seen:
         fail(f"invalid or duplicate id: {app_id!r}")
     seen.add(app_id)
-    if not FILE_RE.fullmatch(entry) or entry.startswith(".") or ".." in entry:
+    if not FILE_RE.fullmatch(entry) or entry.startswith(".") or ".." in entry or entry == "manifest.json":
         fail(f"unsafe entry filename for {app_id}")
     if app.get("runtime") != "roza-lua":
         fail(f"unsupported runtime for {app_id}")

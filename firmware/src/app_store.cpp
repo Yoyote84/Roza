@@ -47,7 +47,7 @@ static bool validEntry(const char* value) {
     const char c = *p;
     if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.')) return false;
   }
-  return strstr(value, "..") == nullptr;
+  return strcmp(value, "manifest.json") != 0 && strstr(value, "..") == nullptr;
 }
 static bool validSha256(const char* value) {
   if (!value || strlen(value) != 64) return false;
@@ -494,10 +494,12 @@ static void drawFooter(const char* text) {
   cv.setTextDatum(bottom_center);
   cv.setTextSize(1);
   cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  cv.drawString(text, SW / 2, SH - 2);
+  const char* shown = jobMessage[0] ? jobMessage : text;
+  cv.drawString(shown, SW / 2, SH - 2);
 }
 } // namespace
 void appStoreEnter() {
+  setJobMessage("");
   scanInstalledApps();
   catalogMode = true;
   catalogReady = false;
