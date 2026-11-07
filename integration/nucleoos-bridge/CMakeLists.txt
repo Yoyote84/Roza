@@ -16,6 +16,7 @@ include("${NUCLEOOS_FIRMWARE_DIR}/version/version.cmake")
 set(EXTRA_COMPONENT_DIRS
     "${NUCLEOOS_FIRMWARE_DIR}/components"
     "${CMAKE_CURRENT_LIST_DIR}/components/roza_launcher_partitions"
+    "${CMAKE_CURRENT_LIST_DIR}/components/roza_launcher_sd"
     "${CMAKE_CURRENT_LIST_DIR}/../arduino-idf-smoke/components/launcher_platform"
 )
 
