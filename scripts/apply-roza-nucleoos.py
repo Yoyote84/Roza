@@ -56,7 +56,12 @@ def replace_exact(path: Path, edits: list[tuple[str, str]]) -> bool:
     for old, new in edits:
         old_count = source.count(old)
         new_count = source.count(new)
-        if old_count == 1:
+        # Some insertions deliberately retain the original declaration/call inside the
+        # replacement block. Recognize that exact larger block before trying the old text,
+        # otherwise a second CI invocation would append the hook a second time.
+        if new_count == 1 and old_count == 1 and old in new:
+            continue
+        if old_count == 1 and new_count == 0:
             source = source.replace(old, new, 1)
             changed = True
         elif old_count == 0 and new_count == 1:

@@ -1,10 +1,7 @@
-get_filename_component(ROZA_REPOSITORY_ROOT "\${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
-set(NUCLEOOS_MAIN_DIR "\${ROZA_REPOSITORY_ROOT}/nucleoos/firmware/main")
+set(NUCLEOOS_MAIN_DIR "\${CMAKE_CURRENT_LIST_DIR}/../../../nucleoos/firmware/main")
 
 if(NOT EXISTS "\${NUCLEOOS_MAIN_DIR}/main.c")
-    message(FATAL_ERROR
-        "NucleoOS main.c missing. Expected: \${NUCLEOOS_MAIN_DIR}/main.c"
-    )
+    message(FATAL_ERROR "NucleoOS main.c is missing; initialize the nucleoos submodule.")
 endif()
 
 # Compile NucleoOS's actual boot source, not a second test app_main.
