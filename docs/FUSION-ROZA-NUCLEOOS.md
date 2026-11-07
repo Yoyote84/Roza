@@ -152,3 +152,13 @@ Cette première tranche est strictement en lecture seule : elle ne modifie ni ta
 La surcouche \`scripts/apply-roza-nucleoos.py\` ajoute l'enregistrement de cette application après les applications natives NucleoOS, pour le démarrage normal et le profil Solo générique. Elle vérifie toujours le commit NucleoOS épinglé et refuse les motifs de patch ambigus. Le composant \`integration/nucleoos-bridge/components/roza_launcher_partitions\` est compilé avec le même projet ESP-IDF.
 
 **Critère de cette étape :** CI de compilation/liens verte sur le composant et le registre. L'écran et les touches doivent encore être validés sur un Cardputer ADV réel ; cette image de test ne doit pas être flashée.
+
+
+
+## Stockage microSD — décision d'intégration vérifiée
+
+L'inventaire des sources épinglées a confirmé que NucleoOS possède déjà une application native **Files** complète : `firmware/components/nucleo_app/app_files.cpp`. Elle est incluse dans le `CMakeLists.txt` du composant `nucleo_app`, déclarée dans le registre natif et enregistrée par `nucleo_app_register_builtins()`. Elle fournit navigation dans les dossiers, tri, recherche, historique, détails, renommage, création de dossiers et suppression avec confirmation. Elle utilise le point de montage et les services SD de NucleoOS (`NUCLEO_SD_MOUNT`, `nucleo_storage`) ; elle ne monte pas une deuxième carte.
+
+**Décision :** ROZA doit conserver et exposer cette application native Files comme gestionnaire microSD commun. Il ne faut pas porter directement `launcher/src/sd_functions.cpp` dans le même processus : ce code appelle `setupSdCard()`, démarre son propre bus SPI/SD et utilise les classes Arduino `SDM`/ `File`, ce qui créerait un deuxième propriétaire du matériel et du système de fichiers. Les actions propres à Launcher (installation de paquets/firmwares depuis SD, sélection de fichiers) devront ensuite être adaptées en consommateurs du service de stockage NucleoOS, sans réinitialiser ni démonter la carte.
+
+**État de preuve :** les sources amont épinglées et le graphe CMake montrent que le navigateur de fichiers NucleoOS est bien compilé et enregistré dans le firmware de base. Le workflow combiné #16 compile et lie le graphe de composants, mais ne constitue pas un test d'exécution de Files. L'accès réel à la carte, les opérations d'écriture et le rendu clavier/écran restent à vérifier sur Cardputer ADV ; aucun test matériel ni flash n'a été effectué.
