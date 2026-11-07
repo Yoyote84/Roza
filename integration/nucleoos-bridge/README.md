@@ -11,6 +11,12 @@ This project is a **compile/link integration test**, not a release firmware.
 
 No substitute implementation is introduced. The main component directly compiles the upstream NucleoOS `main.c`; the Launcher component directly compiles the upstream Launcher source.
 
+## Shared USB Mass Storage ownership
+
+NucleoOS enables `CONFIG_TINYUSB_MSC_ENABLED` for its real `esp_tinyusb` driver. Arduino-ESP32 3.2.1 sees the same Kconfig symbol and otherwise compiles `cores/esp32/USBMSC.cpp`, even though that source also requires Arduino's separate `CONFIG_TINYUSB_ENABLED` HAL. This caused missing declarations such as `tinyusb_add_string_descriptor`, `TUD_MSC_DESCRIPTOR` and `tud_msc_set_sense`.
+
+The build now runs `idf.py reconfigure`, then `scripts/prepare-roza-arduino-usb.py`, then `idf.py build`. The guard adds a CMake condition to the downloaded Arduino component so its own `USBMSC.cpp` is built only when the Arduino TinyUSB HAL is enabled. In this bridge, NucleoOS remains the sole real USB-MSC implementation through `nucleo_usbmsc` + `esp_tinyusb`; no NucleoOS USB source or configuration is disabled. Before applying the guard, the script verifies the NucleoOS MSC implementation and checks that Launcher sources do not reference Arduino's `USBMSC` class. It fails closed if those assumptions change. This is a build-only integration guard, not a physical USB validation.
+
 ## Pinned sources
 
 - NucleoOS: `indecenti/NucleoOs`, commit `cb0f1a5356ddd6f96ec6b31bbcba5d55f52d8123`.
@@ -29,6 +35,8 @@ git checkout migration/roza-chanina-launcher
 git submodule update --init --recursive
 cd integration/nucleoos-bridge
 idf.py set-target esp32s3
+idf.py reconfigure
+python3 ../../scripts/prepare-roza-arduino-usb.py
 idf.py build
 ```
 

@@ -125,3 +125,10 @@ Le premier essai CI a révélé que `nucleo_native` inclut aussi `sdk/native/inc
 ## Identité ROZA sur l'accueil NucleoOS
 
 Le script `scripts/apply-roza-nucleoos.py` applique une surcouche idempotente au commit NucleoOS épinglé : thème par défaut papier clair/bordeaux, écran de démarrage ROZA et titres des écrans de secours ROZA. Il refuse de toucher une autre révision ou des sources qui ne correspondent plus exactement aux motifs attendus. Les thèmes NucleoOS existants restent sélectionnables et un thème déjà enregistré par l'utilisateur continue d'être respecté. Le commit épinglé du sous-module n'est ni modifié ni repinné ; la surcouche est conservée dans le dépôt ROZA.
+
+
+## USB Mass Storage : propriété unique dans le pont
+
+Le workflow combiné a révélé un problème de portée Kconfig : NucleoOS active `CONFIG_TINYUSB_MSC_ENABLED` pour son composant réel `esp_tinyusb`. Arduino-ESP32 3.2.1 voit le même symbole et ajoute `USBMSC.cpp` à sa compilation, alors que ce fichier requiert aussi le HAL propre à Arduino (`CONFIG_TINYUSB_ENABLED`). Les fonctions et macros Arduino TinyUSB n'étant pas déclarées dans ce profil, la compilation échouait.
+
+La correction du pont est maintenant conditionnelle : après résolution des dépendances par `idf.py reconfigure`, le script `scripts/prepare-roza-arduino-usb.py` adapte le CMake du composant Arduino téléchargé pour ne compiler `USBMSC.cpp` que si le HAL Arduino TinyUSB est activé. Dans le pont ROZA courant, le lecteur USB de la carte SD reste fourni par l'implémentation réelle de NucleoOS (`nucleo_usbmsc` et `esp_tinyusb`). Le script vérifie ces sources et refuse l'exclusion si Launcher fait référence à la classe Arduino `USBMSC`. Il ne désactive pas la fonction USB-MSC de NucleoOS et ne crée aucun remplacement fictif. Cette correction ne valide pas encore l'USB en fonctionnement sur le Cardputer ADV.

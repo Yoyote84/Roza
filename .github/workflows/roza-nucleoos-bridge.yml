@@ -13,6 +13,7 @@ on:
       - ".github/workflows/roza-nucleoos-bridge.yml"
       - "docs/FUSION-ROZA-NUCLEOOS.md"
       - "scripts/apply-roza-nucleoos.py"
+      - "scripts/prepare-roza-arduino-usb.py"
   workflow_dispatch:
 
 permissions:
@@ -67,4 +68,7 @@ jobs:
           esp_idf_version: v5.4.4
           target: esp32s3
           path: integration/nucleoos-bridge
-          command: idf.py build
+          command: >-
+            idf.py reconfigure &&
+            python3 ../../scripts/prepare-roza-arduino-usb.py &&
+            idf.py build
