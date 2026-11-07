@@ -52,7 +52,6 @@ jobs:
           test -f nucleoos/firmware/main/main.c
           test -f nucleoos/sdk/native/include/nucleo_native.h
           test -f nucleoos/tools/anima-host/tts-plan-ctest.c
-          test -f nucleoos/sdk/native/include/nucleo_native.h
 
       - name: Apply ROZA theme and boot identity to NucleoOS source
         shell: bash
