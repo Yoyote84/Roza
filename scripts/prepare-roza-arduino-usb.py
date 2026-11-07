@@ -35,9 +35,9 @@ endif()
 
 FATFS_MARKER = "# ROZA: align Arduino's legacy FatFs sector-size test with ESP-IDF."
 FATFS_ANCHOR = (
-    "idf_component_register(INCLUDE_DIRS \${includedirs} PRIV_INCLUDE_DIRS "
-    "\${priv_includes} SRCS \${srcs} REQUIRES \${requires} PRIV_REQUIRES "
-    "\${priv_requires})"
+    "idf_component_register(INCLUDE_DIRS ${includedirs} PRIV_INCLUDE_DIRS "
+    "${priv_includes} SRCS ${srcs} REQUIRES ${requires} PRIV_REQUIRES "
+    "${priv_requires})"
 )
 FATFS_GUARD = """# ROZA: align Arduino's legacy FatFs sector-size test with ESP-IDF.
 # ESP-IDF 5.4.4 sets FF_SS_SDCARD=512; ROZA also pins CONFIG_WL_SECTOR_SIZE_512=y.
@@ -49,7 +49,7 @@ if(NOT CONFIG_WL_SECTOR_SIZE_512)
         "ROZA Arduino FatFs compatibility requires CONFIG_WL_SECTOR_SIZE_512"
     )
 endif()
-target_compile_definitions(\${COMPONENT_LIB} PRIVATE _MAX_SS=512)
+target_compile_definitions(${COMPONENT_LIB} PRIVATE _MAX_SS=512)
 
 """
 
