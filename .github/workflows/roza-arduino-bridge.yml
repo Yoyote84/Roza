@@ -1,0 +1,38 @@
+name: ROZA Arduino-ESP-IDF Bridge Prototype
+
+on:
+  push:
+    branches:
+      - migration/roza-chanina-launcher
+    paths:
+      - ".github/workflows/roza-arduino-bridge.yml"
+      - "integration/arduino-idf-smoke/**"
+      - "launcher"
+      - "docs/FUSION-ROZA-NUCLEOOS.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roza-arduino-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Launcher platform glue with ESP-IDF 5.4.4
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ROZA and pinned Launcher source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Compile IDF-managed Arduino component and real Launcher platform source
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.4.4
+          target: esp32s3
+          path: integration/arduino-idf-smoke
+          command: idf.py build
