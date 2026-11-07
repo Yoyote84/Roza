@@ -1,0 +1,41 @@
+name: ROZA NucleoOS + Launcher ESP-IDF Integration
+
+on:
+  push:
+    branches:
+      - migration/roza-chanina-launcher
+    paths:
+      - ".gitmodules"
+      - "nucleoos"
+      - "launcher"
+      - "integration/nucleoos-bridge/**"
+      - "integration/arduino-idf-smoke/components/launcher_platform/**"
+      - ".github/workflows/roza-nucleoos-bridge.yml"
+      - "docs/FUSION-ROZA-NUCLEOOS.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roza-nucleoos-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build real NucleoOS app + Launcher platform component
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pinned source submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Compile the combined ESP-IDF component graph
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.4.4
+          target: esp32s3
+          path: integration/nucleoos-bridge
+          command: idf.py build

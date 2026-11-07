@@ -1,3 +1,7 @@
 [submodule "launcher"]
 	path = launcher
 	url = https://github.com/bmorcelli/Launcher.git
+
+[submodule "nucleoos"]
+	path = nucleoos
+	url = https://github.com/indecenti/NucleoOs.git

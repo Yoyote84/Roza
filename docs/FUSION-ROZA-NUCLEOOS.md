@@ -112,3 +112,11 @@ La fusion ne sera considérée terminée que lorsque le firmware unique démarre
 - Modifications autorisées uniquement sur `migration/roza-chanina-launcher`.
 - Ne jamais modifier `main`, fusionner automatiquement ou travailler sur une autre branche.
 - Garder le code réel des projets : pas de stub pour masquer une erreur de compilation.
+
+## Deuxième prototype — vrai démarrage NucleoOS + composant Launcher
+
+Le sous-module `nucleoos/` épingle `indecenti/NucleoOs` au commit `cb0f1a5356ddd6f96ec6b31bbcba5d55f52d8123`, avec sa licence amont PolyForm Noncommercial 1.0.0 conservée. Le nouveau projet `integration/nucleoos-bridge/` compile directement le véritable `firmware/main/main.c` et le graphe de composants ESP-IDF de cette révision, puis ajoute `launcher_platform`, qui compile le véritable `launcher/src/idf/launcher_platform.cpp` du sous-module Launcher.
+
+Le harnais réutilise le verrou de dépendances, les valeurs sdkconfig et la table de partitions provenant du même commit NucleoOS. Le démarrage reste celui de NucleoOS : aucun second `app_main()` Arduino n'est ajouté. Le workflow `.github/workflows/roza-nucleoos-bridge.yml` compile l'ensemble sous ESP-IDF 5.4.4 pour ESP32-S3.
+
+Ce prototype est un test de compatibilité du graphe ESP-IDF, pas encore la fusion de toute l'application Launcher : il ne compile pas encore l'ensemble de ses écrans et bibliothèques Arduino et ne valide ni la marge mémoire, ni le fonctionnement sur le Cardputer ADV, ni une mise à jour flashable. La matrice de fonctionnalités et les validations matérielles restent obligatoires. Aucun flash n'est lancé.
