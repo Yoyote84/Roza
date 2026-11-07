@@ -26,11 +26,29 @@ jobs:
     name: Build real NucleoOS app + Launcher platform component
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout pinned source submodules
+      - name: Checkout ROZA source without downloading large submodules
         uses: actions/checkout@v4
         with:
-          submodules: recursive
-          fetch-depth: 0
+          submodules: false
+          fetch-depth: 1
+
+      - name: Initialize the pinned Launcher submodule
+        run: git submodule update --init --recursive launcher
+
+      - name: Fetch only the NucleoOS firmware tree
+        shell: bash
+        run: |
+          nucleoos_commit=cb0f1a5356ddd6f96ec6b31bbcba5d55f52d8123
+          git clone --filter=blob:none --no-checkout --depth=1 --single-branch --branch main https://github.com/indecenti/NucleoOs.git nucleoos
+          git -C nucleoos sparse-checkout init --cone
+          git -C nucleoos sparse-checkout set firmware
+          if ! git -C nucleoos cat-file -e "${nucleoos_commit}^{commit}"; then
+            git -C nucleoos fetch --filter=blob:none --depth=1 origin "${nucleoos_commit}"
+          fi
+          git -C nucleoos checkout --detach "${nucleoos_commit}"
+          test "$(git -C nucleoos rev-parse HEAD)" = "${nucleoos_commit}"
+          test -f nucleoos/LICENSE
+          test -f nucleoos/firmware/main/main.c
 
       - name: Compile the combined ESP-IDF component graph
         uses: espressif/esp-idf-ci-action@v1

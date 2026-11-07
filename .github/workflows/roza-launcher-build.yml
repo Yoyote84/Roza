@@ -20,11 +20,14 @@ jobs:
     name: Build ROZA CHANINA for Cardputer ADV
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout ROZA and all Launcher submodules
+      - name: Checkout ROZA source (submodules initialized explicitly)
         uses: actions/checkout@v4
         with:
-          submodules: recursive
-          fetch-depth: 0
+          submodules: false
+          fetch-depth: 1
+
+      - name: Initialize Launcher and its required submodules only
+        run: git submodule update --init --recursive launcher
 
       - name: Set up Python
         uses: actions/setup-python@v5

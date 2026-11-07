@@ -26,8 +26,11 @@ jobs:
       - name: Checkout ROZA and pinned Launcher source
         uses: actions/checkout@v4
         with:
-          submodules: recursive
-          fetch-depth: 0
+          submodules: false
+          fetch-depth: 1
+
+      - name: Initialize only the pinned Launcher submodule
+        run: git submodule update --init --recursive launcher
 
       - name: Compile IDF-managed Arduino component and real Launcher platform source
         uses: espressif/esp-idf-ci-action@v1
