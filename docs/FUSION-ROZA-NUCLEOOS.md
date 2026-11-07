@@ -132,3 +132,12 @@ Le script `scripts/apply-roza-nucleoos.py` applique une surcouche idempotente au
 Le workflow combiné a révélé un problème de portée Kconfig : NucleoOS active `CONFIG_TINYUSB_MSC_ENABLED` pour son composant réel `esp_tinyusb`. Arduino-ESP32 3.2.1 voit le même symbole et ajoute `USBMSC.cpp` à sa compilation, alors que ce fichier requiert aussi le HAL propre à Arduino (`CONFIG_TINYUSB_ENABLED`). Les fonctions et macros Arduino TinyUSB n'étant pas déclarées dans ce profil, la compilation échouait.
 
 La correction du pont est maintenant conditionnelle : après résolution des dépendances par `idf.py reconfigure`, le script `scripts/prepare-roza-arduino-usb.py` adapte le CMake du composant Arduino téléchargé pour ne compiler `USBMSC.cpp` que si le HAL Arduino TinyUSB est activé. Dans le pont ROZA courant, le lecteur USB de la carte SD reste fourni par l'implémentation réelle de NucleoOS (`nucleo_usbmsc` et `esp_tinyusb`). Le script vérifie ces sources et refuse l'exclusion si Launcher fait référence à la classe Arduino `USBMSC`. Il ne désactive pas la fonction USB-MSC de NucleoOS et ne crée aucun remplacement fictif. Cette correction ne valide pas encore l'USB en fonctionnement sur le Cardputer ADV.
+
+
+## Compatibilité FatFs Arduino / ESP-IDF 5.4.4
+
+La dernière CI combinée a dépassé le conflit TinyUSB, puis s'est arrêtée dans les sources amont Arduino SD.cpp et SD_MMC.cpp : elles consultent FATFS.ssize, absent lorsque FatFs est compilé avec une taille de secteur fixe. Dans le profil du pont, FF_SS_SDCARD=512 et CONFIG_WL_SECTOR_SIZE_512=y, donc FF_MIN_SS == FF_MAX_SS == 512 et le champ ssize n'est volontairement pas présent dans FATFS.
+
+Le script scripts/prepare-roza-arduino-usb.py ajoute désormais _MAX_SS=512 aux seules options de compilation du composant Arduino téléchargé. Cela aligne le test conditionnel historique de Arduino-ESP32 3.2.1 sur le profil FatFs fixe du pont, qui utilise correctement 512 octets par secteur SD. Le script refuse cette adaptation si CONFIG_WL_SECTOR_SIZE_512=y n'est plus activé. Aucun fichier source amont FatFs, Arduino, Launcher ou NucleoOS n'est remplacé.
+
+Cette correction vise le prochain blocage de compilation identifié ; elle doit encore être confirmée par la CI.

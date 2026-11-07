@@ -17,6 +17,13 @@ NucleoOS enables `CONFIG_TINYUSB_MSC_ENABLED` for its real `esp_tinyusb` driver.
 
 The build now runs `idf.py reconfigure`, then `scripts/prepare-roza-arduino-usb.py`, then `idf.py build`. The guard adds a CMake condition to the downloaded Arduino component so its own `USBMSC.cpp` is built only when the Arduino TinyUSB HAL is enabled. In this bridge, NucleoOS remains the sole real USB-MSC implementation through `nucleo_usbmsc` + `esp_tinyusb`; no NucleoOS USB source or configuration is disabled. Before applying the guard, the script verifies the NucleoOS MSC implementation and checks that Launcher sources do not reference Arduino's `USBMSC` class. It fails closed if those assumptions change. This is a build-only integration guard, not a physical USB validation.
 
+
+## Arduino FatFs compatibility (fixed 512-byte sectors)
+
+The combined CI next reached Arduino's real SD.cpp and SD_MMC.cpp, where both referenced FATFS.ssize and failed because the NucleoOS bridge builds FatFs in fixed-sector mode. In ESP-IDF 5.4.4, FATFS.ssize exists only when FF_MAX_SS differs from FF_MIN_SS. This profile has FF_SS_SDCARD=512 and explicitly pins CONFIG_WL_SECTOR_SIZE_512=y, so the minimum and maximum sector sizes are both 512 and that member is intentionally absent.
+
+The preparation script now adds the legacy Arduino compile definition _MAX_SS=512 only to the downloaded Arduino component target, and fails closed if the fixed 512-byte wear-levelling setting is no longer enabled. This makes Arduino 3.2.1 select the fixed-sector branch (multiplication by 512) rather than referencing the nonexistent ssize field. It does not alter FatFs, NucleoOS source, or the SD card's actual sector size. A passing compile is still required to validate the compatibility change.
+
 ## Pinned sources
 
 - NucleoOS: `indecenti/NucleoOs`, commit `cb0f1a5356ddd6f96ec6b31bbcba5d55f52d8123`.
