@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the ROZA theme and native Launcher-feature hook to pinned NucleoOS sources."""
+"""Apply the ROZA theme and native Launcher-feature hooks to pinned NucleoOS sources."""
 
 from pathlib import Path
 import subprocess
@@ -108,20 +108,20 @@ def main() -> int:
     main_changed = replace_exact(MAIN_FILE, [
         ('nucleo_ui_message("NucleoOS",', 'nucleo_ui_message("ROZA",'),
         ('nucleo_ui_home("NucleoOS",', 'nucleo_ui_home("ROZA",'),
-        ('extern void nucleo_store_apps_sync(void);   // nucleo_app/store_apps.cpp: store apps join the launcher',
-         'extern void nucleo_store_apps_sync(void);   // nucleo_app/store_apps.cpp: store apps join the launcher\nextern void roza_register_launcher_partitions(void); // native read-only Launcher partition view'),
-        ('            nucleo_app_register_builtins();          // including a native game installed from the store\n            nucleo_store_apps_sync();',
-         '            nucleo_app_register_builtins();          // including a native game installed from the store\n            roza_register_launcher_partitions();\n            nucleo_store_apps_sync();'),
-        ('        nucleo_app_register_builtins();      bootmark("app-builtins");',
-         '        nucleo_app_register_builtins();\n        roza_register_launcher_partitions();\n        bootmark("app-builtins");'),
+        ('extern void nucleo_store_apps_sync(void);   // nucleo_app/store_apps.cpp: store apps join the launcher\nextern void roza_register_launcher_partitions(void); // native read-only Launcher partition view',
+         'extern void nucleo_store_apps_sync(void);   // nucleo_app/store_apps.cpp: store apps join the launcher\nextern void roza_register_launcher_partitions(void); // native read-only Launcher partition view\nextern void roza_register_launcher_sd(void); // native read-only SD firmware preflight'),
+        ('            nucleo_app_register_builtins();          // including a native game installed from the store\n            roza_register_launcher_partitions();\n            nucleo_store_apps_sync();',
+         '            nucleo_app_register_builtins();          // including a native game installed from the store\n            roza_register_launcher_partitions();\n            roza_register_launcher_sd();\n            nucleo_store_apps_sync();'),
+        ('        nucleo_app_register_builtins();\n        roza_register_launcher_partitions();\n        bootmark("app-builtins");',
+         '        nucleo_app_register_builtins();\n        roza_register_launcher_partitions();\n        roza_register_launcher_sd();\n        bootmark("app-builtins");'),
     ])
     print(
         "Surcouche ROZA appliquee — "
         f"theme={'modifie' if theme_changed else 'deja present'}, "
         f"splash={'modifie' if ui_changed else 'deja present'}, "
-        f"accueil et app Partitions={'modifies' if main_changed else 'deja presents'}."
+        f"accueil et apps Partitions/Firmware SD={'modifies' if main_changed else 'deja presents'}."
     )
-    print("Le registre NucleoOS conserve ses apps ; ROZA ajoute un inspecteur flash en lecture seule.")
+    print("ROZA ajoute les inspecteurs Partitions et Firmware SD sans remplacer les apps NucleoOS.")
     return 0
 
 if __name__ == "__main__":
