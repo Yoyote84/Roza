@@ -4,7 +4,7 @@ This project is a **compile/link integration test**, not a release firmware.
 
 ## What it builds
 
-- NucleoOS's pinned, real `firmware/main/main.c` as the one and only `app_main()`.
+- NucleoOS's pinned, real `firmware/main/main.c` as the one and only `app_main()`, after applying the idempotent ROZA overlay to its default theme and boot identity.
 - The actual NucleoOS ESP-IDF component tree from the pinned `nucleoos` submodule.
 - Launcher 3.0.0's real `launcher/src/idf/launcher_platform.cpp`, through the same IDF component used by the first bridge test; `WHOLE_ARCHIVE` forces that object into the final link so unresolved Arduino/platform dependencies cannot remain hidden in an unused static archive.
 - Arduino-ESP32 3.2.1 as an ESP-IDF-managed component, with ESP-IDF 5.4.4 (the version locked by NucleoOS). Arduino autostart is explicitly disabled; NucleoOS remains the sole `app_main()` owner. Arduino-ESP32 3.2.1 requires `CONFIG_FREERTOS_HZ=1000`, so the ROZA bridge profile selects a 1 ms FreeRTOS tick without changing the pinned NucleoOS repository defaults.
