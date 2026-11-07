@@ -283,7 +283,7 @@ static bool analyze_firmware(const char *path, FirmwareInfo *out)
                 const uint8_t type = entry[2];
                 const uint8_t subtype = entry[3];
                 if (!found_app && type == 0x00 &&
-                    (subtype == 0x00 || subtype == 0x10 || subtype == 0x20)) {
+                    (subtype == 0x00 || (subtype >= 0x10 && subtype <= 0x1F) || subtype == 0x20)) {
                     image_offset = read_le32(entry + 4);
                     out->declared_partition_size = read_le32(entry + 8);
                     memcpy(out->app_label, entry + 12, 16);
@@ -486,7 +486,7 @@ static void sd_browser_draw()
         const SdEntry &entry = s_entries[index];
         const int y = row_top + slot * row_height;
         const bool selected = index == s_selected;
-        const uint16_t background = selected ? SEL : BG;
+        const uint16_t background = selected ? THEME_SEL : BG;
         d.fillRect(6, y, W - 12, row_height - 1, background);
         d.setTextColor(selected ? INK : (entry.directory ? C_YELLOW : FG), background);
         d.setCursor(10, y + 5);
