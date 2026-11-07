@@ -247,3 +247,6 @@ CONFIG_TINYUSB_NET_MODE_NCM=y
 
 # Presence app (Wi-Fi CSI detector)
 CONFIG_ESP_WIFI_CSI_ENABLED=y
+
+# Keep NucleoOS as the sole app_main owner; Arduino is initialized only on explicit request.
+CONFIG_AUTOSTART_ARDUINO=n

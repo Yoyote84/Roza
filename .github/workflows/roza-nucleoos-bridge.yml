@@ -50,6 +50,7 @@ jobs:
           test -f nucleoos/LICENSE
           test -f nucleoos/firmware/main/main.c
           test -f nucleoos/sdk/native/include/nucleo_native.h
+          test -f nucleoos/sdk/native/include/nucleo_native.h
 
       - name: Compile the combined ESP-IDF component graph
         uses: espressif/esp-idf-ci-action@v1
