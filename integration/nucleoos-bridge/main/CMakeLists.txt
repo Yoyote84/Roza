@@ -8,7 +8,7 @@ if(NOT EXISTS "${NUCLEOOS_MAIN_DIR}/main.c")
 endif()
 
 # Compile NucleoOS's actual boot source, not a second test app_main.
-# ROZA adds one native, read-only partition inspector to the same app registry.
+# ROZA adds native, read-only Launcher feature slices to the same app registry.
 idf_component_register(
     SRCS "${NUCLEOOS_MAIN_DIR}/main.c"
     INCLUDE_DIRS "${NUCLEOOS_MAIN_DIR}"
@@ -42,4 +42,5 @@ idf_component_register(
         nucleo_weather
         launcher_platform
         roza_launcher_partitions
+        roza_launcher_sd
 )
