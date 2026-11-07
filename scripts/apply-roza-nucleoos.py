@@ -108,18 +108,18 @@ def main() -> int:
     main_changed = replace_exact(MAIN_FILE, [
         ('nucleo_ui_message("NucleoOS",', 'nucleo_ui_message("ROZA",'),
         ('nucleo_ui_home("NucleoOS",', 'nucleo_ui_home("ROZA",'),
-        'extern void nucleo_store_apps_sync(void);   // nucleo_app/store_apps.cpp: store apps join the launcher\nextern void roza_register_launcher_partitions(void); // native read-only Launcher partition view\nextern void roza_register_launcher_sd(void); // native read-only SD firmware preflight'),
+        ('extern void nucleo_store_apps_sync(void);   // nucleo_app/store_apps.cpp: store apps join the launcher',
          'extern void nucleo_store_apps_sync(void);   // nucleo_app/store_apps.cpp: store apps join the launcher\nextern void roza_register_launcher_partitions(void); // native read-only Launcher partition view\nextern void roza_register_launcher_sd(void); // native read-only SD firmware preflight'),
-        (            nucleo_app_register_builtins();          // including a native game installed from the store\n            roza_register_launcher_partitions();\n            roza_register_launcher_sd();\n            nucleo_store_apps_sync();'),
+        ('            nucleo_app_register_builtins();          // including a native game installed from the store\n            nucleo_store_apps_sync();',
          '            nucleo_app_register_builtins();          // including a native game installed from the store\n            roza_register_launcher_partitions();\n            roza_register_launcher_sd();\n            nucleo_store_apps_sync();'),
-        (        nucleo_app_register_builtins();\n        roza_register_launcher_partitions();\n        roza_register_launcher_sd();\n        bootmark("app-builtins");'),
+        ('        nucleo_app_register_builtins();      bootmark("app-builtins");',
          '        nucleo_app_register_builtins();\n        roza_register_launcher_partitions();\n        roza_register_launcher_sd();\n        bootmark("app-builtins");'),
     ])
     print(
         "Surcouche ROZA appliquee — "
         f"theme={'modifie' if theme_changed else 'deja present'}, "
         f"splash={'modifie' if ui_changed else 'deja present'}, "
-        f"accueil et apps Partitions/Firmware SD={'modifies' if main_changed else 'deja presents'}."
+        f"accueil et apps Partitions/Firmware SD={'modifies' if main_changed else 'deja presentes'}."
     )
     print("ROZA ajoute les inspecteurs Partitions et Firmware SD sans remplacer les apps NucleoOS.")
     return 0
