@@ -141,3 +141,14 @@ La dernière CI combinée a dépassé le conflit TinyUSB, puis s'est arrêtée d
 Le script scripts/prepare-roza-arduino-usb.py ajoute désormais _MAX_SS=512 aux seules options de compilation du composant Arduino téléchargé. Cela aligne le test conditionnel historique de Arduino-ESP32 3.2.1 sur le profil FatFs fixe du pont, qui utilise correctement 512 octets par secteur SD. Le script refuse cette adaptation si CONFIG_WL_SECTOR_SIZE_512=y n'est plus activé. Aucun fichier source amont FatFs, Arduino, Launcher ou NucleoOS n'est remplacé.
 
 Cette correction vise le prochain blocage de compilation identifié ; elle doit encore être confirmée par la CI.
+
+
+## Premier module Launcher exposé dans l'accueil ROZA — inspection des partitions
+
+Le pont ajoute maintenant une première tranche fonctionnelle de Launcher dans le registre natif de NucleoOS : l'application **Partitions**. Elle utilise le cycle de vie natif \`on_enter/on_key/on_draw/on_exit\`, partage donc l'écran et le clavier déjà initialisés par NucleoOS, et relit la table active via l'itérateur officiel ESP-IDF. L'écran affiche le label, le type/sous-type, l'adresse flash, la taille et l'état de chiffrement. Les flèches font défiler la liste et \`r\` relit les métadonnées.
+
+Cette première tranche est strictement en lecture seule : elle ne modifie ni table de partitions, ni slot OTA, ni données utilisateur. Aucune fonction de suppression, d'effacement, de déplacement, de migration ou de restauration n'est exposée. Le gestionnaire de partitions complet de Launcher reste à porter après définition d'une stratégie de migration vérifiable et non destructive.
+
+La surcouche \`scripts/apply-roza-nucleoos.py\` ajoute l'enregistrement de cette application après les applications natives NucleoOS, pour le démarrage normal et le profil Solo générique. Elle vérifie toujours le commit NucleoOS épinglé et refuse les motifs de patch ambigus. Le composant \`integration/nucleoos-bridge/components/roza_launcher_partitions\` est compilé avec le même projet ESP-IDF.
+
+**Critère de cette étape :** CI de compilation/liens verte sur le composant et le registre. L'écran et les touches doivent encore être validés sur un Cardputer ADV réel ; cette image de test ne doit pas être flashée.
