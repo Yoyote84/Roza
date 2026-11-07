@@ -1,17 +1,17 @@
-get_filename_component(ROZA_REPOSITORY_ROOT "\${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
-set(NUCLEOOS_MAIN_DIR "\${ROZA_REPOSITORY_ROOT}/nucleoos/firmware/main")
+get_filename_component(ROZA_REPOSITORY_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+set(NUCLEOOS_MAIN_DIR "${ROZA_REPOSITORY_ROOT}/nucleoos/firmware/main")
 
-if(NOT EXISTS "\${NUCLEOOS_MAIN_DIR}/main.c")
+if(NOT EXISTS "${NUCLEOOS_MAIN_DIR}/main.c")
     message(FATAL_ERROR
-        "NucleoOS main.c missing. Expected: \${NUCLEOOS_MAIN_DIR}/main.c"
+        "NucleoOS main.c missing. Expected: ${NUCLEOOS_MAIN_DIR}/main.c"
     )
 endif()
 
 # Compile NucleoOS's actual boot source, not a second test app_main.
 # ROZA adds one native, read-only partition inspector to the same app registry.
 idf_component_register(
-    SRCS "\${NUCLEOOS_MAIN_DIR}/main.c"
-    INCLUDE_DIRS "\${NUCLEOOS_MAIN_DIR}"
+    SRCS "${NUCLEOOS_MAIN_DIR}/main.c"
+    INCLUDE_DIRS "${NUCLEOOS_MAIN_DIR}"
     REQUIRES
         nucleo_sdcontent
         nucleo_storage
