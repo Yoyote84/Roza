@@ -63,6 +63,25 @@ Il ne faut pas choisir le moteur de compilation sur une supposition. Deux pistes
 
 Le prototype devra prouver la compilation, le démarrage, l'accès à l'écran et au clavier Cardputer ADV, le Wi-Fi, la microSD et la marge RAM/flash. La piste qui permet de conserver le plus de code réel et de fonctions avec le moins de risques sera retenue. Pas de faux modules ni de remplacements factices.
 
+
+## Prototype de compatibilité Arduino / ESP-IDF
+
+Les versions réelles des deux dépôts montrent un décalage de base :
+
+- NucleoOS verrouille **ESP-IDF 5.4.4** dans `firmware/dependencies.lock`.
+- La configuration PlatformIO de Launcher pointe sur pioarduino `55.03.39`, basé sur **Arduino-ESP32 3.3.9 / ESP-IDF 5.5.4**.
+- Le composant officiel Arduino-ESP32 **3.2.1** déclare dans son manifeste la compatibilité ESP-IDF `>=5.3,<5.5`. C'est donc une version candidate pour le test avec IDF 5.4.4, et non une preuve que tout Launcher 3.0.0 est déjà compatible.
+
+Un projet isolé a été ajouté dans `integration/arduino-idf-smoke/`. Il compile le véritable fichier `launcher/src/idf/launcher_platform.cpp` en tant que composant ESP-IDF, avec Arduino-ESP32 3.2.1. Son `app_main()` appelle explicitement `initArduino()` et teste les wrappers de temps, délai, aléatoire, série et GPIO sans toucher à une broche physique.
+
+Le workflow `.github/workflows/roza-arduino-bridge.yml` exécute ce test sur ESP-IDF 5.4.4 / cible ESP32-S3. **Un succès prouvera uniquement la compatibilité du composant Arduino et de cette couche plateforme Launcher.** Il ne prouvera pas la compilation complète des bibliothèques, de l'écran, du clavier ou de tous les services réunis. La suite est d'élargir progressivement le test aux dépendances et modules réels de Launcher.
+
+Sources de version et de méthode :
+- [NucleoOS — dépendances ESP-IDF](https://github.com/indecenti/NucleoOs/blob/main/firmware/dependencies.lock)
+- [Launcher 3.0.0 — configuration PlatformIO](https://github.com/bmorcelli/Launcher/blob/3.0.0/platformio.ini)
+- [Arduino-ESP32 3.2.1 — manifeste de compatibilité](https://github.com/espressif/arduino-esp32/blob/3.2.1/idf_component.yml)
+- [Guide officiel Arduino comme composant ESP-IDF](https://docs.espressif.com/projects/arduino-esp32/en/latest/esp-idf_component.html)
+
 ## Flash, partitions et données utilisateur
 
 - Cible matérielle : Cardputer ADV, flash 8 MB, sans supposer de PSRAM.
