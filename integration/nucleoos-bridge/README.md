@@ -7,7 +7,7 @@ This project is a **compile/link integration test**, not a release firmware.
 - NucleoOS's pinned, real `firmware/main/main.c` as the one and only `app_main()`.
 - The actual NucleoOS ESP-IDF component tree from the pinned `nucleoos` submodule.
 - Launcher 3.0.0's real `launcher/src/idf/launcher_platform.cpp`, through the same IDF component used by the first bridge test; `WHOLE_ARCHIVE` forces that object into the final link so unresolved Arduino/platform dependencies cannot remain hidden in an unused static archive.
-- Arduino-ESP32 3.2.1 as an ESP-IDF-managed component, with ESP-IDF 5.4.4 (the version locked by NucleoOS). Arduino autostart is explicitly disabled; NucleoOS remains the sole `app_main()` owner.
+- Arduino-ESP32 3.2.1 as an ESP-IDF-managed component, with ESP-IDF 5.4.4 (the version locked by NucleoOS). Arduino autostart is explicitly disabled; NucleoOS remains the sole `app_main()` owner. Arduino-ESP32 3.2.1 requires `CONFIG_FREERTOS_HZ=1000`, so the ROZA bridge profile selects a 1 ms FreeRTOS tick without changing the pinned NucleoOS repository defaults.
 
 No substitute implementation is introduced. The main component directly compiles the upstream NucleoOS `main.c`; the Launcher component directly compiles the upstream Launcher source.
 
@@ -32,7 +32,7 @@ idf.py set-target esp32s3
 idf.py build
 ```
 
-The harness carries copies of NucleoOS's `dependencies.lock`, `sdkconfig.defaults` and `partitions.csv` from the pinned source revision. The CI sparse checkout includes both `firmware/` and `sdk/native/`, because NucleoOS's `nucleo_native` component includes the native SDK header from outside `firmware/`. It does not flash the device.
+The harness carries copies of NucleoOS's `dependencies.lock`, `sdkconfig.defaults` and `partitions.csv` from the pinned source revision, with the bridge-only 1 kHz tick requirement recorded explicitly in its own sdkconfig. The CI sparse checkout includes both `firmware/` and `sdk/native/`, because NucleoOS's `nucleo_native` component includes the native SDK header from outside `firmware/`. It does not flash the device.
 
 ## What a green build proves — and what it does not
 

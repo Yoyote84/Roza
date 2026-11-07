@@ -5,6 +5,9 @@ CONFIG_IDF_TARGET="esp32s3"
 CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 
+# Arduino-ESP32 3.2.1 requires a 1 kHz FreeRTOS tick. This is ROZA's integration profile only.
+CONFIG_FREERTOS_HZ=1000
+
 # Custom partition table (docs/partition-table.md)
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
