@@ -41,7 +41,7 @@ jobs:
           nucleoos_commit=cb0f1a5356ddd6f96ec6b31bbcba5d55f52d8123
           git clone --filter=blob:none --no-checkout --depth=1 --single-branch --branch main https://github.com/indecenti/NucleoOs.git nucleoos
           git -C nucleoos sparse-checkout init --cone
-          git -C nucleoos sparse-checkout set firmware
+          git -C nucleoos sparse-checkout set firmware sdk/native
           if ! git -C nucleoos cat-file -e "${nucleoos_commit}^{commit}"; then
             git -C nucleoos fetch --filter=blob:none --depth=1 origin "${nucleoos_commit}"
           fi
@@ -49,6 +49,7 @@ jobs:
           test "$(git -C nucleoos rev-parse HEAD)" = "${nucleoos_commit}"
           test -f nucleoos/LICENSE
           test -f nucleoos/firmware/main/main.c
+          test -f nucleoos/sdk/native/include/nucleo_native.h
 
       - name: Compile the combined ESP-IDF component graph
         uses: espressif/esp-idf-ci-action@v1
