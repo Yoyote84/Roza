@@ -72,3 +72,19 @@ This is not yet a working ROZA OTA implementation. A release channel must provid
 The selected Launcher Cardputer ADV profile uses `launcher/support_files/custom_8Mb.csv`; the pinned NucleoOS profile uses `nucleoos/firmware/partitions.csv`. They are materially different: Launcher NVS is `0x9000/0x5000`, otadata `0xE000/0x2000`, app0 `0x10000/0x150000`, and coredump `0x160000/0x10000`. NucleoOS uses NVS `0x9000/0x6000`, otadata `0xF000/0x2000`, phy_init `0x11000/0x1000`, nvs_keys `0x12000/0x1000`, ota_0 `0x20000/0x380000`, ota_1 `0x3A0000/0x380000`, nucleo_nap `0x720000/0x40000`, and cfg `0x760000/0xA0000`.
 
 These tables are not OTA-compatible. Their NVS sizes and metadata offsets differ, Launcher has one much smaller app partition, and the coredump and native-app scratch/data regions are not equivalent. No non-destructive migration has yet been demonstrated. A final ROZA build needs one validated 8 MB table, data backup/restore, per-image bounds checks, A/B rollback validation, and an explicit cable recovery/migration package. Do not flash the current integration prototype or use the legacy Launcher Cardputer artifact to migrate partitions.
+
+
+## Publication du binaire de diagnostic (pas une version à flasher)
+
+Chaque compilation combinée réussie publie désormais un artefact
+`ROZA-ENGINEERING-NOT-FOR-FLASH-<commit>` contenant l'ELF, l'image applicative,
+le bootloader, la table de partitions générée, les données OTA initiales,
+le CSV et `ROZA-BUILD-INFO.json`.
+
+Le manifeste contient les SHA-256, les révisions exactes des deux sources,
+la géométrie de la table 8 Mio, la taille de l'image et la marge restante dans
+les slots OTA. Il indique toujours `release_ready=false` et
+`safe_to_flash=false` : le port complet de Launcher, la migration depuis
+l'ancienne table Launcher et les essais physiques de démarrage/récupération
+ne sont pas validés. Cet artefact sert uniquement à l'audit de compilation.
+**Ne pas le flasher et ne pas l'utiliser comme paquet de mise à jour.**
