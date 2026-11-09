@@ -45,7 +45,7 @@ jobs:
       - name: Apply ROZA Cardputer interface
         run: python scripts/apply-roza-interface.py
 
-      - name: Compile Cardputer ADV firmware
+      - name: Compile Launcher-only Cardputer baseline (NOT the merged ROZA firmware)
         run: pio run -d launcher -e m5stack-cardputer
 
       - name: Prepare build information
@@ -64,7 +64,12 @@ jobs:
               "partitions": build / "partitions.bin",
               "partition_csv": root / "support_files/custom_8Mb.csv",
           }
-          report = {}
+          report = {
+              "firmware_scope": "Launcher-only Cardputer ADV baseline",
+              "merged_roza_firmware": False,
+              "safe_to_flash_as_roza_fusion": False,
+              "warning": "This artifact does not include the NucleoOS + Launcher ESP-IDF integration and must not be used as the ROZA fusion image or as a partition migration package.",
+          }
           for name, path in files.items():
               if not path.is_file():
                   raise SystemExit(f"Missing build output: {path}")
@@ -83,7 +88,7 @@ jobs:
       - name: Publish firmware artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ROZA-CHANINA-Cardputer-ADV-${{ github.sha }}
+          name: ROZA-CHANINA-Cardputer-ADV-LAUNCHER-ONLY-${{ github.sha }}
           path: |
             launcher/Launcher-m5stack-cardputer.bin
             launcher/.pio/build/m5stack-cardputer/firmware.bin
