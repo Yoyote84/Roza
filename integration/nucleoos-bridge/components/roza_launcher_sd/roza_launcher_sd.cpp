@@ -19,6 +19,8 @@
 #include <sys/stat.h>
 #include <stdint.h>
 #include <limits.h>
+#include <ctype.h>
+#include <mbedtls/sha256.h>
 
 namespace {
 
@@ -47,6 +49,11 @@ struct FirmwareInfo {
     int partition_count;
     char app_label[17];
     char message[64];
+    bool sha_computed;
+    bool sha_reference_found;
+    bool sha_reference_valid;
+    bool sha_match;
+    char sha256[65];
 };
 
 static SdEntry *s_entries;
@@ -231,6 +238,63 @@ static bool measure_image(FILE *file, uint32_t file_size, uint32_t offset,
     return true;
 }
 
+static bool compute_sha256(FILE *file, uint32_t file_size, char output[65])
+{
+    if (!file || !output || fseek(file, 0, SEEK_SET) != 0) return false;
+    mbedtls_sha256_context context;
+    mbedtls_sha256_init(&context);
+    bool ok = mbedtls_sha256_starts_ret(&context, 0) == 0;
+    uint8_t buffer[2048];
+    uint32_t remaining = file_size;
+    while (ok && remaining > 0) {
+        const size_t wanted = remaining < sizeof(buffer) ? remaining : sizeof(buffer);
+        const size_t received = fread(buffer, 1, wanted, file);
+        if (received != wanted || mbedtls_sha256_update_ret(&context, buffer, received) != 0) {
+            ok = false;
+            break;
+        }
+        remaining -= static_cast<uint32_t>(received);
+    }
+    uint8_t digest[32] = {};
+    if (ok && mbedtls_sha256_finish_ret(&context, digest) != 0) ok = false;
+    mbedtls_sha256_free(&context);
+    if (!ok) return false;
+    static const char hex[] = "0123456789abcdef";
+    for (size_t i = 0; i < sizeof(digest); ++i) {
+        output[i * 2] = hex[digest[i] >> 4];
+        output[i * 2 + 1] = hex[digest[i] & 0x0f];
+    }
+    output[64] = '\\0';
+    return true;
+}
+
+static void compare_sha256_sidecar(const char *firmware_path, FirmwareInfo *info)
+{
+    if (!firmware_path || !info || !info->sha_computed) return;
+    char sidecar_path[384];
+    if (snprintf(sidecar_path, sizeof(sidecar_path), "%s.sha256", firmware_path) >=
+        static_cast<int>(sizeof(sidecar_path))) return;
+    FILE *sidecar = fopen(sidecar_path, "rb");
+    if (!sidecar) return;
+    info->sha_reference_found = true;
+    char line[192] = {};
+    if (!fgets(line, sizeof(line), sidecar)) {
+        fclose(sidecar);
+        return;
+    }
+    fclose(sidecar);
+    char *cursor = line;
+    while (*cursor && isspace(static_cast<unsigned char>(*cursor))) ++cursor;
+    char expected[65] = {};
+    for (size_t i = 0; i < 64; ++i) {
+        if (!isxdigit(static_cast<unsigned char>(cursor[i]))) return;
+        expected[i] = static_cast<char>(tolower(static_cast<unsigned char>(cursor[i])));
+    }
+    if (cursor[64] && !isspace(static_cast<unsigned char>(cursor[64])) && cursor[64] != '*') return;
+    info->sha_reference_valid = true;
+    info->sha_match = strcasecmp(expected, info->sha256) == 0;
+}
+
 static bool analyze_firmware(const char *path, FirmwareInfo *out)
 {
     if (!path || !out) return false;
@@ -254,6 +318,8 @@ static bool analyze_firmware(const char *path, FirmwareInfo *out)
             goto done;
         }
         out->file_size = static_cast<uint32_t>(end);
+        out->sha_computed = compute_sha256(file, out->file_size, out->sha256);
+        if (out->sha_computed) compare_sha256_sidecar(path, out);
     }
 
     {
@@ -434,9 +500,16 @@ static void draw_details(int top, int height)
         d.setCursor(8, y); d.print("Partition table: non incluse");
     }
     if (height > 0) {
-        d.setTextColor(MUTED, BG);
+        char hash_status[48];
+        const char *state = !s_info.sha_computed ? "indispo" :
+            !s_info.sha_reference_found ? "sans ref" :
+            !s_info.sha_reference_valid ? "ref invalide" :
+            s_info.sha_match ? "OK" : "ECHEC";
+        snprintf(hash_status, sizeof(hash_status), "SHA %.16s %s",
+                 s_info.sha_computed ? s_info.sha256 : "----------------", state);
+        d.setTextColor(s_info.sha_reference_valid && !s_info.sha_match ? C_RED : MUTED, BG);
         d.setCursor(8, top + height - 11);
-        d.print("Controle structurel seulement");
+        d.print(hash_status);
     }
 }
 

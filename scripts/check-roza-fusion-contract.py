@@ -172,6 +172,20 @@ def main() -> int:
         "#define NUCLEO_SD_PIN_CS     12",
     )
     require("firmware/components/nucleo_storage/nucleo_storage.c", "esp_vfs_fat_sdspi_mount", "install_write_retry();")
+    require(
+        "integration/nucleoos-bridge/components/roza_launcher_sd/roza_launcher_sd.cpp",
+        "mbedtls_sha256_starts_ret", "mbedtls_sha256_update_ret",
+        '"%s.sha256"', "sha_reference_valid", "SHA %.16s %s",
+    )
+    require(
+        "integration/nucleoos-bridge/components/roza_launcher_sd/CMakeLists.txt",
+        "mbedtls",
+    )
+    forbid(
+        "integration/nucleoos-bridge/components/roza_launcher_sd/roza_launcher_sd.cpp",
+        "esp_partition_erase_range(", "esp_ota_write(", 'fopen(sidecar_path, "wb")',
+    )
+
     check_partitions()
 
     if errors:

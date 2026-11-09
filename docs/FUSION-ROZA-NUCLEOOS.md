@@ -201,3 +201,9 @@ Conséquences obligatoires avant une première image ROZA fusionnée :
 Aucune migration non destructive n'est démontrée à ce stade. **Ne pas utiliser le binaire Cardputer du workflow Launcher pour migrer la table NucleoOS et ne pas flasher le prototype ESP-IDF sur la table Launcher actuelle.** Le test de compilation ne remplace ni un plan de sauvegarde ni un essai de récupération.
 
 Cette divergence est une barrière de livraison, pas un détail cosmétique : la fusion ne sera déclarée flashable qu'après une table commune validée et une procédure de migration avec retour arrière.
+
+## Contrôle SHA-256 des firmwares présents sur microSD
+
+L'application native ROZA **Firmware SD** calcule maintenant le SHA-256 du fichier sélectionné, en lecture seule et par blocs de 2 Kio (sans charger tout le binaire en RAM). Si un fichier compagnon portant le nom `firmware.bin.sha256` est présent dans le même dossier, elle lit son premier champ hexadécimal de 64 caractères et compare la valeur attendue au digest calculé. L'écran affiche le préfixe du digest et l'état `OK`, `ECHEC`, `ref invalide` ou `sans ref`.
+
+Ce contrôle détecte une corruption accidentelle lorsque le fichier de référence est fiable. Un fichier `.sha256` placé à côté du firmware n'est **pas une signature** : il ne prouve pas l'origine du fichier et un attaquant pourrait remplacer les deux. Secure Boot, anti-rollback et vérification cryptographique d'un manifeste signé restent requis avant tout installateur/flash. Cette application demeure strictement en lecture seule ; elle n'écrit pas sur la SD, n'efface aucune partition et ne lance aucune mise à jour.
