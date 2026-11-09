@@ -143,10 +143,23 @@ def main() -> int:
         "nucleo_storage.h", "nucleo_sdcontent_http_get", "st_verify",
     )
 
-    # Firmware OTA remains NucleoOS-owned and writes only through ESP-IDF OTA APIs.
+    # The upstream OTA engine exists, but its NucleoOS release feed must stay blocked in ROZA.
+    # Only a future ROZA-owned, signed release channel may re-enable this path.
     require(
         "firmware/components/nucleo_app/nucleo_update.c",
+        "static void fail_install(const char *msg, uint32_t tk) __attribute__((noreturn));",
         "esp_ota_write(", "esp_ota_set_boot_partition(", "mbedtls_sha256_update", "fwsig.h",
+    )
+    require(
+        "scripts/apply-roza-nucleoos.py",
+        "def verify_roza_update_gate()",
+        '"https://updates.roza.invalid/"',
+        "NucleoOS release tags are not ROZA release tags",
+        "goto out_silent;",
+        'nvs_erase_key(s_nvs, "install")',
+        "verify_roza_update_gate()",
+        "ROZA update channel pending",
+        "ROZA update channel not configured",
     )
 
     # Hardware map and storage mount must remain the Cardputer ADV wiring / shared SD owner.
@@ -169,7 +182,7 @@ def main() -> int:
 
     print("ROZA fusion contract: PASS")
     print(" - approved Launcher and NucleoOS revisions")
-    print(" - native Files, signed Store and firmware OTA remain registered")
+    print(" - native Files and signed Store remain registered; firmware OTA stays safely blocked")
     print(" - French is the first-boot language; saved language is preserved")
     print(" - one NucleoOS-owned SD/storage stack; no Launcher second SD mount")
     print(" - Cardputer ADV pin map and 8 MiB dual-OTA partition layout")
