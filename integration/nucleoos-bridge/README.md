@@ -58,3 +58,10 @@ A green build proves that the current NucleoOS firmware component graph, the sel
 It does **not** yet mean that Launcher 3.0.0's complete application/UI, catalogue, OTA, SD installer, WebUI, USB SD mode, writable partition manager and all third-party libraries have been merged into ROZA. It also does not prove runtime display/keyboard behavior, available heap/flash headroom, safe partition migration, first-boot behavior, or physical Cardputer ADV operation. Those remain separate integration and hardware-validation gates.
 
 Never use this test build as a release image. Do not flash it to a device or erase flash as part of this workflow.
+
+
+## ROZA firmware update safety gate
+
+The pinned NucleoOS updater targets NucleoOS releases, not the unified ROZA firmware. The ROZA overlay therefore disables that upstream firmware-update path until a dedicated signed ROZA release channel exists. Automatic/manual checks do not contact the NucleoOS release feed, stale update tags are ignored, a stale pending-install flag is consumed, and the install worker fails before any OTA-slot erase, download or boot-partition change. The UI identifies the ROZA update channel as pending. The native app Store catalog refresh remains available; only firmware OTA is gated.
+
+This is not yet a working ROZA OTA implementation. A release channel must provide a complete signed ROZA image and matching metadata, and must pass partition-layout, SHA-256/signature, rollback and device compatibility checks before being enabled. Do not flash this integration prototype.

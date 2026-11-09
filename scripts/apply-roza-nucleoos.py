@@ -165,6 +165,8 @@ def main() -> int:
          '        "ROZA updates (signed release channel pending)",'),
         ('            center("indecenti.github.io/NucleoOs", 68, 1, FG);',
          '            center(PT("Canale ROZA non disponible", "ROZA channel unavailable", "Canal ROZA no disponible", "Canal ROZA indisponible", "ROZA-Kanal nicht verfuegbar"), 68, 1, FG);'),
+        ('            d.setTextColor(C_BLUE, cb); char u[40]; lg::fit(u, sizeof u, "indecenti.github.io/NucleoOs", w); d.drawString(u, x, y + 28);',
+         '            d.setTextColor(MUTED, cb); d.drawString(PT("Canal ROZA non disponible", "ROZA channel unavailable", "Canal ROZA no disponible", "Canal ROZA indisponible", "ROZA-Kanal nicht verfuegbar"), x, y + 28);'),
     ])
     verify_roza_update_gate()
     print(

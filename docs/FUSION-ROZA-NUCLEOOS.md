@@ -162,3 +162,14 @@ L'inventaire des sources épinglées a confirmé que NucleoOS possède déjà un
 **Décision :** ROZA doit conserver et exposer cette application native Files comme gestionnaire microSD commun. Il ne faut pas porter directement `launcher/src/sd_functions.cpp` dans le même processus : ce code appelle `setupSdCard()`, démarre son propre bus SPI/SD et utilise les classes Arduino `SDM`/ `File`, ce qui créerait un deuxième propriétaire du matériel et du système de fichiers. Les actions propres à Launcher (installation de paquets/firmwares depuis SD, sélection de fichiers) devront ensuite être adaptées en consommateurs du service de stockage NucleoOS, sans réinitialiser ni démonter la carte.
 
 **État de preuve :** les sources amont épinglées et le graphe CMake montrent que le navigateur de fichiers NucleoOS est bien compilé et enregistré dans le firmware de base. Le workflow combiné #16 compile et lie le graphe de composants, mais ne constitue pas un test d'exécution de Files. L'accès réel à la carte, les opérations d'écriture et le rendu clavier/écran restent à vérifier sur Cardputer ADV ; aucun test matériel ni flash n'a été effectué.
+
+
+## Sécurité des mises à jour — canal ROZA obligatoire
+
+Le moteur OTA natif de NucleoOS pointe par défaut vers les releases de NucleoOS et vérifie une image signée pour le projet NucleoOS. Ce flux ne peut pas être réutilisé tel quel dans un firmware fusionné : il risquerait de remplacer ROZA par un firmware NucleoOS autonome.
+
+La surcouche ROZA bloque donc explicitement ce chemin tant qu'un dépôt de releases ROZA, son manifeste/checksum et sa clé de signature ne sont pas définis et testés. Le contrôle automatique et manuel ne contacte plus le serveur NucleoOS ; le dialogue de mise à jour NucleoOS ne se déclenche plus ; le worker d'installation échoue avant tout effacement de slot OTA, téléchargement ou modification de la partition de démarrage ; un ancien indicateur d'installation en attente est consommé et ignoré. L'adresse de secours utilise le domaine réservé `.invalid`.
+
+Le Store d'applications NucleoOS conserve son actualisation de catalogue ; seul le flux de mise à jour du firmware est bloqué. L'application affiche que le canal de mise à jour ROZA est en préparation. Il ne s'agit pas d'une mise à jour OTA ROZA fonctionnelle : ce sera une étape séparée, avec image ROZA complète signée, manifeste, validation de compatibilité de la table de partitions, contrôle SHA-256/signature et retour arrière prouvé.
+
+Cette barrière est une protection volontaire et temporaire. **Aucun binaire de ce prototype ne doit être flashé sur le Cardputer ADV.**
