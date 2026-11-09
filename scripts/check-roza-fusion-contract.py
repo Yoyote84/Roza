@@ -123,6 +123,12 @@ def main() -> int:
         "nucleo_store_apps_sync();",
     )
 
+    require(
+        "firmware/components/nucleo_storage/nucleo_i18n.c",
+        'static char s_lang[6] = "fr";',
+        "norm_lang(s_lang, sizeof s_lang, lg->valuestring)",
+    )
+
     # The Store is the one app-package system: signed catalog/packages, hash checks and atomic SD swap.
     require(
         "firmware/components/nucleo_store/store_engine.c",
@@ -164,6 +170,7 @@ def main() -> int:
     print("ROZA fusion contract: PASS")
     print(" - approved Launcher and NucleoOS revisions")
     print(" - native Files, signed Store and firmware OTA remain registered")
+    print(" - French is the first-boot language; saved language is preserved")
     print(" - one NucleoOS-owned SD/storage stack; no Launcher second SD mount")
     print(" - Cardputer ADV pin map and 8 MiB dual-OTA partition layout")
     print("This gate does not validate runtime behavior or authorize flashing.")

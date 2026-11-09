@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the ROZA theme and native Launcher-feature hooks to pinned NucleoOS sources."""
+"""Apply ROZA theme, French first-boot language and native Launcher-feature hooks to pinned NucleoOS sources."""
 
 from pathlib import Path
 import subprocess
@@ -11,6 +11,7 @@ PINNED_NUCLEOOS = "cb0f1a5356ddd6f96ec6b31bbcba5d55f52d8123"
 
 THEME_FILE = NUCLEO_ROOT / "firmware/components/nucleo_ui/nucleo_theme.cpp"
 UI_FILE = NUCLEO_ROOT / "firmware/components/nucleo_ui/nucleo_ui.cpp"
+I18N_FILE = NUCLEO_ROOT / "firmware/components/nucleo_storage/nucleo_i18n.c"
 MAIN_FILE = NUCLEO_ROOT / "firmware/main/main.c"
 UPDATE_ENGINE_FILE = NUCLEO_ROOT / "firmware/components/nucleo_app/nucleo_update.c"
 UPDATE_UI_FILE = NUCLEO_ROOT / "firmware/components/nucleo_app/app_updates.cpp"
@@ -132,6 +133,17 @@ def main() -> int:
         ('cv.drawString("web-native os", (int)SPL_CX, 117);',
          'cv.drawString("CARDPUTER ADV", (int)SPL_CX, 117);'),
     ])
+    i18n_changed = replace_exact(I18N_FILE, [
+        (
+            '// DEFAULT IS ENGLISH: a fresh device (no settings.json / no ui.language yet) boots in English, and the\n'
+            '// first-run wizard asks the user to pick their language as its very first step.\n'
+            'static char s_lang[6] = "en";              // active OS language code (default English)',
+            '// DEFAULT IS FRENCH for ROZA: a fresh device starts in French. An existing settings.json ui.language\n'
+            '// is loaded below and always wins, so a saved user choice is never overwritten.\n'
+            'static char s_lang[6] = "fr";              // active OS language code (default French)',
+        ),
+    ])
+
     main_changed = replace_exact(MAIN_FILE, [
         ('nucleo_ui_message("NucleoOS",', 'nucleo_ui_message("ROZA",'),
         ('nucleo_ui_home("NucleoOS",', 'nucleo_ui_home("ROZA",'),
@@ -176,6 +188,7 @@ def main() -> int:
         f"apps ROZA={'modifiees' if main_changed else 'deja presentes'}, "
         f"verrou OTA={'modifie' if updater_changed or updates_ui_changed else 'deja present'}."
     )
+    print("Langue francaise par defaut appliquee ; les choix deja enregistres sont conserves.")
     print("ROZA ajoute les inspecteurs Partitions et Firmware SD sans remplacer les apps NucleoOS.")
     print(
         "Mise a jour NucleoOS amont bloquee dans ROZA : aucun controle reseau ni flash OTA "

@@ -124,7 +124,7 @@ Le premier essai CI a révélé que `nucleo_native` inclut aussi `sdk/native/inc
 
 ## Identité ROZA sur l'accueil NucleoOS
 
-Le script `scripts/apply-roza-nucleoos.py` applique une surcouche idempotente au commit NucleoOS épinglé : thème par défaut papier clair/bordeaux, écran de démarrage ROZA et titres des écrans de secours ROZA. Il refuse de toucher une autre révision ou des sources qui ne correspondent plus exactement aux motifs attendus. Les thèmes NucleoOS existants restent sélectionnables et un thème déjà enregistré par l'utilisateur continue d'être respecté. Le commit épinglé du sous-module n'est ni modifié ni repinné ; la surcouche est conservée dans le dépôt ROZA.
+Le script `scripts/apply-roza-nucleoos.py` applique une surcouche idempotente au commit NucleoOS épinglé : thème par défaut papier clair/bordeaux, écran de démarrage ROZA et titres des écrans de secours ROZA. Sur une installation neuve sans `ui.language` enregistré, la langue initiale est le français (`fr`). Une langue déjà choisie dans `/sd/system/config/settings.json` est relue et conservée : la surcouche ne remplace pas les préférences existantes. Il refuse de toucher une autre révision ou des sources qui ne correspondent plus exactement aux motifs attendus. Les thèmes NucleoOS existants restent sélectionnables et un thème déjà enregistré par l'utilisateur continue d'être respecté. Le commit épinglé du sous-module n'est ni modifié ni repinné ; la surcouche est conservée dans le dépôt ROZA.
 
 
 ## USB Mass Storage : propriété unique dans le pont
