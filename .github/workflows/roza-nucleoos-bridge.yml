@@ -14,6 +14,7 @@ on:
       - "docs/FUSION-ROZA-NUCLEOOS.md"
       - "scripts/apply-roza-nucleoos.py"
       - "scripts/prepare-roza-arduino-usb.py"
+      - "scripts/check-roza-fusion-contract.py"
   workflow_dispatch:
 
 permissions:
@@ -61,6 +62,9 @@ jobs:
           python3 scripts/apply-roza-nucleoos.py
           python3 scripts/apply-roza-nucleoos.py
           git -C nucleoos diff --check
+
+      - name: Verify ROZA fusion safety and feature contract
+        run: python3 scripts/check-roza-fusion-contract.py
 
       - name: Compile the combined ESP-IDF component graph
         uses: espressif/esp-idf-ci-action@v1
