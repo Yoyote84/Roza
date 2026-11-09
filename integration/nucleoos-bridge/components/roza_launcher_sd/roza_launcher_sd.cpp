@@ -264,7 +264,7 @@ static bool compute_sha256(FILE *file, uint32_t file_size, char output[65])
         output[i * 2] = hex[digest[i] >> 4];
         output[i * 2 + 1] = hex[digest[i] & 0x0f];
     }
-    output[64] = '\\0';
+    output[64] = '\0';
     return true;
 }
 
