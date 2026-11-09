@@ -176,8 +176,8 @@ static uint32_t align16(uint32_t value)
     return (value + 15u) & ~15u;
 }
 
-// This checks image framing and segment boundaries only. It deliberately does not claim
-// SHA-256, signature, Secure Boot or anti-rollback verification.
+// This parser checks image framing and segment boundaries. SHA-256 is computed separately
+// for file-integrity comparison; neither check authenticates the publisher or firmware.
 static bool measure_image(FILE *file, uint32_t file_size, uint32_t offset,
                           uint32_t available, uint32_t *measured, uint8_t *segments_out,
                           uint16_t *chip_id_out, char *reason, size_t reason_size)
@@ -243,20 +243,20 @@ static bool compute_sha256(FILE *file, uint32_t file_size, char output[65])
     if (!file || !output || fseek(file, 0, SEEK_SET) != 0) return false;
     mbedtls_sha256_context context;
     mbedtls_sha256_init(&context);
-    bool ok = mbedtls_sha256_starts_ret(&context, 0) == 0;
+    bool ok = mbedtls_sha256_starts(&context, 0) == 0;
     uint8_t buffer[2048];
     uint32_t remaining = file_size;
     while (ok && remaining > 0) {
         const size_t wanted = remaining < sizeof(buffer) ? remaining : sizeof(buffer);
         const size_t received = fread(buffer, 1, wanted, file);
-        if (received != wanted || mbedtls_sha256_update_ret(&context, buffer, received) != 0) {
+        if (received != wanted || mbedtls_sha256_update(&context, buffer, received) != 0) {
             ok = false;
             break;
         }
         remaining -= static_cast<uint32_t>(received);
     }
     uint8_t digest[32] = {};
-    if (ok && mbedtls_sha256_finish_ret(&context, digest) != 0) ok = false;
+    if (ok && mbedtls_sha256_finish(&context, digest) != 0) ok = false;
     mbedtls_sha256_free(&context);
     if (!ok) return false;
     static const char hex[] = "0123456789abcdef";

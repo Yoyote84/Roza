@@ -174,7 +174,7 @@ def main() -> int:
     require("firmware/components/nucleo_storage/nucleo_storage.c", "esp_vfs_fat_sdspi_mount", "install_write_retry();")
     require(
         "integration/nucleoos-bridge/components/roza_launcher_sd/roza_launcher_sd.cpp",
-        "mbedtls_sha256_starts_ret", "mbedtls_sha256_update_ret",
+        "mbedtls_sha256_starts", "mbedtls_sha256_update",
         '"%s.sha256"', "sha_reference_valid", "SHA %.16s %s",
     )
     require(
