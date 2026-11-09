@@ -173,3 +173,31 @@ La surcouche ROZA bloque donc explicitement ce chemin tant qu'un dépôt de rele
 Le Store d'applications NucleoOS conserve son actualisation de catalogue ; seul le flux de mise à jour du firmware est bloqué. L'application affiche que le canal de mise à jour ROZA est en préparation. Il ne s'agit pas d'une mise à jour OTA ROZA fonctionnelle : ce sera une étape séparée, avec image ROZA complète signée, manifeste, validation de compatibilité de la table de partitions, contrôle SHA-256/signature et retour arrière prouvé.
 
 Cette barrière est une protection volontaire et temporaire. **Aucun binaire de ce prototype ne doit être flashé sur le Cardputer ADV.**
+ 
+
+## Comparaison exacte des partitions 8 Mo — migration non résolue
+
+Le profil Launcher réellement sélectionné par `launcher/boards/m5stack-cardputer/platformio.ini` utilise `launcher/support_files/custom_8Mb.csv`. Il n'est pas compatible en l'état avec `nucleoos/firmware/partitions.csv`.
+
+| Zone | Launcher Cardputer ADV | NucleoOS épinglé |
+|---|---:|---:|
+| NVS | `0x9000`, taille `0x5000` | `0x9000`, taille `0x6000` |
+| OTA data | `0xE000`, taille `0x2000` | `0xF000`, taille `0x2000` |
+| PHY init | — | `0x11000`, taille `0x1000` |
+| NVS keys | — | `0x12000`, taille `0x1000` |
+| Firmware app | `app0` `0x10000`, taille `0x150000` | `ota_0` `0x20000`, taille `0x380000` |
+| Deuxième slot OTA | — | `ota_1` `0x3A0000`, taille `0x380000` |
+| Zone native / données | `coredump` `0x160000`, taille `0x10000` | `nucleo_nap` `0x720000`, taille `0x40000` ; `cfg` `0x760000`, taille `0xA0000` |
+
+La différence de `otadata` décale aussi les lignes suivantes de la table. Le nom `coredump` dans Launcher ne signifie pas la même chose que la zone `nucleo_nap` de NucleoOS. Les deux tables ne peuvent donc pas être mélangées ni flashées l'une sur l'autre comme une mise à jour d'application.
+
+Conséquences obligatoires avant une première image ROZA fusionnée :
+
+1. déterminer si les NVS et données actuellement présentes sur le Cardputer ADV doivent être migrées ou recréées, et fournir un outil de sauvegarde/restauration vérifié ;
+2. choisir et valider une table ROZA unique, avec deux slots A/B de taille suffisante, données persistantes, scratch pour applications natives et espace de récupération sur 8 Mo ;
+3. vérifier les limites de chaque image et toutes les écritures de mise à jour sur la table finale, y compris le retour arrière ;
+4. produire un paquet de migration câble explicite (bootloader, table, application, éventuelles données initiales) et un chemin de récupération testé.
+
+Aucune migration non destructive n'est démontrée à ce stade. **Ne pas utiliser le binaire Cardputer du workflow Launcher pour migrer la table NucleoOS et ne pas flasher le prototype ESP-IDF sur la table Launcher actuelle.** Le test de compilation ne remplace ni un plan de sauvegarde ni un essai de récupération.
+
+Cette divergence est une barrière de livraison, pas un détail cosmétique : la fusion ne sera déclarée flashable qu'après une table commune validée et une procédure de migration avec retour arrière.

@@ -65,3 +65,10 @@ Never use this test build as a release image. Do not flash it to a device or era
 The pinned NucleoOS updater targets NucleoOS releases, not the unified ROZA firmware. The ROZA overlay therefore disables that upstream firmware-update path until a dedicated signed ROZA release channel exists. Automatic/manual checks do not contact the NucleoOS release feed, stale update tags are ignored, a stale pending-install flag is consumed, and the install worker fails before any OTA-slot erase, download or boot-partition change. The UI identifies the ROZA update channel as pending. The native app Store catalog refresh remains available; only firmware OTA is gated.
 
 This is not yet a working ROZA OTA implementation. A release channel must provide a complete signed ROZA image and matching metadata, and must pass partition-layout, SHA-256/signature, rollback and device compatibility checks before being enabled. Do not flash this integration prototype.
+ 
+
+## Exact 8 MB partition-table incompatibility
+
+The selected Launcher Cardputer ADV profile uses `launcher/support_files/custom_8Mb.csv`; the pinned NucleoOS profile uses `nucleoos/firmware/partitions.csv`. They are materially different: Launcher NVS is `0x9000/0x5000`, otadata `0xE000/0x2000`, app0 `0x10000/0x150000`, and coredump `0x160000/0x10000`. NucleoOS uses NVS `0x9000/0x6000`, otadata `0xF000/0x2000`, phy_init `0x11000/0x1000`, nvs_keys `0x12000/0x1000`, ota_0 `0x20000/0x380000`, ota_1 `0x3A0000/0x380000`, nucleo_nap `0x720000/0x40000`, and cfg `0x760000/0xA0000`.
+
+These tables are not OTA-compatible. Their NVS sizes and metadata offsets differ, Launcher has one much smaller app partition, and the coredump and native-app scratch/data regions are not equivalent. No non-destructive migration has yet been demonstrated. A final ROZA build needs one validated 8 MB table, data backup/restore, per-image bounds checks, A/B rollback validation, and an explicit cable recovery/migration package. Do not flash the current integration prototype or use the legacy Launcher Cardputer artifact to migrate partitions.
