@@ -7,8 +7,8 @@ on:
     paths:
       - ".github/workflows/roza-launcher-build.yml"
       - ".gitmodules"
-      - "scripts/**"
-      - "README.md"
+      - "scripts/apply-roza-branding.py"
+      - "scripts/apply-roza-interface.py"
       - "launcher"
   workflow_dispatch:
 
