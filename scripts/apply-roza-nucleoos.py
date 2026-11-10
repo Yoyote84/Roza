@@ -154,11 +154,11 @@ def main() -> int:
         ('nucleo_ui_message("NucleoOS",', 'nucleo_ui_message("ROZA",'),
         ('nucleo_ui_home("NucleoOS",', 'nucleo_ui_home("ROZA",'),
         ('extern void nucleo_store_apps_sync(void);   // nucleo_app/store_apps.cpp: store apps join the launcher',
-         'extern void nucleo_store_apps_sync(void);   // nucleo_app/store_apps.cpp: store apps join the launcher\nextern void roza_register_launcher_partitions(void); // native read-only Launcher partition view\nextern void roza_register_launcher_sd(void); // native read-only SD firmware preflight\nextern void roza_register_launcher_diagnostics(void); // shared native HAL diagnostic\nextern void roza_register_gnss(void); // Cardputer ADV Cap LoRa-1262 GNSS receiver'),
+         'extern void nucleo_store_apps_sync(void);   // nucleo_app/store_apps.cpp: store apps join the launcher\nextern void roza_register_launcher_partitions(void); // native read-only Launcher partition view\nextern void roza_register_launcher_sd(void); // native read-only SD firmware preflight\nextern void roza_register_launcher_diagnostics(void); // shared native HAL diagnostic\nextern void roza_register_gnss(void); // Cardputer ADV Cap LoRa-1262 GNSS receiver\nextern void roza_register_lora(void); // SX1262 receive-only app'),
         ('            nucleo_app_register_builtins();          // including a native game installed from the store\n            nucleo_store_apps_sync();',
-         '            nucleo_app_register_builtins();          // including a native game installed from the store\n            roza_register_launcher_partitions();\n            roza_register_launcher_sd();\n            roza_register_launcher_diagnostics();\n            roza_register_gnss();\n            nucleo_store_apps_sync();'),
+         '            nucleo_app_register_builtins();          // including a native game installed from the store\n            roza_register_launcher_partitions();\n            roza_register_launcher_sd();\n            roza_register_launcher_diagnostics();\n            roza_register_gnss();\n            roza_register_lora();\n            nucleo_store_apps_sync();'),
         ('        nucleo_app_register_builtins();      bootmark("app-builtins");',
-         '        nucleo_app_register_builtins();\n        roza_register_launcher_partitions();\n        roza_register_launcher_sd();\n        roza_register_launcher_diagnostics();\n        roza_register_gnss();\n        bootmark("app-builtins");'),
+         '        nucleo_app_register_builtins();\n        roza_register_launcher_partitions();\n        roza_register_launcher_sd();\n        roza_register_launcher_diagnostics();\n        roza_register_gnss();\n        roza_register_lora();\n        bootmark("app-builtins");'),
     ])
     updater_changed = replace_exact(UPDATE_ENGINE_FILE, [
         ('#define UPD_BASE        "https://indecenti.github.io/NucleoOs/"',

@@ -113,7 +113,7 @@ La fusion ne sera considérée terminée que lorsque le firmware unique démarre
 - Ne jamais modifier `main`, fusionner automatiquement ou travailler sur une autre branche.
 - Garder le code réel des projets : pas de stub pour masquer une erreur de compilation.
 
-## Deuxième prototype — vrai démarrage NucleoOS + composant Launcher
+## Deuxième prototype — vrai démarrage NucleoOS + composant Launcher (historique)
 
 Le sous-module `nucleoos/` épingle `indecenti/NucleoOs` au commit `cb0f1a5356ddd6f96ec6b31bbcba5d55f52d8123`, avec sa licence amont PolyForm Noncommercial 1.0.0 conservée. Le nouveau projet `integration/nucleoos-bridge/` compile directement le véritable `firmware/main/main.c` et le graphe de composants ESP-IDF de cette révision, puis ajoute `launcher_platform`, qui compile le véritable `launcher/src/idf/launcher_platform.cpp` du sous-module Launcher.
 
@@ -143,7 +143,7 @@ Le script scripts/prepare-roza-arduino-usb.py ajoute désormais _MAX_SS=512 aux 
 Cette correction vise le prochain blocage de compilation identifié ; elle doit encore être confirmée par la CI.
 
 
-## Premier module Launcher exposé dans l'accueil ROZA — inspection des partitions
+## Premier module Launcher exposé dans l'accueil ROZA — inspection des partitions (historique)
 
 Le pont ajoute maintenant une première tranche fonctionnelle de Launcher dans le registre natif de NucleoOS : l'application **Partitions**. Elle utilise le cycle de vie natif \`on_enter/on_key/on_draw/on_exit\`, partage donc l'écran et le clavier déjà initialisés par NucleoOS, et relit la table active via l'itérateur officiel ESP-IDF. L'écran affiche le label, le type/sous-type, l'adresse flash, la taille et l'état de chiffrement. Les flèches font défiler la liste et \`r\` relit les métadonnées.
 
@@ -155,7 +155,7 @@ La surcouche \`scripts/apply-roza-nucleoos.py\` ajoute l'enregistrement de cette
 
 
 
-## Stockage microSD — décision d'intégration vérifiée
+## Stockage microSD — décision d'intégration vérifiée (historique)
 
 L'inventaire des sources épinglées a confirmé que NucleoOS possède déjà une application native **Files** complète : `firmware/components/nucleo_app/app_files.cpp`. Elle est incluse dans le `CMakeLists.txt` du composant `nucleo_app`, déclarée dans le registre natif et enregistrée par `nucleo_app_register_builtins()`. Elle fournit navigation dans les dossiers, tri, recherche, historique, détails, renommage, création de dossiers et suppression avec confirmation. Elle utilise le point de montage et les services SD de NucleoOS (`NUCLEO_SD_MOUNT`, `nucleo_storage`) ; elle ne monte pas une deuxième carte.
 
@@ -207,3 +207,32 @@ Cette divergence est une barrière de livraison, pas un détail cosmétique : la
 L'application native ROZA **Firmware SD** calcule maintenant le SHA-256 du fichier sélectionné, en lecture seule et par blocs de 2 Kio (sans charger tout le binaire en RAM). Si un fichier compagnon portant le nom `firmware.bin.sha256` est présent dans le même dossier, elle lit son premier champ hexadécimal de 64 caractères et compare la valeur attendue au digest calculé. L'écran affiche le préfixe du digest et l'état `OK`, `ECHEC`, `ref invalide` ou `sans ref`.
 
 Ce contrôle détecte une corruption accidentelle lorsque le fichier de référence est fiable. Un fichier `.sha256` placé à côté du firmware n'est **pas une signature** : il ne prouve pas l'origine du fichier et un attaquant pourrait remplacer les deux. Secure Boot, anti-rollback et vérification cryptographique d'un manifeste signé restent requis avant tout installateur/flash. Cette application demeure strictement en lecture seule ; elle n'écrit pas sur la SD, n'efface aucune partition et ne lance aucune mise à jour.
+
+
+## Livraison ROZA Cardputer ADV — candidat logiciel complet
+
+La branche de livraison construit un seul firmware ESP-IDF basé sur NucleoOS, avec l'identité et l'accueil ROZA en français. Il n'exécute pas un deuxième menu ni les boucles Arduino de Launcher en parallèle. Les capacités qui se recouvrent (fichiers, Store, Wi-Fi, paramètres, USB et WebUI) restent celles des services natifs NucleoOS ; le composant plateforme Launcher est lié comme couche de compatibilité, sans prétendre que son interface Arduino complète a été portée.
+
+Le registre natif ajoute les vues ROZA Partitions et Firmware SD (lecture seule), Diagnostic, GNSS NMEA et réception SX1262. Le GNSS utilise UART1 GPIO13/15 à 115200 bauds. Le SX1262 utilise RadioLib 7.8.0 et le HAL ESP-IDF sur SPI2, partagé avec le stockage SD ; l'expandeur PI4IOE5V6408 est ajouté au bus I²C déjà créé par le clavier et son P0 active le commutateur d'antenne. Le module radio n'expose aucune émission.
+
+### Partitionnement et installation
+
+La table de 8 Mio réserve l'ancienne NVS Launcher dans une partition brute `launcher_nvs_old` à `0x9000/0x5000`. Elle n'est pas montée par NucleoOS. Le script la sauvegarde sur le PC, écrit le binaire fusionné, restaure les 20 Kio à `0x9000` puis vérifie la relecture octet par octet ; les données sont ainsi préservées malgré les espaces `0xFF` du binaire fusionné. Le nouveau NucleoOS utilise une NVS propre à `0x13000/0x6000`, ce qui évite de risquer un effacement automatique de l'ancienne NVS si son format diffère.
+
+La zone otadata reste à `0xE000/0x2000`, mais le binaire l'initialise pour démarrer `ota_0`. L'ancien choix de slot et l'ancienne application Launcher ne sont pas conservés. Le script efface seulement `0x11000-0x11FFF`, `0x13000-0x18FFF` et `0x19000-0x19FFF`, puis écrit l'image fusionnée à `0x0`. Il n'exécute jamais d'effacement global. Le contenu microSD n'est pas écrit par la procédure.
+
+### Fonctions et limites livrées
+
+- Réglage manuel date/heure et fuseau Europe/Paris par défaut, sans écraser un fuseau déjà enregistré.
+- Fichiers/microSD, Store natif avec vérification de signature, Wi-Fi manuel, WebUI, USB MSC, applications et jeux natifs.
+- Vues ROZA de diagnostic, partitions en lecture seule, pré-vérification du firmware SD, GNSS et réception LoRa.
+- Le pourcentage de batterie est une estimation à partir de la tension ADC, pas une jauge coulombmétrique exacte.
+- Le système de fichiers de cette construction est FAT32 ; exFAT n'est pas activé.
+- Le Store natif conserve son catalogue signé existant. Aucun catalogue spécifique ROZA ni clé privée de signature n'est inventé ou commité.
+- OTA firmware ROZA reste désactivée tant qu'un canal de publication signé et une politique de rollback propres à ROZA ne sont pas disponibles.
+- SX1262 en réception seule ; transmission non exposée.
+
+Le binaire `ROZA-Cardputer-ADV-FULL.bin` est un candidat logiciel complet pour un premier essai matériel. La CI vérifiera compilation, offsets, sections fusionnées, manifeste et SHA-256. Elle ne peut pas certifier le premier démarrage, l'écran, le clavier, la microSD, l'audio, le Wi-Fi ou les radios sur un appareil physique ; ces essais restent à faire sur le Cardputer ADV réel.
+
+
+> **Statut courant :** les notes historiques ci-dessus décrivent les prototypes antérieurs. Le schéma final de première installation, les limites connues et le paquet autonome sont décrits dans « Livraison ROZA Cardputer ADV — candidat logiciel complet » en fin de document.

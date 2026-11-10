@@ -76,10 +76,11 @@ def check_partitions() -> None:
     # allowed accidental movement of NVS/otadata/keys to pass CI, which could make
     # an otherwise valid image lose settings or fail to boot after an update.
     expected = {
-        "nvs": ("data", "nvs", 0x009000, 0x006000),
-        "otadata": ("data", "ota", 0x00F000, 0x002000),
+        "launcher_nvs_old": ("data", "0x40", 0x009000, 0x005000),
+        "nvs": ("data", "nvs", 0x013000, 0x006000),
+        "otadata": ("data", "ota", 0x00E000, 0x002000),
         "phy_init": ("data", "phy", 0x011000, 0x001000),
-        "nvs_keys": ("data", "nvs_keys", 0x012000, 0x001000),
+        "nvs_keys": ("data", "nvs_keys", 0x019000, 0x001000),
         "ota_0": ("app", "ota_0", 0x020000, 0x380000),
         "ota_1": ("app", "ota_1", 0x3A0000, 0x380000),
         "nucleo_nap": ("data", "littlefs", 0x720000, 0x040000),
@@ -321,6 +322,41 @@ def main() -> int:
         "esp_partition_erase_range(", "esp_ota_write(", 'fopen(sidecar_path, "wb")',
     )
 
+    require("scripts/apply-roza-nucleoos.py", "roza_register_gnss();", "roza_register_lora();")
+    require("integration/nucleoos-bridge/CMakeLists.txt", "components/roza_lora")
+    require("integration/nucleoos-bridge/main/CMakeLists.txt", "roza_lora")
+    require("integration/nucleoos-bridge/components/roza_lora/CMakeLists.txt",
+            "jgromes__radiolib", "esp_driver_spi", "esp_driver_i2c", "nucleo_kbd")
+    require("integration/nucleoos-bridge/components/roza_lora/idf_component.yml",
+            "jgromes/radiolib", "7.8.0")
+    require("integration/nucleoos-bridge/components/roza_lora/roza_lora.cpp",
+            "SPI2_HOST", "nucleo_kbd_i2c_bus()", "IOE_ADDR=0x43",
+            "(id & 0xFC) != 0xA0", "!update_reg(0x05,0x01,0x00)",
+            "PIN_SCK=40", "PIN_MISO=39", "PIN_MOSI=14",
+            "PIN_NSS=5", "PIN_DIO1=4", "PIN_RESET=3", "PIN_BUSY=6",
+            "startReceive()", "setPacketReceivedAction", "getPacketLength()",
+            "readData(", "getRSSI()", "getSNR()", "radio_enter", "radio_exit")
+    forbid("integration/nucleoos-bridge/components/roza_lora/roza_lora.cpp",
+           "s_radio.startTransmit(", "s_radio.transmit(",
+           "spi_bus_initialize(", "i2c_new_master_bus(")
+
+    require(
+        "tools/installer/flash.sh",
+        'read-flash 0x9000 0x5000 "$BACKUP"',
+        'write-flash 0x9000 "$BACKUP"',
+        'read-flash 0x9000 0x5000 "$VERIFY"',
+        'cmp -s "$BACKUP" "$VERIFY"',
+    )
+
+    require(
+        "firmware/components/nucleo_app/include/nucleo_app.h",
+        "#define NUCLEO_APP_MAX 80",
+    )
+    require(
+        "integration/nucleoos-bridge/components/roza_lora/roza_lora.cpp",
+        "Reception active", "Dernier paquet", "Reception seule",
+    )
+
     check_partitions()
 
     if errors:
@@ -334,7 +370,8 @@ def main() -> int:
     print(" - native Files and signed Store remain registered; firmware OTA stays safely blocked")
     print(" - French is the first-boot language; saved language is preserved")
     print(" - one NucleoOS-owned SD/storage stack; no Launcher second SD mount")
-    print(" - Cardputer ADV pin map and 8 MiB dual-OTA partition layout")
+    print(" - Cardputer ADV pin map, LoRa-1262 receive-only integration and 8 MiB partition layout")
+    print(" - legacy Launcher NVS reserved, NucleoOS NVS clean and separate")
     print("This gate does not validate runtime behavior or authorize flashing.")
     return 0
 

@@ -9,6 +9,9 @@ on:
       - "nucleoos"
       - "launcher"
       - "integration/nucleoos-bridge/**"
+      - "tools/installer/**"
+      - "docs/INSTALL-ROZA-FR.md"
+      - "third_party/licenses/**"
       - "integration/arduino-idf-smoke/components/launcher_platform/**"
       - ".github/workflows/roza-nucleoos-bridge.yml"
       - "docs/FUSION-ROZA-NUCLEOOS.md"
@@ -30,7 +33,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build real NucleoOS app + Launcher platform component
+    name: Build ROZA unified Cardputer ADV firmware candidate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ROZA source without downloading large submodules
@@ -115,28 +118,48 @@ jobs:
             --image ROZA-ESP32S3-FLASH-PREVIEW.bin \
             --flash-args integration/nucleoos-bridge/build/flash_args \
             --partition-csv integration/nucleoos-bridge/partitions.csv
+          cp integration/nucleoos-bridge/build/ROZA-ESP32S3-FLASH-PREVIEW.bin integration/nucleoos-bridge/build/ROZA-Cardputer-ADV-FULL.bin
 
-      - name: Generate engineering manifest and SHA-256 checksums
+      - name: Generate complete device-test manifest and SHA-256 checksums
         run: |
           python3 scripts/create-roza-build-manifest.py \
             --build-dir integration/nucleoos-bridge/build \
             --partition-csv integration/nucleoos-bridge/partitions.csv \
             --output ROZA-BUILD-INFO.json
 
-      - name: Publish merged flash image preview (NOT APPROVED FOR DEVICE)
+      - name: Assemble one self-contained installation package
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="dist/ROZA-Cardputer-ADV"
+          mkdir -p "$package/audit"
+          cp integration/nucleoos-bridge/build/ROZA-Cardputer-ADV-FULL.bin "$package/"
+          cp ROZA-BUILD-INFO.json "$package/"
+          cp integration/nucleoos-bridge/build/flash_args "$package/"
+          cp tools/installer/flash.sh "$package/flash.sh"
+          cp docs/INSTALL-ROZA-FR.md "$package/INSTALL.md"
+          cp docs/FUSION-ROZA-NUCLEOOS.md "$package/FUSION-DETAILS.md"
+          cp launcher/LICENSE "$package/LICENSE-Launcher-MIT.txt"
+          cp nucleoos/LICENSE "$package/LICENSE-NucleoOS.txt"
+          cp third_party/licenses/RadioLib-7.8.0-MIT.txt "$package/LICENSE-RadioLib-MIT.txt"
+          cp integration/nucleoos-bridge/build/ROZA-ESP32S3-FLASH-PREVIEW.bin "$package/audit/"
+          cp integration/nucleoos-bridge/build/roza_nucleoos_launcher_bridge.bin "$package/audit/"
+          cp integration/nucleoos-bridge/build/roza_nucleoos_launcher_bridge.elf "$package/audit/"
+          cp integration/nucleoos-bridge/build/bootloader/bootloader.bin "$package/audit/"
+          cp integration/nucleoos-bridge/build/partition_table/partition-table.bin "$package/audit/"
+          cp integration/nucleoos-bridge/build/ota_data_initial.bin "$package/audit/"
+          cp integration/nucleoos-bridge/partitions.csv "$package/audit/"
+          cp integration/nucleoos-bridge/dependencies.lock "$package/audit/"
+          chmod +x "$package/flash.sh"
+          test -s "$package/ROZA-Cardputer-ADV-FULL.bin"
+          test -s "$package/ROZA-BUILD-INFO.json"
+          test -s "$package/flash.sh"
+
+      - name: Publish complete ROZA Cardputer ADV software test candidate
         uses: actions/upload-artifact@v4
         with:
-          name: ROZA-FLASH-PREVIEW-NOT-APPROVED-${{ github.sha }}
+          name: ROZA-CARDPUTER-ADV-FIRMWARE-TEST-CANDIDATE-${{ github.sha }}
           path: |
-            integration/nucleoos-bridge/build/ROZA-ESP32S3-FLASH-PREVIEW.bin
-            integration/nucleoos-bridge/build/flash_args
-            integration/nucleoos-bridge/build/roza_nucleoos_launcher_bridge.bin
-            integration/nucleoos-bridge/build/roza_nucleoos_launcher_bridge.elf
-            integration/nucleoos-bridge/build/bootloader/bootloader.bin
-            integration/nucleoos-bridge/build/partition_table/partition-table.bin
-            integration/nucleoos-bridge/build/ota_data_initial.bin
-            integration/nucleoos-bridge/partitions.csv
-            docs/FLASH-PREVIEW-NOT-READY.md
-            ROZA-BUILD-INFO.json
+            dist/ROZA-Cardputer-ADV/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90

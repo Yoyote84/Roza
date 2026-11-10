@@ -19,6 +19,7 @@ set(EXTRA_COMPONENT_DIRS
     "${CMAKE_CURRENT_LIST_DIR}/components/roza_launcher_sd"
     "${CMAKE_CURRENT_LIST_DIR}/components/roza_launcher_hal"
     "${CMAKE_CURRENT_LIST_DIR}/components/roza_gnss"
+    "${CMAKE_CURRENT_LIST_DIR}/components/roza_lora"
     "${CMAKE_CURRENT_LIST_DIR}/../arduino-idf-smoke/components/launcher_platform"
 )
 

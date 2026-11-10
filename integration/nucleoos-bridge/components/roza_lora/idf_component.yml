@@ -1,0 +1,7 @@
+version: "1.0.0"
+description: "ROZA SX1262 receive app for the M5Stack Cardputer ADV Cap LoRa-1262"
+dependencies:
+  idf: ">=5.4,<5.5"
+  jgromes/radiolib:
+    git: https://github.com/jgromes/RadioLib.git
+    version: "7.8.0"
