@@ -44,4 +44,5 @@ idf_component_register(
         roza_launcher_partitions
         roza_launcher_sd
         roza_launcher_hal
+        roza_gnss
 )

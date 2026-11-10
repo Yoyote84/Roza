@@ -79,6 +79,16 @@ jobs:
             -o /tmp/roza-launcher-input-test
           /tmp/roza-launcher-input-test
 
+      - name: Test Cap LoRa-1262 GNSS NMEA parser on the host
+        shell: bash
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror \
+            -I integration/nucleoos-bridge/components/roza_gnss/include \
+            integration/nucleoos-bridge/components/roza_gnss/roza_gnss_nmea.cpp \
+            tests/roza_gnss_nmea_test.cpp \
+            -o /tmp/roza-gnss-nmea-test
+          /tmp/roza-gnss-nmea-test
+
       - name: Compile the combined ESP-IDF component graph
         uses: espressif/esp-idf-ci-action@v1
         with:
