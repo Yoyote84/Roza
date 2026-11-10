@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create an audit-only manifest for a ROZA ESP-IDF bridge build."""
+"""Create a verified engineering manifest for the ROZA merged ESP32-S3 flash preview."""
 from __future__ import annotations
 import argparse
 import hashlib
@@ -42,6 +42,8 @@ def main() -> int:
         "bootloader": build / "bootloader/bootloader.bin",
         "partition_table": build / "partition_table/partition-table.bin",
         "ota_data_initial": build / "ota_data_initial.bin",
+        "merged_flash_preview": build / "ROZA-ESP32S3-FLASH-PREVIEW.bin",
+        "flash_args": build / "flash_args",
         "partition_csv": args.partition_csv.resolve(),
     }
     records = {}
@@ -87,9 +89,9 @@ def main() -> int:
     if used > capacity:
         raise SystemExit(f"Image ({used}) trop grande pour un slot ({capacity}).")
     manifest = {
-        "schema": "roza-engineering-build-manifest/v1",
+        "schema": "roza-engineering-build-manifest/v2",
         "product": "ROZA CHANINA",
-        "build_scope": "NucleoOS + surcouche ROZA + deux apps de diagnostic + lien objet Launcher IDF",
+        "build_scope": "NucleoOS + surcouche ROZA + apps natives Partitions/Firmware SD/Diagnostic/GNSS + objet launcher_platform lie; interface Launcher complete non portee",
         "hardware": {"board": "M5Stack Cardputer ADV", "chip": "ESP32-S3FN8",
                      "flash_bytes": FLASH_BYTES, "psram": False},
         "source": {"roza_commit": os.getenv("GITHUB_SHA", "local"),
@@ -102,13 +104,32 @@ def main() -> int:
                              "free_bytes": capacity-used,
                              "free_percent": round((capacity-used)*100/capacity, 2),
                              "csv": records["partition_csv"]},
+        "flash_image": {
+            "artifact": records["merged_flash_preview"],
+            "format": "ESP-IDF esptool merged raw binary",
+            "chip": "esp32s3",
+            "write_offset": "0x0",
+            "flash_capacity_bytes": FLASH_BYTES,
+            "flash_image_is_padded_to_full_flash": False,
+            "flash_args": records["flash_args"],
+            "components": [
+                {"name": "bootloader", "offset": "0x0"},
+                {"name": "partition_table", "offset": "0x8000"},
+                {"name": "ota_data_initial", "offset": "0xF000"},
+                {"name": "application", "offset": "0x20000"},
+            ],
+            "warning": "Image techniquement fusionnee mais non approuvee pour installation sur le Cardputer ADV.",
+        },
         "artifacts": records,
-        "release": {"release_ready": False, "safe_to_flash": False,
-                    "class": "engineering-diagnostic-only",
-                    "blockers": ["port Launcher incomplet",
-                                 "migration de partition non validée",
-                                 "démarrage/récupération physique non testés",
-                                 "canal ROZA signé non configuré"]},
+        "release": {"flash_image_generated": True, "release_ready": False,
+                    "safe_to_flash": False,
+                    "class": "engineering-flash-preview-not-approved",
+                    "blockers": [
+                        "interface et fonctions Launcher 3.0.0 completes non portees; seul launcher_platform est lie",
+                        "migration depuis la table Launcher Cardputer non validee; les anciennes zones applicatives/coredump seront remplacees",
+                        "demarrage a froid, clavier/ecran et recuperation non testes physiquement",
+                        "canal de firmware ROZA signe non configure",
+                    ]},
     }
     out = args.output.resolve()
     out.write_text(json.dumps(manifest, ensure_ascii=False, indent=2)+"\n",
@@ -116,7 +137,9 @@ def main() -> int:
     print(json.dumps({"output": str(out), "application_bytes": used,
                       "slot_bytes": capacity, "free_bytes": capacity-used,
                       "free_percent": manifest["partition_layout"]["free_percent"],
-                      "sha256": records["application"]["sha256"],
+                      "application_sha256": records["application"]["sha256"],
+                      "flash_preview_bytes": records["merged_flash_preview"]["size_bytes"],
+                      "flash_preview_sha256": records["merged_flash_preview"]["sha256"],
                       "safe_to_flash": False}, ensure_ascii=False, indent=2))
     return 0
 
