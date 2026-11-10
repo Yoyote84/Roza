@@ -191,6 +191,35 @@ def main() -> int:
         "Date et heure reglees",
     )
 
+    # The native French UI must have real French literals on the core screens,
+    # not merely store "fr" while silently falling back to Italian/English.
+    require(
+        "firmware/components/nucleo_storage/include/nucleo_i18n.h",
+        "TR5(it_, en_, es_, fr_, de_)",
+    )
+    require(
+        "firmware/components/nucleo_storage/nucleo_i18n.c",
+        "if (l[0] == 'f' && l[1] == 'r') return fr;",
+    )
+    require(
+        "firmware/components/nucleo_app/app_files.cpp",
+        "Chemin trop long",
+        "pas d'app pour ce type",
+    )
+    require(
+        "firmware/components/nucleo_app/app_store.cpp",
+        "Installer",
+        "Mettre a jour",
+        "Installee",
+    )
+    require(
+        "firmware/components/nucleo_app/launcher_render.cpp",
+        "Bureau",
+        "Outils",
+        "Systeme",
+        "Connecter",
+    )
+
     # The Store is the one app-package system: signed catalog/packages, hash checks and atomic SD swap.
     require(
         "firmware/components/nucleo_store/store_engine.c",
