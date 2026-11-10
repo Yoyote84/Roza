@@ -40,7 +40,7 @@ def main() -> int:
     root = Path.cwd().resolve()
     build = args.build_dir.resolve()
     files = {
-        "firmware_candidate": build / "ROZA-Cardputer-ADV-FULL.bin",
+        "firmware_candidate": root / "ROZA-Cardputer-ADV-FULL.bin",
         "merged_image_audit": build / "ROZA-ESP32S3-FLASH-PREVIEW.bin",
         "application": build / "roza_nucleoos_launcher_bridge.bin",
         "elf": build / "roza_nucleoos_launcher_bridge.elf",

@@ -118,7 +118,7 @@ jobs:
             --image ROZA-ESP32S3-FLASH-PREVIEW.bin \
             --flash-args integration/nucleoos-bridge/build/flash_args \
             --partition-csv integration/nucleoos-bridge/partitions.csv
-          cp integration/nucleoos-bridge/build/ROZA-ESP32S3-FLASH-PREVIEW.bin integration/nucleoos-bridge/build/ROZA-Cardputer-ADV-FULL.bin
+          cp integration/nucleoos-bridge/build/ROZA-ESP32S3-FLASH-PREVIEW.bin ROZA-Cardputer-ADV-FULL.bin
 
       - name: Generate complete device-test manifest and SHA-256 checksums
         run: |
@@ -133,7 +133,7 @@ jobs:
           set -euo pipefail
           package="dist/ROZA-Cardputer-ADV"
           mkdir -p "$package/audit"
-          cp integration/nucleoos-bridge/build/ROZA-Cardputer-ADV-FULL.bin "$package/"
+          cp ROZA-Cardputer-ADV-FULL.bin "$package/"
           cp ROZA-BUILD-INFO.json "$package/"
           cp integration/nucleoos-bridge/build/flash_args "$package/"
           cp tools/installer/flash.sh "$package/flash.sh"
