@@ -342,10 +342,18 @@ def main() -> int:
 
     require(
         "tools/installer/flash.sh",
+        'if release.get("hardware_tested") is not True:',
+        'if release.get("safe_to_flash") is not True:',
+        'if install.get("whole_flash_erase") is not False:',
         'read-flash 0x9000 0x5000 "$BACKUP"',
         '0x9000 "$BACKUP"',
         'read-flash 0x9000 0x5000 "$VERIFY"',
         'cmp -s "$BACKUP" "$VERIFY"',
+    )
+    require(
+        ".github/workflows/roza-nucleoos-bridge.yml",
+        "Refuse flashing of an unvalidated device candidate",
+        "REFUS DE FLASH",
     )
 
     require(
@@ -372,6 +380,7 @@ def main() -> int:
     print(" - one NucleoOS-owned SD/storage stack; no Launcher second SD mount")
     print(" - Cardputer ADV pin map, LoRa-1262 receive-only integration and 8 MiB partition layout")
     print(" - legacy Launcher NVS reserved, NucleoOS NVS clean and separate")
+    print(" - installer refuses candidates until hardware_tested and safe_to_flash are both true")
     print("This gate does not validate runtime behavior or authorize flashing.")
     return 0
 

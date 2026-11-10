@@ -1,68 +1,52 @@
-# Installer ROZA / РO3А sur M5Stack Cardputer ADV
+# ROZA / РO3А — paquet candidat Cardputer ADV (flash non autorisé)
 
-Cette livraison contient une **image complète de première installation** pour le Cardputer ADV : ESP32-S3FN8, flash 8 Mio, sans PSRAM. Ce n'est pas une mise à jour OTA.
+> **Ne pas flasher ce paquet.** Ce document décrit le contenu et les limites du candidat logiciel ; ce n'est pas une procédure d'installation pour la version actuelle.
 
-## Fichiers de la livraison
+Le manifeste `ROZA-BUILD-INFO.json` fait foi. Pour le candidat produit par la CI, il indique explicitement :
 
-- `ROZA-Cardputer-ADV-FULL.bin` : image ESP-IDF fusionnée, à écrire à l'adresse `0x000000`.
-- `ROZA-BUILD-INFO.json` : révisions sources, tailles, offsets, fonctions incluses et SHA-256.
-- `flash_args` : paramètres de flash générés par ESP-IDF.
-- `flash.sh` : sauvegarde de l'ancienne NVS puis écriture sans effacement global.
-- Les licences des composants sources sont jointes.
+- `release_ready: false`
+- `safe_to_flash: false`
+- `hardware_tested: false`
 
-## Avant le premier démarrage
+Le script `flash.sh` vérifie ces champs et s'arrête avant de rechercher esptool, de demander un port série ou d'envoyer une commande au Cardputer. Il n'est pas possible de contourner ce contrôle avec une simple confirmation au clavier.
 
-1. Sauvegardez le contenu de la microSD 128 Go sur un autre support.
-2. Vérifiez que la carte est en FAT32. Cette construction ne fournit pas le support exFAT ; une carte 128 Go formatée en exFAT ne sera pas montée correctement.
-3. Vissez l'antenne RP-SMA du Cap LoRa-1262 **avant toute mise sous tension**.
-4. Chargez suffisamment la batterie et utilisez un câble USB de données.
-5. Fermez les applications qui peuvent occuper le port série.
+## Contenu du paquet
 
-## Migration de la mémoire interne
+- `ROZA-Cardputer-ADV-FULL.bin` : image ESP-IDF fusionnée contenant bootloader, table de partitions, données OTA initiales et application.
+- `ROZA-BUILD-INFO.json` : révisions des sources, géométrie des partitions, tailles, empreintes et limites connues.
+- `flash_args` : arguments générés par ESP-IDF.
+- `flash.sh` : installateur initial protégé par le manifeste.
+- `audit/` : image fusionnée de contrôle, ELF, application, bootloader, table binaire, données OTA, CSV des partitions et verrou de dépendances.
+- Les licences des composants intégrés.
 
-La table ROZA conserve l'ancienne plage NVS Launcher à l'identique en la réservant sous le label `launcher_nvs_old` : `0x9000`, taille `0x5000`. Le nouveau NucleoOS utilise une nouvelle partition NVS vierge à `0x13000`, taille `0x6000`. L'ancienne NVS est donc préservée physiquement, mais ses réglages ne sont pas importés automatiquement dans ROZA.
+## Cible et mémoire flash
 
-La zone `otadata` reste à `0xE000/0x2000`, mais elle est réinitialisée pour démarrer le slot `ota_0`. L'ancienne application Launcher et son coredump sont remplacés par les deux slots OTA et les partitions de données de ROZA. Comme le binaire fusionné remplit les espaces vides avec `0xFF`, le script restaure l'ancienne NVS à son adresse d'origine après l'écriture complète, puis relit les 20 Kio et compare la sauvegarde octet par octet.
+- M5Stack Cardputer ADV, ESP32-S3FN8.
+- Flash : 8 Mio ; PSRAM : absente.
+- Image fusionnée écrite à l'offset logique `0x0` lorsqu'une version sera autorisée.
+- La table unique réserve l'ancienne NVS Launcher à `0x9000/0x5000`, conserve `otadata` à `0xE000/0x2000`, et place les deux slots applicatifs à `0x20000/0x380000` et `0x3A0000/0x380000`.
+- Le slot applicatif fait 3 670 016 octets. Le binaire de cette construction utilise 3 256 224 octets, soit 413 792 octets (11,27 %) de marge flash dans le slot.
+- La marge flash est calculée ; la marge de heap en fonctionnement n'est pas encore mesurée sur le matériel. L'absence de PSRAM rend cette validation indispensable.
 
-Le script sauvegarde d'abord l'ancienne NVS sur le PC, puis efface seulement :
-- `0x11000-0x11FFF` : nouvelle zone PHY ;
-- `0x13000-0x18FFF` : nouvelle NVS ;
-- `0x19000-0x19FFF` : clés NVS.
+L'installateur est conçu pour sauvegarder puis restaurer l'ancienne plage NVS et vérifier sa restauration octet par octet. Il n'utilise pas d'effacement global et ne formate pas la microSD. Cela ne remplace pas un essai de récupération réel.
 
-Il n'exécute jamais `erase_flash` et ne formate pas la microSD.
+## Fonctions présentes dans ce candidat
 
-## Installation avec le script Linux/macOS
+- Runtime NucleoOS unique avec identité et interface ROZA françaises.
+- Services natifs NucleoOS pour l'écran, le clavier, la SD, l'USB, les fichiers et le Store.
+- Store natif unique avec vérification des signatures et installation atomique ; le catalogue signé propre à ROZA n'est pas encore configuré.
+- Applications ROZA de diagnostic, de consultation des partitions en lecture seule et de pré-vérification des fichiers Firmware SD.
+- Réglage manuel de la date et de l'heure, fuseau Europe/Paris, Wi-Fi manuel et WebUI via les services NucleoOS.
+- GNSS NMEA du Cap LoRa-1262 et réception LoRa SX1262.
 
-Python 3 et esptool sont nécessaires :
+Le portage complet de l'interface et de toutes les applications/bibliothèques Launcher 3.0.0 n'est pas achevé. La présence du composant plateforme Launcher dans le graphe ESP-IDF ne signifie pas que tous les écrans Launcher ont été portés.
 
-```sh
-python3 -m pip install esptool
-PORT=/dev/ttyACM0 ./flash.sh ROZA-Cardputer-ADV-FULL.bin
-```
+## Blocages avant toute autorisation
 
-Remplacez le port série par celui du Cardputer. Le script vérifie le SHA-256 avec le manifeste avant toute commande de flash, sauvegarde l'ancienne NVS, efface les zones nécessaires, écrit l'image fusionnée à `0x0`, restaure l'ancienne NVS à `0x9000`, puis vérifie la restauration par relecture. Passez le Cardputer en mode téléchargement en maintenant BOOT/G0 pendant la connexion USB ou le reset si esptool ne le détecte pas.
+1. Premier démarrage, écran, clavier, batterie, microSD, USB, Wi-Fi, audio, GNSS et SX1262 non testés sur un Cardputer ADV réel.
+2. Mesure de la RAM libre et du comportement sans PSRAM à réaliser en fonctionnement.
+3. Catalogue de paquets signé propre à ROZA non configuré.
+4. Canal de firmware ROZA signé et politique de retour arrière non publiés ; l'OTA reste désactivée.
+5. Portage fonctionnel complet des parties Launcher retenues encore à terminer.
 
-## Installation avec un outil graphique
-
-Choisissez :
-- cible : ESP32-S3 ;
-- fichier : `ROZA-Cardputer-ADV-FULL.bin` ;
-- offset : `0x000000` ;
-- flash : 8 MB ;
-- mode : DIO.
-
-Avant l'écriture, faites une sauvegarde de la zone `0x9000` sur `0x5000` octets, puis effacez uniquement les plages listées dans la section Migration. N'utilisez pas `Erase All Flash`.
-
-## Ce que contient le firmware
-
-Un seul runtime NucleoOS personnalisé ROZA : interface française et fuseau Europe/Paris par défaut, réglage manuel de la date et de l'heure, fichiers/microSD, Store natif signé, Wi-Fi manuel, WebUI, USB MSC, applications/jeux NucleoOS, diagnostic, partitions en lecture seule, pré-vérification du firmware SD, GNSS du Cap LoRa-1262 et réception LoRa SX1262.
-
-Les fonctions qui se recouvrent entre Launcher et NucleoOS sont fournies par les services natifs NucleoOS. Il n'y a pas de deuxième menu, de second `setup()`/`loop()`, de deuxième montage SD ou de deuxième installateur de paquets Launcher.
-
-Le SX1262 est en réception seule dans cette livraison. L'OTA firmware reste désactivée tant qu'un canal de mise à jour ROZA signé n'est pas publié. Le Store natif conserve la vérification de signature, mais son catalogue n'est pas encore propre à ROZA.
-
-## Premier essai matériel
-
-Le build logiciel et la structure du binaire seront contrôlés par la CI. Le fonctionnement réel doit encore être vérifié sur le Cardputer : démarrage à froid, écran, clavier, microSD, batterie, audio, Wi-Fi, GNSS et radio. Le manifeste indique explicitement que ces essais matériels n'ont pas encore été réalisés.
-
-Après installation, notez les éventuels messages de démarrage série et vérifiez chaque périphérique avant de considérer ROZA comme stable.
+Aucun flash ni essai matériel n'a été exécuté pendant la compilation. La CI ne peut pas remplacer les contrôles de premier démarrage et de périphériques sur le matériel ; le paquet reste donc bloqué.

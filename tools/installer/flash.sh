@@ -8,10 +8,6 @@ PORT="${PORT:-}"
 [[ -f "$IMAGE" ]] || { echo "Image introuvable : $IMAGE" >&2; exit 1; }
 [[ -f "$MANIFEST" ]] || { echo "Manifeste introuvable : $MANIFEST" >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "Python 3 est requis." >&2; exit 1; }
-python3 -m esptool --help >/dev/null 2>&1 || {
-  echo "Installez esptool : python3 -m pip install esptool" >&2
-  exit 1
-}
 
 python3 - "$IMAGE" "$MANIFEST" <<'PY'
 import hashlib, json, pathlib, sys
@@ -24,6 +20,13 @@ if manifest.get("hardware", {}).get("flash_bytes") != 8 * 1024 * 1024:
 release = manifest.get("release", {})
 if release.get("class") != "complete-software-device-test-candidate":
     raise SystemExit("Ce paquet n'est pas un candidat ROZA complet de test appareil.")
+if release.get("hardware_tested") is not True:
+    raise SystemExit("REFUS DE FLASH : le manifeste confirme que le matériel n'a pas été validé.")
+if release.get("safe_to_flash") is not True:
+    raise SystemExit("REFUS DE FLASH : le manifeste n'autorise pas l'écriture de cette image.")
+install = release.get("installation", {})
+if install.get("whole_flash_erase") is not False:
+    raise SystemExit("Refus : le manifeste n'interdit pas explicitement l'effacement global.")
 if release.get("installation", {}).get("legacy_nvs_backup_required") is not True:
     raise SystemExit("Manifeste sans procédure de sauvegarde NVS.")
 if release.get("installation", {}).get("legacy_nvs_restored_after_contiguous_merge_bin_write") is not True:
@@ -41,6 +44,11 @@ if release.get("installation", {}).get("legacy_nvs_backup_required") is not True
     raise SystemExit("Manifeste sans procédure de sauvegarde NVS.")
 print("SHA-256 image vérifié :", actual)
 PY
+
+python3 -m esptool --help >/dev/null 2>&1 || {
+  echo "Installez esptool : python3 -m pip install esptool" >&2
+  exit 1
+}
 
 if [[ -z "$PORT" ]]; then
   read -r -p "Port série du Cardputer (ex. /dev/ttyACM0) : " PORT

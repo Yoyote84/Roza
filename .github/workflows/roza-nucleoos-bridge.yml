@@ -127,6 +127,17 @@ jobs:
             --partition-csv integration/nucleoos-bridge/partitions.csv \
             --output ROZA-BUILD-INFO.json
 
+      - name: Refuse flashing of an unvalidated device candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if output="$(bash tools/installer/flash.sh ROZA-Cardputer-ADV-FULL.bin 2>&1)"; then
+            echo "ERREUR : le candidat non validé a passé le contrôle de flash." >&2
+            exit 1
+          fi
+          grep -q "REFUS DE FLASH" <<< "$output"
+          printf '%s\n' "$output"
+
       - name: Assemble one self-contained installation package
         shell: bash
         run: |

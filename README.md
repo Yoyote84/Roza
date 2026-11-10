@@ -1,48 +1,31 @@
-# ROZA CHANINA — Cardputer ADV
+# ROZA CHANINA — M5Stack Cardputer ADV
 
-**ROZA CHANINA** est un firmware pour M5Stack Cardputer ADV construit sur [Launcher 3.0.0](https://github.com/bmorcelli/Launcher), avec une identité visuelle ROZA et une interface française.
+ROZA vise un **seul firmware**, un seul accueil et un seul runtime pour le Cardputer ADV. NucleoOS reste propriétaire de l'écran, du clavier, du stockage microSD et de l'USB. Les fonctions retenues de Launcher 3.0.0 sont adaptées comme applications ou services natifs ; aucun second firmware Launcher ne doit être démarré.
 
-## Interface ROZA
+## État réel du projet
 
-[Ouvrir la référence graphique ROZA](https://yoyote84.github.io/Roza/).
+La branche de travail est `migration/roza-chanina-launcher`. Les sources Launcher 3.0.0 et NucleoOS sont épinglées à des révisions précises et compilées dans le projet ESP-IDF combiné.
 
-La référence définit le langage visuel à retrouver sur le Cardputer : papier crème, encre brun-noir, accents bordeaux, bandeau **РОЗА**, navigation compacte et libellés français. La maquette Web est uniquement une référence de conception ; les actions doivent être exécutées par le vrai firmware.
+La CI produit désormais un **candidat logiciel complet de test appareil** : bootloader, table de partitions, données OTA initiales et application réunis dans une image ESP32-S3. Les contrôles vérifient les offsets, les contenus fusionnés, la géométrie 8 Mio et les empreintes SHA-256.
 
-Le menu principal du firmware est personnalisé pour l'écran 240 × 135 : liste compacte, sélection bordeaux, état Wi-Fi et indication de batterie. Les autres fonctions natives de Launcher restent la base des écrans secondaires.
+**Ce candidat n'est pas autorisé au flash.** Une compilation verte ne prouve pas le premier démarrage ni le fonctionnement du Cardputer réel. Le manifeste garde `hardware_tested=false` et `safe_to_flash=false`, et le script d'installation refuse ces paquets.
 
-## Fonctions conservées
+## Architecture et limites actuelles
 
-- applications et lancement des applications ;
-- installateur OTA et catalogue compatible ;
-- gestion des fichiers et installation depuis microSD ;
-- interface d'administration Web intégrée au firmware ;
-- stockage USB de la microSD ;
-- réglages et gestionnaire de partitions.
+- Un seul `app_main()` NucleoOS ; pas de second `setup()`/ `loop()`, de réinitialisation M5 ou de montage SD parallèle.
+- Le composant plateforme réel de Launcher 3.0.0 est compilé. Des tranches natives ROZA (diagnostic, partitions en lecture seule, contrôle Firmware SD, GNSS et LoRa RX) utilisent le cycle de vie et les périphériques NucleoOS.
+- Le portage complet de toutes les interfaces et bibliothèques applicatives de Launcher n'est pas terminé. Le prototype ne doit pas être présenté comme la fusion exhaustive de chaque écran et fonction Launcher.
+- Le Store natif NucleoOS est l'unique gestionnaire de paquets. Aucun second installateur Launcher n'est ajouté ; le catalogue signé propre à ROZA reste à configurer.
+- Les outils Partitions et Firmware SD restent en lecture seule.
+- L'OTA du firmware reste désactivée tant qu'un canal de publication ROZA signé et sa politique de retour arrière n'existent pas.
+- Cible : ESP32-S3FN8, flash 8 Mio, sans PSRAM. La carte microSD doit être en FAT32 dans cette construction ; exFAT n'est pas activé. Le pourcentage batterie est une estimation basée sur la tension, pas une mesure par compteur de charge.
+- Le SX1262 du Cap LoRa-1262 est limité à la réception dans cette version.
 
-## Source et versions
+## Documentation
 
-Le sous-module `launcher/` est épinglé sur **bmorcelli/Launcher 3.0.0**, commit `4b06de691df15b0fe6a9f09f56d1d107bbf32b12`.
+- [Plan et état de la fusion](docs/FUSION-ROZA-NUCLEOOS.md)
+- [Statut du candidat et contrôles de flash](docs/FLASH-PREVIEW-NOT-READY.md)
+- [Contenu du paquet de test](docs/INSTALL-ROZA-FR.md)
+- [Prototype d'intégration ESP-IDF](integration/nucleoos-bridge/README.md)
 
-Le script `scripts/apply-roza-branding.py` applique l'identité ROZA, la palette papier/bordeaux, les libellés français, le thème WebUI et la personnalisation du parcours Wi-Fi. Le script `scripts/apply-roza-interface.py` remplace le menu principal en grille par une liste adaptée au format 240 × 135. Les deux scripts sont appliqués par le workflow de compilation.
-
-## Compilation
-
-```sh
-git clone --recurse-submodules https://github.com/Yoyote84/Roza.git
-cd Roza
-git checkout migration/roza-chanina-launcher
-git submodule update --init --recursive
-python3 scripts/apply-roza-branding.py
-python3 scripts/apply-roza-interface.py
-pio run -d launcher -e m5stack-cardputer
-```
-
-Une compilation réussie ne prouve pas le démarrage ni le fonctionnement de tous les périphériques sur le Cardputer réel. La nouvelle interface doit encore être vérifiée physiquement sur l'écran 240 × 135 avant de déclarer la mise à jour validée.
-
-## Mise à jour matérielle
-
-Le schéma amont 8 MB utilise une NVS à `0x9000` (taille `0x5000`), une zone OTA data à `0xE000` et l'application à `0x10000`. Vérifier la table de partitions de l'image avant toute mise à jour. Ne pas effacer la flash complète ; sauvegarder la NVS reste recommandé.
-
-## Licence
-
-Le firmware amont est [bmorcelli/Launcher](https://github.com/bmorcelli/Launcher), distribué sous sa licence d'origine. Voir `launcher/LICENSE` et les licences des sous-modules.
+Aucun flash, effacement ou essai matériel n'est lancé par la CI.
