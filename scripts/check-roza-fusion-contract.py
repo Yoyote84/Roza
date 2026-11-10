@@ -64,22 +64,60 @@ def check_partitions() -> None:
             errors.append(f"{rel}: malformed row: {raw}")
             continue
         try:
-            rows[cols[0]] = (cols[1], cols[2], int(cols[3], 0), int(cols[4], 0))
+            label = cols[0]
+            if label in rows:
+                errors.append(f"{rel}: duplicate partition label: {label}")
+                continue
+            rows[label] = (cols[1], cols[2], int(cols[3], 0), int(cols[4], 0))
         except ValueError:
             errors.append(f"{rel}: invalid numeric partition field: {raw}")
 
+    # Freeze the complete NucleoOS-owned 8 MiB layout. Checking only the OTA slots
+    # allowed accidental movement of NVS/otadata/keys to pass CI, which could make
+    # an otherwise valid image lose settings or fail to boot after an update.
     expected = {
+        "nvs": ("data", "nvs", 0x009000, 0x006000),
+        "otadata": ("data", "ota", 0x00F000, 0x002000),
+        "phy_init": ("data", "phy", 0x011000, 0x001000),
+        "nvs_keys": ("data", "nvs_keys", 0x012000, 0x001000),
         "ota_0": ("app", "ota_0", 0x020000, 0x380000),
         "ota_1": ("app", "ota_1", 0x3A0000, 0x380000),
         "nucleo_nap": ("data", "littlefs", 0x720000, 0x040000),
         "cfg": ("data", "spiffs", 0x760000, 0x0A0000),
     }
+    if set(rows) != set(expected):
+        errors.append(
+            f"{rel}: partition labels must be exactly {sorted(expected)}, got {sorted(rows)}"
+        )
     for label, value in expected.items():
         if rows.get(label) != value:
             errors.append(f"{rel}: {label} must be {value}, got {rows.get(label)}")
-    if "factory" in rows:
-        errors.append(f"{rel}: unexpected factory partition in the dual-OTA layout")
-    if max((off + size for _, _, off, size in rows.values()), default=0) != 0x800000:
+
+    # Independently validate geometry so future edits cannot hide overlaps,
+    # zero-sized entries, unaligned app slots or an address beyond the 8 MiB chip.
+    ranges: list[tuple[int, int, str]] = []
+    for label, (kind, subtype, offset, size) in rows.items():
+        if size <= 0:
+            errors.append(f"{rel}: {label} has a non-positive size")
+            continue
+        end = offset + size
+        if offset < 0x9000 or end > 0x800000:
+            errors.append(
+                f"{rel}: {label} range 0x{offset:x}..0x{end:x} is outside usable 8 MiB flash"
+            )
+        if offset % 0x1000 or size % 0x1000:
+            errors.append(f"{rel}: {label} is not aligned to the 4 KiB flash sector")
+        if kind == "app" and (offset % 0x10000 or size % 0x10000):
+            errors.append(f"{rel}: app partition {label} is not 64 KiB aligned")
+        ranges.append((offset, end, label))
+
+    ranges.sort()
+    for previous, current_range in zip(ranges, ranges[1:]):
+        if current_range[0] < previous[1]:
+            errors.append(
+                f"{rel}: partitions {previous[2]} and {current_range[2]} overlap"
+            )
+    if max((end for _, end, _ in ranges), default=0) != 0x800000:
         errors.append(f"{rel}: partition map must end exactly at 8 MiB (0x800000)")
 
 
