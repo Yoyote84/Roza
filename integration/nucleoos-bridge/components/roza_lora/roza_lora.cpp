@@ -65,7 +65,7 @@ static bool enable_antenna_switch() {
         if (e!=ESP_OK) { s_ioe=nullptr; snprintf(s_error,sizeof(s_error),"Expandeur I2C: %d",(int)e); return false; }
     }
     uint8_t id=0;
-    if (read_reg(0x01,&id)!=ESP_OK || (id & 0xFC) != 0xA0) {
+    if (read_reg(0x01,&id)!=ESP_OK || (id & 0xE0) != 0xA0) {
         snprintf(s_error,sizeof(s_error),"Expandeur PI4IOE5V6408 absent"); return false;
     }
     // Load HIGH before enabling P0 as an output to avoid a low pulse on SX_ANT_SW.

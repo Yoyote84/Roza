@@ -331,7 +331,7 @@ def main() -> int:
             "jgromes/radiolib", "7.8.0")
     require("integration/nucleoos-bridge/components/roza_lora/roza_lora.cpp",
             "SPI2_HOST", "nucleo_kbd_i2c_bus()", "IOE_ADDR=0x43",
-            "(id & 0xFC) != 0xA0", "!update_reg(0x05,0x01,0x00)",
+            "(id & 0xE0) != 0xA0", "!update_reg(0x05,0x01,0x00)",
             "PIN_SCK=40", "PIN_MISO=39", "PIN_MOSI=14",
             "PIN_NSS=5", "PIN_DIO1=4", "PIN_RESET=3", "PIN_BUSY=6",
             "startReceive()", "setPacketReceivedAction", "getPacketLength()",
