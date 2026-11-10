@@ -29,6 +29,12 @@ int main()
     assert(near(fix.speed_kmh, 41.4848, 0.01));
     assert(near(fix.course_deg, 84.4, 0.01));
     assert(strcmp(fix.utc_date, "230394") == 0);
+    int64_t utc_epoch = 0;
+    assert(roza_gnss_utc_epoch(&fix, &utc_epoch));
+    assert(utc_epoch == 764426119); // 1994-03-23 12:35:19 UTC
+    roza_gnss_fix_t invalid_date = fix;
+    snprintf(invalid_date.utc_date, sizeof(invalid_date.utc_date), "310224");
+    assert(!roza_gnss_utc_epoch(&invalid_date, &utc_epoch));
 
     const char *bad_checksum = "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*46";
     assert(!roza_gnss_parse_sentence(bad_checksum, &fix));

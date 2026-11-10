@@ -141,3 +141,38 @@ extern "C" bool roza_gnss_parse_sentence(const char *sentence, roza_gnss_fix_t *
 
     return false;
 }
+
+
+extern "C" bool roza_gnss_utc_epoch(const roza_gnss_fix_t *fix, int64_t *epoch_seconds)
+{
+    if (!fix || !epoch_seconds || !fix->has_fix ||
+        strlen(fix->utc_date) != 6 || strlen(fix->utc_time) < 6) return false;
+
+    int day = 0, month = 0, short_year = 0;
+    int hour = 0, minute = 0, second = 0;
+    if (sscanf(fix->utc_date, "%2d%2d%2d", &day, &month, &short_year) != 3 ||
+        sscanf(fix->utc_time, "%2d%2d%2d", &hour, &minute, &second) != 3) return false;
+
+    const int year = short_year >= 80 ? 1900 + short_year : 2000 + short_year;
+    const bool leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+    static const int month_days[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    if (month < 1 || month > 12 || day < 1 ||
+        day > month_days[month - 1] + ((month == 2 && leap) ? 1 : 0) ||
+        hour < 0 || hour > 23 || minute < 0 || minute > 59 ||
+        second < 0 || second > 60) return false;
+
+    int adjusted_year = year - (month <= 2);
+    const int era = (adjusted_year >= 0 ? adjusted_year : adjusted_year - 399) / 400;
+    const unsigned year_of_era = static_cast<unsigned>(adjusted_year - era * 400);
+    const int shifted_month = month + (month > 2 ? -3 : 9);
+    const unsigned day_of_year =
+        (153u * static_cast<unsigned>(shifted_month) + 2u) / 5u +
+        static_cast<unsigned>(day - 1);
+    const unsigned day_of_era =
+        year_of_era * 365u + year_of_era / 4u - year_of_era / 100u + day_of_year;
+    const int64_t days = static_cast<int64_t>(era) * 146097 +
+                         static_cast<int64_t>(day_of_era) - 719468;
+    *epoch_seconds = days * 86400 + hour * 3600 + minute * 60 +
+                     (second > 59 ? 59 : second);
+    return true;
+}

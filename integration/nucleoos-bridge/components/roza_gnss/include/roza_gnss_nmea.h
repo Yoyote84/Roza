@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,6 +22,7 @@ typedef struct {
 
 void roza_gnss_fix_reset(roza_gnss_fix_t *fix);
 bool roza_gnss_parse_sentence(const char *sentence, roza_gnss_fix_t *fix);
+bool roza_gnss_utc_epoch(const roza_gnss_fix_t *fix, int64_t *epoch_seconds);
 
 #ifdef __cplusplus
 }
