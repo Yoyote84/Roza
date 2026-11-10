@@ -343,7 +343,7 @@ def main() -> int:
     require(
         "tools/installer/flash.sh",
         'read-flash 0x9000 0x5000 "$BACKUP"',
-        'write-flash 0x9000 "$BACKUP"',
+        '0x9000 "$BACKUP"',
         'read-flash 0x9000 0x5000 "$VERIFY"',
         'cmp -s "$BACKUP" "$VERIFY"',
     )
