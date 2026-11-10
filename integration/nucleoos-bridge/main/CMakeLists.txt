@@ -43,4 +43,5 @@ idf_component_register(
         launcher_platform
         roza_launcher_partitions
         roza_launcher_sd
+        roza_launcher_hal
 )

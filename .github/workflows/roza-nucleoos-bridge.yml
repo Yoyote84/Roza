@@ -16,6 +16,7 @@ on:
       - "scripts/prepare-roza-arduino-usb.py"
       - "scripts/check-roza-fusion-contract.py"
       - "scripts/create-roza-build-manifest.py"
+      - "tests/**"
   workflow_dispatch:
 
 permissions:
@@ -66,6 +67,17 @@ jobs:
 
       - name: Verify ROZA fusion safety and feature contract
         run: python3 scripts/check-roza-fusion-contract.py
+
+      - name: Test Launcher input translation on the host
+        shell: bash
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror \
+            -I integration/nucleoos-bridge/components/roza_launcher_hal/include \
+            -I nucleoos/firmware/components/nucleo_kbd/include \
+            integration/nucleoos-bridge/components/roza_launcher_hal/roza_launcher_input.cpp \
+            tests/roza_launcher_input_test.cpp \
+            -o /tmp/roza-launcher-input-test
+          /tmp/roza-launcher-input-test
 
       - name: Compile the combined ESP-IDF component graph
         uses: espressif/esp-idf-ci-action@v1

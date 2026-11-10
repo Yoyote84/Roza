@@ -181,6 +181,42 @@ def main() -> int:
         "integration/nucleoos-bridge/components/roza_launcher_sd/CMakeLists.txt",
         "mbedtls",
     )
+    # Shared compatibility facade: every peripheral remains NucleoOS-owned.
+    require("integration/nucleoos-bridge/CMakeLists.txt", "components/roza_launcher_hal")
+    require("integration/nucleoos-bridge/main/CMakeLists.txt", "roza_launcher_hal")
+    require(
+        "integration/nucleoos-bridge/components/roza_launcher_hal/CMakeLists.txt",
+        "roza_launcher_input.cpp", "roza_launcher_hal.cpp", "roza_launcher_diagnostics.cpp",
+        "nucleo_app", "nucleo_kbd", "nucleo_power", "nucleo_storage",
+    )
+    require(
+        "integration/nucleoos-bridge/components/roza_launcher_hal/include/roza_launcher_hal.h",
+        "roza_launcher_display_target", "roza_launcher_key_from_callback",
+        "roza_launcher_battery_percent", "roza_launcher_battery_millivolts",
+        "roza_launcher_storage_ready", "roza_launcher_set_brightness",
+    )
+    require(
+        "integration/nucleoos-bridge/components/roza_launcher_hal/roza_launcher_hal.cpp",
+        "nucleo_app_gfx()", "nucleo_kbd_mods()", "nucleo_power_battery_pct()",
+        "nucleo_power_battery_mv()", "nucleo_storage_info()", "nucleo_app_set_brightness(",
+    )
+    forbid(
+        "integration/nucleoos-bridge/components/roza_launcher_hal/roza_launcher_hal.cpp",
+        "M5.begin(", "Wire.begin(", "nucleo_kbd_init(", "nucleo_ui_init(", "SD.begin(",
+    )
+    require(
+        "integration/nucleoos-bridge/components/roza_launcher_hal/roza_launcher_input.cpp",
+        "case NK_UP:", "case NK_DOWN:", "case NK_LEFT:", "case NK_RIGHT:",
+        "case NK_ENTER:", "case NK_BACK:", "case NK_DEL:", "case NK_TAB:", "case NK_CHAR:",
+        "NK_MOD_SHIFT", "NK_MOD_CTRL", "NK_MOD_ALT", "NK_MOD_GUI", "NK_MOD_FN",
+    )
+    require(
+        "integration/nucleoos-bridge/components/roza_launcher_hal/roza_launcher_diagnostics.cpp",
+        "roza_launcher_display_target()", "roza_launcher_key_from_callback(",
+        "roza_launcher_battery_percent()", "roza_launcher_storage_ready()",
+        "roza_register_launcher_diagnostics",
+    )
+    require("scripts/apply-roza-nucleoos.py", "roza_register_launcher_diagnostics")
     forbid(
         "integration/nucleoos-bridge/components/roza_launcher_sd/roza_launcher_sd.cpp",
         "esp_partition_erase_range(", "esp_ota_write(", 'fopen(sidecar_path, "wb")',

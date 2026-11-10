@@ -31,13 +31,24 @@ Le test de compatibilité Arduino/ESP-IDF qui compile `launcher/src/idf/launcher
 - Nucleo expose déjà les API de clavier, batterie, luminosité, Wi-Fi, stockage, registre et applications mentionnées dans le tableau. Ce sont les points d'entrée à utiliser avant d'ajouter un autre pilote.
 - La carte est sans PSRAM. Un canvas ou un tampon plein écran supplémentaire peut consommer une part importante du plus grand bloc RAM contigu. Le dessin doit réutiliser le tampon Nucleo et chaque gros tampon d'application doit être mesuré.
 
-## Ordre des prochains tests
+## Première couche d'adaptation livrée
 
-1. Après validation du build NucleoOS, compiler le backend M5GFX réel de DisplayDrivers sous un mode ROZA ciblant `nucleo_app_gfx()`, avec `begin()/init()` sans initialisation matérielle et sprites rattachés à la bonne cible.
-2. Ajouter un traducteur d'événements clavier Nucleo vers le modèle d'entrée Launcher et des tests hôte couvrant navigation, Enter, Esc/Backspace, Shift, Ctrl, Alt, Fn, répétition et relâchement.
-3. Remplacer les accès directs Launcher au Wi-Fi, à la batterie, à la luminosité et à la SD par les façades Nucleo et compiler chaque groupe réel.
-4. Porter les applications/fonctions Launcher dans le registre Nucleo, puis vérifier individuellement le catalogue, OTA, SD installer, WebUI, USB-MSC et outils de partition.
-5. Mesurer taille ELF/flash, heap libre/minimal et plus grand bloc contigu ; confronter le résultat à la table de partitions 8 MB et aux deux banques OTA.
-6. Effectuer ensuite les essais physiques Cardputer ADV (écran, clavier, Wi-Fi, SD, audio, capteurs, USB, OTA et récupération), après validation explicite de l'image et de la procédure de retour arrière.
+Le composant `roza_launcher_hal` fournit maintenant un contrat commun aux futures applications portées :
+
+- `roza_launcher_display_target()` retourne le pointeur courant de `nucleo_app_gfx()`. L'application doit le récupérer pendant chaque callback de dessin et ne pas le conserver entre deux frames : NucleoOS peut basculer entre canvas partagé et dessin direct.
+- `roza_launcher_key_from_callback(key, ch, out)` traduit les événements reçus dans le callback natif `on_key(key, ch)`, avec le masque de modificateurs courant. Il ne lit pas la file clavier, car NucleoOS l'a déjà consommée avant l'appel de l'application.
+- Les fonctions batterie, tension, état SD et luminosité délèguent aux API NucleoOS. Une batterie inconnue reste `-1`.
+- L'application native **Diagnostic ROZA** est enregistrée dans le menu unique. Elle affiche les touches/modificateurs reçus et l'état batterie/SD pour guider les essais sur le matériel.
+- Le traducteur clavier pur est testé côté hôte pour les flèches, Enter, Esc, Backspace, Tab, caractères et les cinq modificateurs.
+
+Cette couche n'appelle jamais `M5.begin()`, `nucleo_ui_init()`, `nucleo_kbd_init()`, `Wire.begin()` ou un second montage SD. Elle ne réutilise pas encore le backend autonome `DisplayDrivers/src/backends/m5gfx_hal.cpp`, qui réinitialise `M5` et dessine sur `M5.Display` au lieu du canvas dynamique NucleoOS. Ce backend doit être adapté avant de réutiliser les applications qui en dépendent.
+
+## Étapes suivantes
+
+1. Porter une première fonction applicative Launcher réelle, en priorité parmi celles qui ne dupliquent pas Files, Store, Wi-Fi ou USB déjà natifs, dans le cycle de vie `on_enter/on_key/on_tick/on_draw/on_exit`.
+2. Remplacer les accès directs Launcher au Wi-Fi, à la batterie, à la luminosité et à la SD par les façades Nucleo et compiler chaque groupe réel.
+3. Porter les autres applications/fonctions Launcher dans le registre Nucleo, puis vérifier individuellement catalogue, OTA, installateur SD, WebUI, USB-MSC et outils de partition.
+4. Mesurer taille ELF/flash, heap libre/minimal et plus grand bloc contigu ; confronter le résultat à la table de partitions 8 MB et aux deux banques OTA.
+5. Effectuer ensuite les essais physiques Cardputer ADV (écran, clavier, Wi-Fi, SD, audio, capteurs, USB, OTA et récupération), après validation explicite de l'image et de la procédure de retour arrière.
 
 Aucune fonction marquée « à adapter » ci-dessus n'est considérée comme fusionnée simplement parce qu'elle apparaît dans la liste cible. Aucun test de flash matériel n'a été réalisé.
