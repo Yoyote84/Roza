@@ -12,6 +12,7 @@ PINNED_NUCLEOOS = "cb0f1a5356ddd6f96ec6b31bbcba5d55f52d8123"
 THEME_FILE = NUCLEO_ROOT / "firmware/components/nucleo_ui/nucleo_theme.cpp"
 UI_FILE = NUCLEO_ROOT / "firmware/components/nucleo_ui/nucleo_ui.cpp"
 I18N_FILE = NUCLEO_ROOT / "firmware/components/nucleo_storage/nucleo_i18n.c"
+CLOCK_ZONE_FILE = NUCLEO_ROOT / "firmware/components/nucleo_setup/clock_zones.h"
 MAIN_FILE = NUCLEO_ROOT / "firmware/main/main.c"
 UPDATE_ENGINE_FILE = NUCLEO_ROOT / "firmware/components/nucleo_app/nucleo_update.c"
 UPDATE_UI_FILE = NUCLEO_ROOT / "firmware/components/nucleo_app/app_updates.cpp"
@@ -144,6 +145,11 @@ def main() -> int:
         ),
     ])
 
+    clock_changed = replace_exact(CLOCK_ZONE_FILE, [
+        ('#define CLOCK_ZONE_DEFAULT_ID "Europe/Rome"   // what every device ran before the zone could be chosen',
+         '#define CLOCK_ZONE_DEFAULT_ID "Europe/Paris"  // ROZA fresh-install default; a saved user zone always wins'),
+    ])
+
     main_changed = replace_exact(MAIN_FILE, [
         ('nucleo_ui_message("NucleoOS",', 'nucleo_ui_message("ROZA",'),
         ('nucleo_ui_home("NucleoOS",', 'nucleo_ui_home("ROZA",'),
@@ -189,6 +195,7 @@ def main() -> int:
         f"verrou OTA={'modifie' if updater_changed or updates_ui_changed else 'deja present'}."
     )
     print("Langue francaise par defaut appliquee ; les choix deja enregistres sont conserves.")
+    print("Fuseau Europe/Paris applique aux nouvelles installations ; un fuseau deja choisi est conserve.")
     print("ROZA ajoute les inspecteurs Partitions et Firmware SD sans remplacer les apps NucleoOS.")
     print(
         "Mise a jour NucleoOS amont bloquee dans ROZA : aucun controle reseau ni flash OTA "

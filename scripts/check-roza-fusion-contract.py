@@ -167,6 +167,30 @@ def main() -> int:
         "norm_lang(s_lang, sizeof s_lang, lg->valuestring)",
     )
 
+    # Keep the requested offline date/time editor and French first-run timezone.
+    require(
+        "firmware/components/nucleo_setup/clock_zones.h",
+        '#define CLOCK_ZONE_DEFAULT_ID "Europe/Paris"',
+    )
+    require(
+        "firmware/components/nucleo_setup/clock_zones.c",
+        '"Europe/Paris"',
+        '"CET-1CEST,M3.5.0,M10.5.0/3"',
+    )
+    require(
+        "firmware/components/nucleo_setup/nucleo_setup.c",
+        "void nucleo_setup_set_datetime(int year, int mon, int day, int hour, int min)",
+        "tm.tm_isdst = -1;",
+        "time_t t = mktime(&tm);",
+        "settimeofday(&tv, NULL);",
+        'NUCLEO_SD_MOUNT "/system/time.json"',
+    )
+    require(
+        "firmware/components/nucleo_app/app_wifi.cpp",
+        "nucleo_setup_set_datetime(s_dtv[0], s_dtv[1], s_dtv[2], s_dtv[3], s_dtv[4]);",
+        "Date et heure reglees",
+    )
+
     # The Store is the one app-package system: signed catalog/packages, hash checks and atomic SD swap.
     require(
         "firmware/components/nucleo_store/store_engine.c",
