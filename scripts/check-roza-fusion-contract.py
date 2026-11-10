@@ -280,7 +280,7 @@ def main() -> int:
     require("integration/nucleoos-bridge/components/roza_gnss/CMakeLists.txt", "roza_gnss.cpp", "roza_gnss_nmea.cpp", "driver", "nucleo_app", "nucleo_setup")
     require("integration/nucleoos-bridge/components/roza_gnss/roza_gnss.cpp", "uart_driver_install", "UART_NUM_1", "uart_set_pin", "115200", "GNSS_TX_PIN = 13", "GNSS_RX_PIN = 15", "roza_gnss_parse_sentence", "nucleo_app_register", "nucleo_setup_set_datetime", "roza_gnss_utc_epoch")
     forbid("integration/nucleoos-bridge/components/roza_gnss/roza_gnss.cpp", "RadioLib", "SX1262", "radio.begin(", "spi_bus_initialize(")
-    require("integration/nucleoos-bridge/components/roza_gnss/roza_gnss_nmea.cpp", "roza_gnss_parse_sentence", "roza_gnss_utc_epoch", "days_from_civil", "GGA", "RMC", "checksum")
+    require("integration/nucleoos-bridge/components/roza_gnss/roza_gnss_nmea.cpp", "roza_gnss_parse_sentence", "roza_gnss_utc_epoch", "719468", "GGA", "RMC", "checksum")
     require("tests/roza_gnss_nmea_test.cpp", "roza_gnss_utc_epoch", "764426119")
     require("integration/nucleoos-bridge/main/CMakeLists.txt", "roza_launcher_hal")
     require(
