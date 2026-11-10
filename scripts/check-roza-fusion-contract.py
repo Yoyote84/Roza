@@ -278,7 +278,7 @@ def main() -> int:
     require("integration/nucleoos-bridge/main/CMakeLists.txt", "roza_gnss")
     require("scripts/apply-roza-nucleoos.py", "roza_register_gnss();")
     require("integration/nucleoos-bridge/components/roza_gnss/CMakeLists.txt", "roza_gnss.cpp", "roza_gnss_nmea.cpp", "driver", "nucleo_app")
-    require("integration/nucleoos-bridge/components/roza_gnss/roza_gnss.cpp", "uart_driver_install", "UART_NUM_1", "uart_set_pin", "115200", "13, 15", "roza_gnss_parse_sentence", "nucleo_app_register")
+    require("integration/nucleoos-bridge/components/roza_gnss/roza_gnss.cpp", "uart_driver_install", "UART_NUM_1", "uart_set_pin", "115200", "GNSS_TX_PIN = 13", "GNSS_RX_PIN = 15", "roza_gnss_parse_sentence", "nucleo_app_register")
     forbid("integration/nucleoos-bridge/components/roza_gnss/roza_gnss.cpp", "RadioLib", "SX1262", "radio.begin(", "spi_bus_initialize(")
     require("integration/nucleoos-bridge/components/roza_gnss/roza_gnss_nmea.cpp", "roza_gnss_parse_sentence", "GGA", "RMC", "checksum")
     require("integration/nucleoos-bridge/main/CMakeLists.txt", "roza_launcher_hal")
