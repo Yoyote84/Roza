@@ -5,9 +5,9 @@
 #include "nucleo_power.h"
 #include "nucleo_storage.h"
 
-extern "C" LovyanGFX *roza_launcher_display_target(void)
+extern "C" void *roza_launcher_display_target(void)
 {
-    return nucleo_app_gfx();
+    return static_cast<void *>(nucleo_app_gfx());
 }
 
 extern "C" bool roza_launcher_key_from_callback(

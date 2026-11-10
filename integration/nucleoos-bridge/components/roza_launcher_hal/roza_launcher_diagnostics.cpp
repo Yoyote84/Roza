@@ -67,7 +67,7 @@ static void diagnostic_key(int key, char ch)
 
 static void diagnostic_draw(void)
 {
-    LovyanGFX *display = roza_launcher_display_target();
+    LovyanGFX *display = static_cast<LovyanGFX *>(roza_launcher_display_target());
     if (!display) return;
     const int top = nucleo_app_content_top();
     const int height = nucleo_app_content_height();

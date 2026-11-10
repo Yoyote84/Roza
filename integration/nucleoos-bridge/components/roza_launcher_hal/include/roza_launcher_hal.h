@@ -3,7 +3,6 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-namespace lgfx { class LovyanGFX; }
 extern "C" {
 #endif
 
@@ -37,7 +36,8 @@ bool roza_launcher_translate_key(int native_key, char native_char,
                                  roza_launcher_key_event_t *out);
 bool roza_launcher_key_from_callback(int native_key, char native_char,
                                      roza_launcher_key_event_t *out);
-lgfx::LovyanGFX *roza_launcher_display_target(void);
+/* Opaque pointer keeps the host-tested HAL independent of M5GFX headers. */
+void *roza_launcher_display_target(void);
 int roza_launcher_battery_percent(void);
 int roza_launcher_battery_millivolts(void);
 bool roza_launcher_storage_ready(void);
