@@ -5,7 +5,6 @@ on:
     branches:
       - migration/roza-chanina-launcher
     paths:
-      - ".github/workflows/roza-launcher-build.yml"
       - ".gitmodules"
       - "scripts/apply-roza-branding.py"
       - "scripts/apply-roza-interface.py"
