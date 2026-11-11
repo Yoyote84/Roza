@@ -138,6 +138,9 @@ jobs:
           grep -q "REFUS DE FLASH" <<< "$output"
           printf '%s\n' "$output"
 
+      - name: Test installer approval and refusal paths without hardware access
+        run: python3 tests/test_flash_installer_guard.py
+
       - name: Assemble one self-contained installation package
         shell: bash
         run: |

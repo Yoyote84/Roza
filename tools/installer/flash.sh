@@ -27,12 +27,23 @@ if release.get("safe_to_flash") is not True:
 install = release.get("installation", {})
 if install.get("whole_flash_erase") is not False:
     raise SystemExit("Refus : le manifeste n'interdit pas explicitement l'effacement global.")
-if release.get("installation", {}).get("legacy_nvs_backup_required") is not True:
+if install.get("legacy_nvs_backup_required") is not True:
     raise SystemExit("Manifeste sans procédure de sauvegarde NVS.")
-if release.get("installation", {}).get("legacy_nvs_restored_after_contiguous_merge_bin_write") is not True:
+if install.get("legacy_nvs_restored_after_contiguous_merge_bin_write") is not True:
     raise SystemExit("Manifeste sans garantie de restauration NVS après image fusionnée.")
-if release.get("safe_to_flash") is not False or release.get("hardware_tested") is not False:
-    raise SystemExit("Le statut de validation matériel du manifeste est incohérent.")
+if install.get("legacy_nvs_restored_exactly_after_merged_image_write") is not True:
+    raise SystemExit("Manifeste sans garantie de restauration exacte de la NVS historique.")
+if install.get("legacy_nvs_readback_compared_byte_for_byte") is not True:
+    raise SystemExit("Manifeste sans vérification octet par octet de la NVS restaurée.")
+if install.get("new_nvs_initialized_empty") is not True:
+    raise SystemExit("Manifeste sans garantie d'initialisation de la nouvelle NVS.")
+if install.get("otadata_reset") is not True:
+    raise SystemExit("Manifeste sans politique explicite de sélection du slot ota_0.")
+if install.get("micro_sd_contents_erased") is not False:
+    raise SystemExit("Refus : le manifeste n'interdit pas explicitement l'effacement de la microSD.")
+expected_erase_regions = ["0x11000-0x11FFF", "0x13000-0x18FFF", "0x19000-0x19FFF"]
+if install.get("erase_regions") != expected_erase_regions:
+    raise SystemExit("Plages d'effacement du manifeste incompatibles avec l'installateur.")
 flash = manifest.get("flash_image", {})
 if flash.get("write_offset") != "0x0":
     raise SystemExit("Offset d'écriture inattendu.")
@@ -40,8 +51,6 @@ expected = flash.get("sha256")
 actual = hashlib.sha256(image.read_bytes()).hexdigest()
 if not expected or actual.lower() != expected.lower():
     raise SystemExit("SHA-256 de l'image invalide : aucun flash n'a été effectué.")
-if release.get("installation", {}).get("legacy_nvs_backup_required") is not True:
-    raise SystemExit("Manifeste sans procédure de sauvegarde NVS.")
 print("SHA-256 image vérifié :", actual)
 PY
 
