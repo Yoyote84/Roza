@@ -41,11 +41,11 @@ Le composant `roza_launcher_hal` fournit maintenant un contrat commun aux future
 - L'application native **Diagnostic ROZA** est enregistrée dans le menu unique. Elle affiche les touches/modificateurs reçus et l'état batterie/SD pour guider les essais sur le matériel.
 - Le traducteur clavier pur est testé côté hôte pour les flèches, Enter, Esc, Backspace, Tab, caractères et les cinq modificateurs.
 
-Cette couche n'appelle jamais `M5.begin()`, `nucleo_ui_init()`, `nucleo_kbd_init()`, `Wire.begin()` ou un second montage SD. Elle ne réutilise pas encore le backend autonome `DisplayDrivers/src/backends/m5gfx_hal.cpp`, qui réinitialise `M5` et dessine sur `M5.Display` au lieu du canvas dynamique NucleoOS. Ce backend doit être adapté avant de réutiliser les applications qui en dépendent.
+Cette couche n'appelle jamais `M5.begin()`, `nucleo_ui_init()`, `nucleo_kbd_init()`, `Wire.begin()` ou un second montage SD. Le vrai backend amont `launcher/lib/DisplayDrivers/src/backends/m5gfx_hal.cpp` est maintenant compilé en mode `ROZA_NUCLEO_TARGET` : `M5_DRV` est redirigé vers `nucleo_app_gfx()` à chaque opération de dessin ; `init()` et `begin()` ne réinitialisent rien ; `display()` laisse le run loop Nucleo présenter l'image ; `setRotation()` ne remplace pas l'orientation Nucleo ; les sprites utilisent la cible Nucleo. L'application native `Affichage Launcher` vérifie ce chemin avec un sprite limité à 72×18 pixels. Elle active le dessin direct pendant sa durée de vie afin que le parent du sprite reste stable, puis libère son allocation à la sortie. Aucun second canvas plein écran n'est créé. Ce test de compilation et de cycle de vie ne valide pas encore le rendu physique ni le pic de RAM réel.
 
 ## Étapes suivantes
 
-1. Porter une première fonction applicative Launcher réelle, en priorité parmi celles qui ne dupliquent pas Files, Store, Wi-Fi ou USB déjà natifs, dans le cycle de vie `on_enter/on_key/on_tick/on_draw/on_exit`.
+1. Porter une première fonction applicative Launcher réelle, en priorité parmi celles qui ne dupliquent pas Files, Store, Wi-Fi ou USB déjà natifs, dans le cycle de vie `on_enter/on_key/on_tick/on_draw/on_exit`. L'application `Affichage Launcher` est seulement une sonde du backend, pas une application Launcher complète.
 2. Remplacer les accès directs Launcher au Wi-Fi, à la batterie, à la luminosité et à la SD par les façades Nucleo et compiler chaque groupe réel.
 3. Porter les autres applications/fonctions Launcher dans le registre Nucleo, puis vérifier individuellement catalogue, OTA, installateur SD, WebUI, USB-MSC et outils de partition.
 4. Mesurer taille ELF/flash, heap libre/minimal et plus grand bloc contigu ; confronter le résultat à la table de partitions 8 MB et aux deux banques OTA.

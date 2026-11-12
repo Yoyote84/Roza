@@ -38,6 +38,8 @@ bool roza_launcher_key_from_callback(int native_key, char native_char,
                                      roza_launcher_key_event_t *out);
 /* Opaque pointer keeps the host-tested HAL independent of M5GFX headers. */
 void *roza_launcher_display_target(void);
+void roza_launcher_display_mode_enter(void);
+void roza_launcher_display_mode_exit(void);
 int roza_launcher_battery_percent(void);
 int roza_launcher_battery_millivolts(void);
 bool roza_launcher_storage_ready(void);

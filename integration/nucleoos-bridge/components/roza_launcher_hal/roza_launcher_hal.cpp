@@ -10,6 +10,21 @@ extern "C" void *roza_launcher_display_target(void)
     return static_cast<void *>(nucleo_app_gfx());
 }
 
+extern "C" LovyanGFX *roza_launcher_graphics_target(void)
+{
+    return nucleo_app_gfx();
+}
+
+extern "C" void roza_launcher_display_mode_enter(void)
+{
+    nucleo_app_set_direct_draw(true);
+}
+
+extern "C" void roza_launcher_display_mode_exit(void)
+{
+    nucleo_app_set_direct_draw(false);
+}
+
 extern "C" bool roza_launcher_key_from_callback(
     int native_key, char native_char, roza_launcher_key_event_t *out)
 {

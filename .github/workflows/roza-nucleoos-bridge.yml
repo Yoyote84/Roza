@@ -16,6 +16,7 @@ on:
       - ".github/workflows/roza-nucleoos-bridge.yml"
       - "docs/FUSION-ROZA-NUCLEOOS.md"
       - "scripts/apply-roza-nucleoos.py"
+      - "scripts/apply-roza-displaydrivers.py"
       - "scripts/prepare-roza-arduino-usb.py"
       - "scripts/check-roza-fusion-contract.py"
       - "scripts/create-roza-build-manifest.py"
@@ -44,6 +45,14 @@ jobs:
 
       - name: Initialize the pinned Launcher submodule
         run: git submodule update --init --recursive launcher
+
+      - name: Adapt the real Launcher M5GFX backend to NucleoOS display ownership
+        shell: bash
+        run: |
+          python3 -m py_compile scripts/apply-roza-displaydrivers.py
+          python3 scripts/apply-roza-displaydrivers.py
+          python3 scripts/apply-roza-displaydrivers.py
+          python3 tests/test_roza_display_backend_patch.py
 
       - name: Fetch only the NucleoOS firmware tree
         shell: bash

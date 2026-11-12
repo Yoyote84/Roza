@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 NUCLEO = ROOT / "nucleoos"
 PINNED_LAUNCHER = "4b06de691df15b0fe6a9f09f56d1d107bbf32b12"
+PINNED_DISPLAY_DRIVERS = "79d2dc757d0684a3f63ab027920edd152972f93f"
 PINNED_NUCLEOOS = "cb0f1a5356ddd6f96ec6b31bbcba5d55f52d8123"
 AUTHORIZED_BRANCH = "migration/roza-chanina-launcher"
 errors: list[str] = []
@@ -129,6 +130,8 @@ def main() -> int:
 
     if git_head(ROOT / "launcher") != PINNED_LAUNCHER:
         errors.append("Launcher submodule is not at the approved pinned commit")
+    if git_head(ROOT / "launcher/lib/DisplayDrivers") != PINNED_DISPLAY_DRIVERS:
+        errors.append("DisplayDrivers nested submodule revision is not the approved M5GFX backend commit.")
     if git_head(NUCLEO) != PINNED_NUCLEOOS:
         errors.append("NucleoOS submodule is not at the approved pinned commit")
 
@@ -374,6 +377,54 @@ def main() -> int:
     require(
         "integration/nucleoos-bridge/components/roza_lora/roza_lora.cpp",
         "Reception active", "Dernier paquet", "Reception seule",
+    )
+
+    # The real Launcher M5GFX backend is compiled in a Nucleo-owned target mode.
+    require(
+        "integration/nucleoos-bridge/components/roza_launcher_hal/CMakeLists.txt",
+        "backends/m5gfx_hal.cpp", "roza_launcher_display_app.cpp",
+        "m5stack__m5gfx", "arduino-esp32", "ROZA_NUCLEO_TARGET=1",
+        "DISPLAY_DEVICE_M5STACK_CARDPUTER=1", "WHOLE_ARCHIVE",
+    )
+    require(
+        "launcher/lib/DisplayDrivers/src/backends/m5gfx_hal.h",
+        "#include <M5GFX.h>", "#undef USE_CANVAS",
+        "#define M5_DRV (*roza_launcher_graphics_target())",
+    )
+    require(
+        "launcher/lib/DisplayDrivers/src/backends/m5gfx_hal.cpp",
+        "roza_launcher_graphics_target()->invertDisplay(i)",
+        "parent ? roza_launcher_graphics_target() : nullptr",
+        "NucleoOS owns the app draw transaction and frame presentation.",
+    )
+    require(
+        "integration/nucleoos-bridge/components/roza_launcher_hal/include/roza_launcher_hal.h",
+        "roza_launcher_display_mode_enter", "roza_launcher_display_mode_exit",
+    )
+    require(
+        "integration/nucleoos-bridge/components/roza_launcher_hal/roza_launcher_hal.cpp",
+        "roza_launcher_graphics_target", "nucleo_app_set_direct_draw(true)",
+        "nucleo_app_set_direct_draw(false)",
+    )
+    require(
+        "integration/nucleoos-bridge/components/roza_launcher_hal/roza_launcher_display_app.cpp",
+        "tft_display", "tft_sprite", "roza_launcher_display_mode_enter()",
+        "roza_launcher_display_mode_exit()", "nucleo_app_register(&s_app)",
+    )
+    forbid(
+        "integration/nucleoos-bridge/components/roza_launcher_hal/roza_launcher_display_app.cpp",
+        "M5.begin(", "Wire.begin(", "SD.begin(", "nucleo_ui_init(",
+    )
+    require(
+        "scripts/apply-roza-displaydrivers.py",
+        "PINNED_DISPLAY_DRIVERS", "ROZA_NUCLEO_TARGET", "M5GFX.h",
+        "verify_patch()", "NucleoOS owns the panel",
+    )
+    require("scripts/apply-roza-nucleoos.py", "roza_register_launcher_display();")
+    require(
+        "tests/test_roza_display_backend_patch.py",
+        "upstream backend is compiled against NucleoOS's current draw target",
+        "sprite parent remains stable in direct-draw mode",
     )
 
     check_partitions()
