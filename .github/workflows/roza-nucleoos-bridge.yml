@@ -118,6 +118,9 @@ jobs:
             -o /tmp/roza-partition-layout-test
           /tmp/roza-partition-layout-test
 
+      - name: Test read-only Firmware SD structural preflight contract
+        run: python3 tests/test_roza_firmware_sd_source.py
+
       - name: Compile the combined ESP-IDF component graph
         uses: espressif/esp-idf-ci-action@v1
         with:

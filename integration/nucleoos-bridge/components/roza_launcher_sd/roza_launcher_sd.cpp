@@ -11,7 +11,7 @@
 #include "esp_app_format.h"
 #include "esp_err.h"
 #include "esp_flash_partitions.h"
-#include "esp_image_format.h
+#include "esp_image_format.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -31,6 +31,7 @@ constexpr int kMaxEntries = 64;
 constexpr size_t kNameSize = 64;
 constexpr size_t kPathSize = 192;
 constexpr uint32_t kPartitionTableOffset = 0x8000;
+constexpr uint32_t kBootloaderOffset = ESP_BOOTLOADER_OFFSET;
 
 struct SdEntry {
     char name[kNameSize];
@@ -427,26 +428,60 @@ static bool analyze_firmware(const char *path, FirmwareInfo *out)
 
     {
         uint8_t first_entry[3] = {};
-        const bool has_table = out->file_size >= kPartitionTableOffset + ESP_PARTITION_TABLE_MAX_LEN &&
+        const bool has_table_magic =
+            out->file_size >= kPartitionTableOffset + sizeof(first_entry) &&
             read_at(file, kPartitionTableOffset, first_entry, sizeof(first_entry)) &&
             first_entry[0] == 0xAA && first_entry[1] == 0x50 &&
             (first_entry[2] == 0x00 || first_entry[2] == 0x01);
 
+        // A truncated merged image must not fall back to parsing its bootloader as
+        // though it were a standalone application.
+        if (has_table_magic &&
+            out->file_size < kPartitionTableOffset + ESP_PARTITION_TABLE_MAX_LEN) {
+            snprintf(out->message, sizeof(out->message), "Table de partitions incomplete");
+            goto done;
+        }
+
+        bool complete_image = false;
         uint32_t image_offset = 0;
         uint32_t available = out->file_size;
-        if (has_table) {
-            out->full_image = true;
+        if (has_table_magic) {
+            if (kBootloaderOffset >= kPartitionTableOffset) {
+                snprintf(out->message, sizeof(out->message), "Offset bootloader invalide");
+                goto done;
+            }
+
+            uint32_t bootloader_size = 0;
+            uint8_t bootloader_segments = 0;
+            uint16_t bootloader_chip_id = 0;
+            char bootloader_reason[64] = {};
+            if (!measure_image(file, out->file_size, kBootloaderOffset,
+                               kPartitionTableOffset - kBootloaderOffset,
+                               &bootloader_size, &bootloader_segments,
+                               &bootloader_chip_id, bootloader_reason,
+                               sizeof(bootloader_reason))) {
+                snprintf(out->message, sizeof(out->message),
+                         "Bootloader invalide: %.36s", bootloader_reason);
+                goto done;
+            }
+
             if (!read_roza_partition_table(file, out, &image_offset,
                                            &out->declared_partition_size)) {
                 goto done;
             }
-            if (image_offset >= out->file_size || out->declared_partition_size == 0) {
-                snprintf(out->message, sizeof(out->message), "Partition ota_0 hors du fichier");
+            const uint64_t app_end = static_cast<uint64_t>(image_offset) +
+                                     out->declared_partition_size;
+            if (image_offset >= out->file_size ||
+                out->declared_partition_size == 0 ||
+                app_end > ROZA_PARTITION_FLASH_BYTES) {
+                snprintf(out->message, sizeof(out->message), "Partition ota_0 hors limites");
                 goto done;
             }
+
             const uint32_t remaining = out->file_size - image_offset;
             available = out->declared_partition_size < remaining ?
                 out->declared_partition_size : remaining;
+            complete_image = true;
         }
 
         out->image_offset = image_offset;
@@ -455,8 +490,10 @@ static bool analyze_firmware(const char *path, FirmwareInfo *out)
                            out->message, sizeof(out->message))) {
             goto done;
         }
-        if (out->full_image) {
-            snprintf(out->message, sizeof(out->message), "Image ESP32-S3 / table ROZA 8 Mio OK");
+        if (complete_image) {
+            out->full_image = true;
+            snprintf(out->message, sizeof(out->message),
+                     "Bootloader/table/app structure ESP32-S3 OK");
         }
         out->parsed = true;
         ok = true;
@@ -552,7 +589,8 @@ static void draw_details(int top, int height)
     d.setTextSize(1);
     d.setTextColor(C_BLUE, BG);
     d.setCursor(8, top + 2);
-    d.print(s_info.full_image ? "IMAGE COMPLETE" : "APPLICATION ESP-IDF");
+    d.print(s_info.parsed && s_info.full_image ? "IMAGE COMPLETE" :
+            s_info.parsed ? "APPLICATION ESP-IDF" : "IMAGE INVALIDE");
     d.drawFastHLine(8, top + 14, W - 16, LINE);
 
     int y = top + 19;
