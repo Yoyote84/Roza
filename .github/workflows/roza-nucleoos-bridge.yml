@@ -108,6 +108,16 @@ jobs:
             -o /tmp/roza-gnss-nmea-test
           /tmp/roza-gnss-nmea-test
 
+      - name: Test ROZA 8 MiB partition layout on the host
+        shell: bash
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror \
+            -I integration/nucleoos-bridge/components/roza_launcher_sd \
+            integration/nucleoos-bridge/components/roza_launcher_sd/roza_partition_layout.cpp \
+            tests/roza_partition_layout_test.cpp \
+            -o /tmp/roza-partition-layout-test
+          /tmp/roza-partition-layout-test
+
       - name: Compile the combined ESP-IDF component graph
         uses: espressif/esp-idf-ci-action@v1
         with:

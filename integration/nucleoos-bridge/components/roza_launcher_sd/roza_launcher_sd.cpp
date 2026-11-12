@@ -6,9 +6,12 @@
 #include "launcher_theme.h"
 #include "nucleo_storage.h"
 #include "nucleo_board.h"
+#include "roza_partition_layout.h"
 
 #include "esp_app_format.h"
-#include "esp_image_format.h"
+#include "esp_err.h"
+#include "esp_flash_partitions.h"
+#include "esp_image_format.h
 
 #include <dirent.h>
 #include <errno.h>
@@ -28,8 +31,6 @@ constexpr int kMaxEntries = 64;
 constexpr size_t kNameSize = 64;
 constexpr size_t kPathSize = 192;
 constexpr uint32_t kPartitionTableOffset = 0x8000;
-constexpr uint32_t kPartitionEntrySize = 32;
-constexpr int kMaxPartitionEntries = 96;
 
 struct SdEntry {
     char name[kNameSize];
@@ -191,6 +192,10 @@ static bool measure_image(FILE *file, uint32_t file_size, uint32_t offset,
         snprintf(reason, reason_size, "Magic ESP invalide");
         return false;
     }
+    if (header.chip_id != ESP_CHIP_ID_ESP32S3) {
+        snprintf(reason, reason_size, "Firmware non compatible ESP32-S3");
+        return false;
+    }
     if (header.segment_count == 0 || header.segment_count > ESP_IMAGE_MAX_SEGMENTS) {
         snprintf(reason, reason_size, "Nombre de segments invalide");
         return false;
@@ -295,6 +300,104 @@ static void compare_sha256_sidecar(const char *firmware_path, FirmwareInfo *info
     info->sha_match = strcasecmp(expected, info->sha256) == 0;
 }
 
+static bool read_roza_partition_table(FILE *file, FirmwareInfo *out,
+                                      uint32_t *app_offset, uint32_t *app_size)
+{
+    if (!file || !out || !app_offset || !app_size) {
+        if (out) snprintf(out->message, sizeof(out->message), "Parametres de table invalides");
+        return false;
+    }
+
+    auto *table = static_cast<esp_partition_info_t *>(calloc(1, ESP_PARTITION_TABLE_MAX_LEN));
+    if (!table) {
+        snprintf(out->message, sizeof(out->message), "RAM insuffisante pour la table");
+        return false;
+    }
+
+    bool ok = false;
+    if (!read_at(file, kPartitionTableOffset, table, ESP_PARTITION_TABLE_MAX_LEN)) {
+        snprintf(out->message, sizeof(out->message), "Table de partitions incomplete");
+        goto done;
+    }
+
+    {
+        int verified_count = 0;
+        const esp_err_t verify_result = esp_partition_table_verify(table, false, &verified_count);
+        if (verify_result != ESP_OK) {
+            snprintf(out->message, sizeof(out->message), "Checksum ou bornes de table invalides");
+            goto done;
+        }
+
+        roza_partition_layout_entry_t entries[ROZA_PARTITION_EXPECTED_COUNT] = {};
+        size_t count = 0;
+        bool md5_found = false;
+        bool end_found = false;
+
+        for (size_t i = 0; i < ESP_PARTITION_TABLE_MAX_ENTRIES; ++i) {
+            const esp_partition_info_t &part = table[i];
+            if (part.magic == ESP_PARTITION_MAGIC_MD5) {
+                md5_found = true;
+                continue;
+            }
+            if (part.magic == 0xFFFF && part.type == 0xFF && part.subtype == 0xFF) {
+                end_found = true;
+                break;
+            }
+            if (part.magic != ESP_PARTITION_MAGIC) {
+                snprintf(out->message, sizeof(out->message), "Entree de partition invalide");
+                goto done;
+            }
+            if (count >= ROZA_PARTITION_EXPECTED_COUNT) {
+                snprintf(out->message, sizeof(out->message), "Trop de partitions pour ROZA");
+                goto done;
+            }
+
+            roza_partition_layout_entry_t &entry = entries[count++];
+            entry.type = part.type;
+            entry.subtype = part.subtype;
+            entry.offset = part.pos.offset;
+            entry.size = part.pos.size;
+            entry.flags = part.flags;
+            memcpy(entry.label, part.label, sizeof(entry.label));
+        }
+
+        if (!md5_found || !end_found || count != static_cast<size_t>(verified_count)) {
+            snprintf(out->message, sizeof(out->message), "Table sans MD5 ou fin valide");
+            goto done;
+        }
+
+        const roza_partition_layout_status_t layout =
+            roza_partition_layout_validate(entries, count);
+        if (layout != ROZA_PARTITION_LAYOUT_OK) {
+            snprintf(out->message, sizeof(out->message), "%s",
+                     roza_partition_layout_status_message(layout));
+            goto done;
+        }
+
+        bool found_ota0 = false;
+        for (size_t i = 0; i < count; ++i) {
+            if (strncmp(entries[i].label, "ota_0", sizeof(entries[i].label)) != 0) continue;
+            *app_offset = entries[i].offset;
+            *app_size = entries[i].size;
+            memcpy(out->app_label, entries[i].label, sizeof(entries[i].label));
+            out->app_label[sizeof(entries[i].label)] = '\0';
+            found_ota0 = true;
+            break;
+        }
+        if (!found_ota0) {
+            snprintf(out->message, sizeof(out->message), "Partition ota_0 absente");
+            goto done;
+        }
+
+        out->partition_count = verified_count;
+        ok = true;
+    }
+
+done:
+    free(table);
+    return ok;
+}
+
 static bool analyze_firmware(const char *path, FirmwareInfo *out)
 {
     if (!path || !out) return false;
@@ -313,8 +416,8 @@ static bool analyze_firmware(const char *path, FirmwareInfo *out)
 
     {
         const long end = ftell(file);
-        if (end <= 0 || static_cast<unsigned long>(end) > UINT32_MAX) {
-            snprintf(out->message, sizeof(out->message), "Taille de fichier invalide");
+        if (end <= 0 || static_cast<unsigned long>(end) > ROZA_PARTITION_FLASH_BYTES) {
+            snprintf(out->message, sizeof(out->message), "Fichier invalide ou superieur a 8 Mio");
             goto done;
         }
         out->file_size = static_cast<uint32_t>(end);
@@ -324,7 +427,7 @@ static bool analyze_firmware(const char *path, FirmwareInfo *out)
 
     {
         uint8_t first_entry[3] = {};
-        const bool has_table = out->file_size >= kPartitionTableOffset + sizeof(first_entry) &&
+        const bool has_table = out->file_size >= kPartitionTableOffset + ESP_PARTITION_TABLE_MAX_LEN &&
             read_at(file, kPartitionTableOffset, first_entry, sizeof(first_entry)) &&
             first_entry[0] == 0xAA && first_entry[1] == 0x50 &&
             (first_entry[2] == 0x00 || first_entry[2] == 0x01);
@@ -333,42 +436,17 @@ static bool analyze_firmware(const char *path, FirmwareInfo *out)
         uint32_t available = out->file_size;
         if (has_table) {
             out->full_image = true;
-            bool found_app = false;
-            for (int i = 0; i < kMaxPartitionEntries; ++i) {
-                uint8_t entry[kPartitionEntrySize] = {};
-                const uint32_t entry_offset = kPartitionTableOffset +
-                    static_cast<uint32_t>(i) * kPartitionEntrySize;
-                if (!read_at(file, entry_offset, entry, sizeof(entry))) {
-                    snprintf(out->message, sizeof(out->message), "Table partitions incomplete");
-                    goto done;
-                }
-                if ((entry[0] == 0xEB && entry[1] == 0xEB) ||
-                    (entry[0] == 0xFF && entry[1] == 0xFF)) break;
-
-                ++out->partition_count;
-                const uint8_t type = entry[2];
-                const uint8_t subtype = entry[3];
-                if (!found_app && type == 0x00 &&
-                    (subtype == 0x00 || (subtype >= 0x10 && subtype <= 0x1F) || subtype == 0x20)) {
-                    image_offset = read_le32(entry + 4);
-                    out->declared_partition_size = read_le32(entry + 8);
-                    memcpy(out->app_label, entry + 12, 16);
-                    out->app_label[16] = '\0';
-                    found_app = true;
-                }
-            }
-
-            if (!found_app) {
-                snprintf(out->message, sizeof(out->message), "Aucune partition APP");
+            if (!read_roza_partition_table(file, out, &image_offset,
+                                           &out->declared_partition_size)) {
                 goto done;
             }
-            if (image_offset >= out->file_size) {
-                snprintf(out->message, sizeof(out->message), "Offset APP hors fichier");
+            if (image_offset >= out->file_size || out->declared_partition_size == 0) {
+                snprintf(out->message, sizeof(out->message), "Partition ota_0 hors du fichier");
                 goto done;
             }
             const uint32_t remaining = out->file_size - image_offset;
-            available = out->declared_partition_size == 0 ? remaining :
-                (out->declared_partition_size < remaining ? out->declared_partition_size : remaining);
+            available = out->declared_partition_size < remaining ?
+                out->declared_partition_size : remaining;
         }
 
         out->image_offset = image_offset;
@@ -376,6 +454,9 @@ static bool analyze_firmware(const char *path, FirmwareInfo *out)
                            &out->image_size, &out->segments, &out->chip_id,
                            out->message, sizeof(out->message))) {
             goto done;
+        }
+        if (out->full_image) {
+            snprintf(out->message, sizeof(out->message), "Image ESP32-S3 / table ROZA 8 Mio OK");
         }
         out->parsed = true;
         ok = true;

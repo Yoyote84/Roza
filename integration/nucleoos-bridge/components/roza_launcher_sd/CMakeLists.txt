@@ -6,7 +6,7 @@ if(NOT EXISTS "${NUCLEO_APP_SOURCE_DIR}/app_gfx.h")
 endif()
 
 idf_component_register(
-    SRCS "roza_launcher_sd.cpp"
+    SRCS "roza_launcher_sd.cpp" "roza_partition_layout.cpp"
     INCLUDE_DIRS "."
     REQUIRES nucleo_app nucleo_storage nucleo_board bootloader_support mbedtls
 )
