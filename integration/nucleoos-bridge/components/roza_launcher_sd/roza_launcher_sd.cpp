@@ -178,8 +178,34 @@ static uint32_t align16(uint32_t value)
     return (value + 15u) & ~15u;
 }
 
-// This parser checks image framing and segment boundaries. SHA-256 is computed separately
-// for file-integrity comparison; neither check authenticates the publisher or firmware.
+// Verify the ESP-IDF image checksum and, when present, its appended SHA-256.
+// The appended digest is an integrity check, not a publisher signature.
+static bool compute_sha256_range(FILE *file, uint32_t offset, uint32_t length,
+                                 uint8_t output[ESP_IMAGE_HASH_LEN])
+{
+    if (!file || !output || offset > static_cast<uint32_t>(LONG_MAX) ||
+        fseek(file, static_cast<long>(offset), SEEK_SET) != 0) return false;
+
+    mbedtls_sha256_context context;
+    mbedtls_sha256_init(&context);
+    bool ok = mbedtls_sha256_starts(&context, 0) == 0;
+    uint8_t buffer[2048];
+    uint32_t remaining = length;
+    while (ok && remaining > 0) {
+        const size_t wanted = remaining < sizeof(buffer) ? remaining : sizeof(buffer);
+        const size_t received = fread(buffer, 1, wanted, file);
+        if (received != wanted ||
+            mbedtls_sha256_update(&context, buffer, received) != 0) {
+            ok = false;
+            break;
+        }
+        remaining -= static_cast<uint32_t>(received);
+    }
+    if (ok && mbedtls_sha256_finish(&context, output) != 0) ok = false;
+    mbedtls_sha256_free(&context);
+    return ok;
+}
+
 static bool measure_image(FILE *file, uint32_t file_size, uint32_t offset,
                           uint32_t available, uint32_t *measured, uint8_t *segments_out,
                           uint16_t *chip_id_out, char *reason, size_t reason_size)
@@ -209,6 +235,10 @@ static bool measure_image(FILE *file, uint32_t file_size, uint32_t offset,
         return false;
     }
 
+    // ESP-IDF starts its 8-bit image checksum at 0xEF and XORs every byte
+    // of every segment payload (equivalent to XORing its little-endian words).
+    uint8_t checksum = 0xEF;
+    uint8_t payload[256];
     for (uint8_t i = 0; i < header.segment_count; ++i) {
         uint8_t segment_header[sizeof(esp_image_segment_header_t)] = {};
         if (cursor > UINT32_MAX ||
@@ -218,20 +248,79 @@ static bool measure_image(FILE *file, uint32_t file_size, uint32_t offset,
         }
         const uint32_t segment_size = read_le32(segment_header + 4);
         cursor += sizeof(segment_header);
+        if ((segment_size & 3u) != 0) {
+            snprintf(reason, reason_size, "Segment %u non aligne", static_cast<unsigned>(i + 1));
+            return false;
+        }
         if (cursor > limit || static_cast<uint64_t>(segment_size) > limit - cursor) {
             snprintf(reason, reason_size, "Segment %u hors limites", static_cast<unsigned>(i + 1));
             return false;
         }
+
+        uint64_t payload_offset = cursor;
+        uint32_t remaining = segment_size;
+        while (remaining > 0) {
+            const size_t chunk_size = remaining < sizeof(payload) ? remaining : sizeof(payload);
+            if (payload_offset > UINT32_MAX ||
+                !read_at(file, static_cast<uint32_t>(payload_offset), payload, chunk_size)) {
+                snprintf(reason, reason_size, "Lecture segment %u impossible",
+                         static_cast<unsigned>(i + 1));
+                return false;
+            }
+            for (size_t j = 0; j < chunk_size; ++j) checksum ^= payload[j];
+            payload_offset += chunk_size;
+            remaining -= static_cast<uint32_t>(chunk_size);
+        }
         cursor += segment_size;
     }
 
-    if (cursor > UINT32_MAX - 16u) {
+    const uint64_t unpadded_length = cursor - offset;
+    if (unpadded_length > UINT32_MAX - 16u) {
         snprintf(reason, reason_size, "Image trop grande");
         return false;
     }
-    uint64_t end = static_cast<uint64_t>(align16(static_cast<uint32_t>(cursor))) + 1u;
-    if (header.hash_appended) end += ESP_IMAGE_HASH_LEN;
-    end = (end + 15u) & ~static_cast<uint64_t>(15u);
+
+    // ESP-IDF places the checksum in the final byte of the next 16-byte block:
+    // end = align16(unpadded_length + 1), not align16(unpadded_length) + 1.
+    const uint64_t checksum_end = static_cast<uint64_t>(offset) +
+        align16(static_cast<uint32_t>(unpadded_length + 1u));
+    if (checksum_end <= cursor || checksum_end > limit ||
+        checksum_end > file_size || checksum_end > UINT32_MAX) {
+        snprintf(reason, reason_size, "Fin de checksum hors limites");
+        return false;
+    }
+
+    uint8_t stored_checksum = 0;
+    if (!read_at(file, static_cast<uint32_t>(checksum_end - 1u),
+                 &stored_checksum, sizeof(stored_checksum))) {
+        snprintf(reason, reason_size, "Checksum ESP illisible");
+        return false;
+    }
+    if (stored_checksum != checksum) {
+        snprintf(reason, reason_size, "Checksum ESP invalide");
+        return false;
+    }
+
+    uint64_t end = checksum_end;
+    if (header.hash_appended) {
+        uint8_t expected_hash[ESP_IMAGE_HASH_LEN] = {};
+        uint8_t actual_hash[ESP_IMAGE_HASH_LEN] = {};
+        const uint64_t image_length = checksum_end - offset;
+        if (end > limit || ESP_IMAGE_HASH_LEN > limit - end ||
+            end > file_size || ESP_IMAGE_HASH_LEN > file_size - end ||
+            end > UINT32_MAX || image_length > UINT32_MAX ||
+            !read_at(file, static_cast<uint32_t>(end), expected_hash, sizeof(expected_hash)) ||
+            !compute_sha256_range(file, offset, static_cast<uint32_t>(image_length), actual_hash)) {
+            snprintf(reason, reason_size, "SHA-256 ESP hors limites ou illisible");
+            return false;
+        }
+        if (memcmp(expected_hash, actual_hash, sizeof(expected_hash)) != 0) {
+            snprintf(reason, reason_size, "SHA-256 ESP invalide");
+            return false;
+        }
+        end += ESP_IMAGE_HASH_LEN;
+    }
+
     if (end <= offset || end > limit || end > file_size) {
         snprintf(reason, reason_size, "Fin d'image hors limites");
         return false;
@@ -240,31 +329,14 @@ static bool measure_image(FILE *file, uint32_t file_size, uint32_t offset,
     *measured = static_cast<uint32_t>(end - offset);
     *segments_out = header.segment_count;
     *chip_id_out = static_cast<uint16_t>(header.chip_id);
-    snprintf(reason, reason_size, "Structure ESP-IDF plausible");
+    snprintf(reason, reason_size, "Checksum/hash ESP-IDF OK");
     return true;
 }
 
 static bool compute_sha256(FILE *file, uint32_t file_size, char output[65])
 {
-    if (!file || !output || fseek(file, 0, SEEK_SET) != 0) return false;
-    mbedtls_sha256_context context;
-    mbedtls_sha256_init(&context);
-    bool ok = mbedtls_sha256_starts(&context, 0) == 0;
-    uint8_t buffer[2048];
-    uint32_t remaining = file_size;
-    while (ok && remaining > 0) {
-        const size_t wanted = remaining < sizeof(buffer) ? remaining : sizeof(buffer);
-        const size_t received = fread(buffer, 1, wanted, file);
-        if (received != wanted || mbedtls_sha256_update(&context, buffer, received) != 0) {
-            ok = false;
-            break;
-        }
-        remaining -= static_cast<uint32_t>(received);
-    }
-    uint8_t digest[32] = {};
-    if (ok && mbedtls_sha256_finish(&context, digest) != 0) ok = false;
-    mbedtls_sha256_free(&context);
-    if (!ok) return false;
+    uint8_t digest[ESP_IMAGE_HASH_LEN] = {};
+    if (!compute_sha256_range(file, 0, file_size, digest)) return false;
     static const char hex[] = "0123456789abcdef";
     for (size_t i = 0; i < sizeof(digest); ++i) {
         output[i * 2] = hex[digest[i] >> 4];
@@ -589,8 +661,26 @@ static void draw_details(int top, int height)
     d.setTextSize(1);
     d.setTextColor(C_BLUE, BG);
     d.setCursor(8, top + 2);
-    d.print(s_info.parsed && s_info.full_image ? "IMAGE COMPLETE" :
-            s_info.parsed ? "APPLICATION ESP-IDF" : "IMAGE INVALIDE");
+    const char *image_title = "IMAGE INVALIDE";
+    if (s_info.parsed) {
+        if (s_info.sha_reference_found && !s_info.sha_reference_valid) {
+            image_title = "REF SHA INVALIDE";
+        } else if (s_info.sha_reference_found && s_info.sha_reference_valid &&
+                   s_info.sha_computed && !s_info.sha_match) {
+            image_title = "INTEGRITE ECHEC";
+        } else if (s_info.full_image && s_info.sha_reference_found &&
+                   s_info.sha_reference_valid && s_info.sha_computed && s_info.sha_match) {
+            image_title = "STRUCTURE + SHA OK";
+        } else if (s_info.full_image && s_info.sha_reference_found &&
+                   s_info.sha_reference_valid && !s_info.sha_computed) {
+            image_title = "STRUCTURE OK / SHA INDISPO";
+        } else if (s_info.full_image) {
+            image_title = "STRUCTURE OK / SANS REF";
+        } else {
+            image_title = "APPLICATION ESP-IDF";
+        }
+    }
+    d.print(image_title);
     d.drawFastHLine(8, top + 14, W - 16, LINE);
 
     int y = top + 19;
