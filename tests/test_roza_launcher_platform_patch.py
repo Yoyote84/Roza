@@ -29,6 +29,7 @@ def main() -> int:
         raise SystemExit("Backend console incomplet : " + ", ".join(missing))
 
     forbidden = (
+        'Serial.',
         '#include <Arduino.h>',
         '#include <HardwareSerial.h>',
         'Serial.begin(',

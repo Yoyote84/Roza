@@ -130,6 +130,7 @@ def verify_patch() -> None:
     )
     missing = [item for item in required if item not in source]
     forbidden = (
+        'Serial.',
         '#include <Arduino.h>',
         '#include <HardwareSerial.h>',
         'Serial.begin(',

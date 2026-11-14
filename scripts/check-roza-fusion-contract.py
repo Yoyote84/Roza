@@ -393,6 +393,7 @@ def main() -> int:
         "launcher/src/idf/launcher_platform.cpp",
         "#include <Arduino.h>",
         "#include <HardwareSerial.h>",
+        "Serial.",
         "Serial.begin(",
         "Serial.end(",
         "Serial.flush(",
