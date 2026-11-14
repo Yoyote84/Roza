@@ -379,6 +379,34 @@ def main() -> int:
         "Reception active", "Dernier paquet", "Reception seule",
     )
 
+    # Launcher console diagnostics must not take ownership of NucleoOS USB CDC.
+    require(
+        "launcher/src/idf/launcher_platform.cpp",
+        "#include <esp_log.h>",
+        'esp_log_writev(ESP_LOG_INFO, kLauncherLogTag, fmt, args)',
+        'esp_log_write(ESP_LOG_INFO, kLauncherLogTag, "%s", text)',
+        "void launcherConsoleBegin(unsigned long baud) { (void)baud; }",
+        "void launcherConsoleFlush() {}",
+        "void launcherConsoleEnd() {}",
+    )
+    forbid(
+        "launcher/src/idf/launcher_platform.cpp",
+        "#include <Arduino.h>",
+        "#include <HardwareSerial.h>",
+        "Serial.begin(",
+        "Serial.end(",
+        "Serial.flush(",
+        "Serial.write(",
+        "Serial.vprintf(",
+        "Serial.setTxTimeoutMs(",
+    )
+    require(
+        "scripts/apply-roza-launcher-platform.py",
+        'PINNED_LAUNCHER = "4b06de691df15b0fe6a9f09f56d1d107bbf32b12"',
+        "verify_patch()",
+        "esp_log_writev",
+    )
+
     # The real Launcher M5GFX backend is compiled in a Nucleo-owned target mode.
     require(
         "integration/nucleoos-bridge/components/roza_launcher_hal/CMakeLists.txt",
