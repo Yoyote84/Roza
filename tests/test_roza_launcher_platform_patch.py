@@ -7,14 +7,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "launcher/src/idf/launcher_platform.cpp"
 PATCH = ROOT / "scripts/apply-roza-launcher-platform.py"
+CMAKE = ROOT / "integration/arduino-idf-smoke/components/launcher_platform/CMakeLists.txt"
 
 
 def main() -> int:
-    if not SOURCE.is_file() or not PATCH.is_file():
+    if not SOURCE.is_file() or not PATCH.is_file() or not CMAKE.is_file():
         raise SystemExit("Source Launcher ou adaptateur ROZA absent.")
 
     source = SOURCE.read_text(encoding="utf-8")
     patch = PATCH.read_text(encoding="utf-8")
+    cmake = CMAKE.read_text(encoding="utf-8")
 
     required_source = (
         '#include <esp_log.h>',
@@ -43,6 +45,8 @@ def main() -> int:
     if present:
         raise SystemExit("Le backend Launcher reprend l'USB NucleoOS : " + ", ".join(present))
 
+    if "REQUIRES arduino-esp32 driver esp_timer log" not in cmake:
+        raise SystemExit("Le composant Launcher ne declare pas sa dependance ESP-IDF log.")
     if 'PINNED_LAUNCHER = "4b06de691df15b0fe6a9f09f56d1d107bbf32b12"' not in patch:
         raise SystemExit("L'adaptateur ne verrouille pas la revision Launcher approuvee.")
     if "old_count == 1 and new_count == 0" not in patch or "old_count == 0 and new_count == 1" not in patch:

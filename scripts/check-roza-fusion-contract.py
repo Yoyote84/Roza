@@ -379,6 +379,10 @@ def main() -> int:
         "Reception active", "Dernier paquet", "Reception seule",
     )
 
+    require(
+        "integration/arduino-idf-smoke/components/launcher_platform/CMakeLists.txt",
+        "REQUIRES arduino-esp32 driver esp_timer log",
+    )
     # Launcher console diagnostics must not take ownership of NucleoOS USB CDC.
     require(
         "launcher/src/idf/launcher_platform.cpp",

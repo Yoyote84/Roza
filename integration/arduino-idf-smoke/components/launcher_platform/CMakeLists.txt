@@ -9,6 +9,6 @@ endif()
 idf_component_register(
     SRCS "${LAUNCHER_PLATFORM_DIR}/launcher_platform.cpp"
     INCLUDE_DIRS "${LAUNCHER_PLATFORM_DIR}"
-    REQUIRES arduino-esp32 driver esp_timer
+    REQUIRES arduino-esp32 driver esp_timer log
     WHOLE_ARCHIVE
 )
