@@ -38,7 +38,7 @@ def main() -> int:
     if tick.index("nucleo_app_request_draw();") < tick.index("return;"):
         raise SystemExit("Le redraw doit etre ignore quand batterie et SD sont inchanges.")
 
-    enter = between(source, "static void diagnostic_enter(void)", "static void diagnostic_key(void)")
+    enter = between(source, "static void diagnostic_enter(void)", "static void diagnostic_key(int key, char ch)")
     if "diagnostic_tick();" not in enter or "s_last_battery_percent = -101;" not in enter:
         raise SystemExit("L'etat initial du diagnostic n'est pas force au premier tick.")
 
