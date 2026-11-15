@@ -87,19 +87,26 @@ def main() -> int:
         "tft_sprite",
         "roza_launcher_display_mode_enter()",
         "roza_launcher_display_mode_exit()",
-        "s_display.init()",
-        "s_display.begin()",
-        "s_display.display()",
+        "s_display.fillRect(",
+        "s_sprite->pushSprite(",
         "nucleo_app_register(&s_app)",
     )
-    for forbidden in ("M5.begin(", "Wire.begin(", "SD.begin(", "nucleo_ui_init("):
+    for forbidden in (
+        "s_display.init(",
+        "s_display.begin(",
+        "s_display.display(",
+        "M5.begin(",
+        "Wire.begin(",
+        "SD.begin(",
+        "nucleo_ui_init(",
+    ):
         if forbidden in app:
             raise SystemExit(f"L'application de test reprend un peripherique : {forbidden}")
 
     require(OVERLAY, "roza_register_launcher_display();")
     print("ROZA Launcher M5GFX adapter: PASS")
     print(" - upstream backend is compiled against NucleoOS's current draw target")
-    print(" - init/begin/display do not reinitialize or present a second framebuffer")
+    print(" - native app never calls standalone init/begin/display lifecycle hooks")
     print(" - sprite parent remains stable in direct-draw mode and is freed on exit")
     print(" - native app registration uses the single NucleoOS launcher")
     return 0

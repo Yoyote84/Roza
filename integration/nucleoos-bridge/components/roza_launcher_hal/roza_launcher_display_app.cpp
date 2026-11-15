@@ -23,11 +23,8 @@ static void display_enter()
         return;
     }
 
-    // Compatibility calls are intentionally harmless in ROZA mode: NucleoOS has
-    // already initialized M5/display and owns the frame presentation.
-    s_display.init();
-    s_display.begin();
-
+    // Do not call tft_display::init/begin/display here. Those lifecycle hooks
+    // belong to standalone Launcher; NucleoOS owns M5 initialization and frame flush.
     s_sprite = new (std::nothrow) tft_sprite(&s_display);
     if (s_sprite && s_sprite->createSprite(72, 18) == nullptr) {
         delete s_sprite;
@@ -80,8 +77,6 @@ static void display_draw()
         s_display.print("Sprite non alloue");
     }
 
-    // No-op in ROZA mode: NucleoOS's app run loop owns the actual frame flush.
-    s_display.display();
 }
 
 static void display_exit()

@@ -10,6 +10,10 @@ namespace {
 static roza_launcher_key_event_t s_last_event = {};
 static unsigned long s_key_count;
 static char s_key_label[32] = "Aucune";
+static int s_last_battery_percent = -101;
+static int s_last_battery_millivolts = -1;
+static bool s_last_storage_ready;
+
 
 static const char *key_name(roza_launcher_key_t key)
 {
@@ -43,17 +47,38 @@ static bool capture_event(int key, char ch)
     return true;
 }
 
+static void diagnostic_tick(void)
+{
+    const int battery = roza_launcher_battery_percent();
+    const int millivolts = roza_launcher_battery_millivolts();
+    const bool storage_ready = roza_launcher_storage_ready();
+
+    if (battery == s_last_battery_percent &&
+        millivolts == s_last_battery_millivolts &&
+        storage_ready == s_last_storage_ready) {
+        return;
+    }
+
+    s_last_battery_percent = battery;
+    s_last_battery_millivolts = millivolts;
+    s_last_storage_ready = storage_ready;
+    nucleo_app_request_draw();
+}
+
 static void diagnostic_enter(void)
 {
     s_last_event = {};
     s_key_count = 0;
     snprintf(s_key_label, sizeof(s_key_label), "Aucune");
+    s_last_battery_percent = -101;
+    s_last_battery_millivolts = -1;
+    s_last_storage_ready = false;
     nucleo_app_set_hint("Q quitter  |  ESC / fleche gauche tester");
     nucleo_app_set_back_handler([](int key) -> bool {
         capture_event(key, 0);
         return true;
     });
-    nucleo_app_request_draw();
+    diagnostic_tick();
 }
 
 static void diagnostic_key(int key, char ch)
@@ -132,7 +157,7 @@ static void diagnostic_draw(void)
 static const nucleo_app_def_t s_app = {
     "roza-launcher-diagnostics", "Diagnostic ROZA", "Systeme",
     "Controle clavier, ecran, batterie et SD", 'D', C_BLUE,
-    diagnostic_enter, diagnostic_key, nullptr, diagnostic_draw, nullptr,
+    diagnostic_enter, diagnostic_key, diagnostic_tick, diagnostic_draw, nullptr,
     0, nullptr, nullptr
 };
 } // namespace
