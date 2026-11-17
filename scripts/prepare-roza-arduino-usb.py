@@ -5,11 +5,16 @@ NucleoOS owns the real USB MSC implementation through esp_tinyusb. The shared
 CONFIG_TINYUSB_MSC_ENABLED Kconfig symbol must not accidentally enable Arduino's
 separate USBMSC.cpp without Arduino's own TinyUSB HAL.
 
-ESP-IDF 5.4.4 also fixes FatFs sectors at 512 bytes in this bridge profile:
-SD sectors are 512 bytes and CONFIG_WL_SECTOR_SIZE_512 is enabled. In that
-fixed-sector configuration FATFS has no ssize member. Arduino 3.2.1 tests its
-legacy _MAX_SS macro and needs it aligned to 512 so it selects the fixed-sector
-code path. Both adjustments are made only to the downloaded managed component.
+ESP-IDF 5.4.4 fixes FatFs sectors at 512 bytes in this bridge profile. In that
+fixed-sector configuration FATFS has no ssize member; Arduino 3.2.1 needs the
+legacy _MAX_SS macro aligned to 512 to select its fixed-sector code path.
+
+The ROZA bridge keeps lwIP IPv6 disabled, matching the pinned NucleoOS defaults
+and avoiding static ND6 tables on the PSRAM-less Cardputer ADV. Arduino 3.2.1
+has one unguarded IPv4 ip_addr_t union access in AsyncUDP::listenMulticast.
+This script patches only that exact pinned source block to use ip4_addr_t
+directly when IPv6 is disabled. Every adjustment is build-only and fails closed
+if the pinned component or expected source has changed.
 """
 
 from __future__ import annotations
@@ -54,6 +59,32 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE _MAX_SS=512)
 """
 
 
+ASYNCUDP_MARKER = "// ROZA: IPv4-only ip_addr_t has no u_addr union."
+ASYNCUDP_OLD_BLOCK = """#if CONFIG_LWIP_IPV6
+  if (IP_IS_V6(addr)) {
+    IP_SET_TYPE(&bind_addr, IPADDR_TYPE_V6);
+    ip6_addr_set_any(&bind_addr.u_addr.ip6);
+  } else {
+#endif
+    IP_SET_TYPE(&bind_addr, IPADDR_TYPE_V4);
+    ip4_addr_set_any(&bind_addr.u_addr.ip4);
+#if CONFIG_LWIP_IPV6
+  }
+#endif"""
+ASYNCUDP_NEW_BLOCK = """#if CONFIG_LWIP_IPV6
+  if (IP_IS_V6(addr)) {
+    IP_SET_TYPE(&bind_addr, IPADDR_TYPE_V6);
+    ip6_addr_set_any(&bind_addr.u_addr.ip6);
+  } else {
+    IP_SET_TYPE(&bind_addr, IPADDR_TYPE_V4);
+    ip4_addr_set_any(&bind_addr.u_addr.ip4);
+  }
+#else
+  // ROZA: IPv4-only ip_addr_t has no u_addr union.
+  ip4_addr_set_any(&bind_addr);
+#endif"""
+
+
 def fail(message: str) -> "None":
     print(f"ROZA Arduino compatibility guard: ERROR: {message}", file=sys.stderr)
     raise SystemExit(1)
@@ -75,11 +106,30 @@ def add_once(text: str, marker: str, anchor: str, addition: str, label: str) -> 
     return result
 
 
+
+def patch_asyncudp_ipv4_only(source: str) -> str:
+    """Patch the single Arduino-ESP32 3.2.1 IPv4-only ip_addr_t access."""
+    old_count = source.count(ASYNCUDP_OLD_BLOCK)
+    new_count = source.count(ASYNCUDP_NEW_BLOCK)
+    if old_count == 1 and new_count == 0:
+        return source.replace(ASYNCUDP_OLD_BLOCK, ASYNCUDP_NEW_BLOCK, 1)
+    if old_count == 0 and new_count == 1:
+        return source
+    fail(
+        "Arduino AsyncUDP source drift: expected exactly one pinned IPv4-only "
+        f"listenMulticast block (source={old_count}, patched={new_count})"
+    )
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     managed_cmake = (
         root
         / "integration/nucleoos-bridge/managed_components/espressif__arduino-esp32/CMakeLists.txt"
+    )
+    managed_asyncudp = (
+        root
+        / "integration/nucleoos-bridge/managed_components/espressif__arduino-esp32/libraries/AsyncUDP/src/AsyncUDP.cpp"
     )
     nucleo_cmake = root / "nucleoos/firmware/components/nucleo_usbmsc/CMakeLists.txt"
     nucleo_source = root / "nucleoos/firmware/components/nucleo_usbmsc/nucleo_usbmsc.c"
@@ -92,6 +142,7 @@ def main() -> int:
 
     required_paths = (
         managed_cmake,
+        managed_asyncudp,
         nucleo_cmake,
         nucleo_source,
         sdkconfig,
@@ -120,6 +171,10 @@ def main() -> int:
         fail("the bridge profile no longer enables NucleoOS TinyUSB MSC")
     if not re.search(r"(?m)^CONFIG_WL_SECTOR_SIZE_512=y\s*$", sdkconfig_text):
         fail("the bridge profile no longer pins wear-levelling sectors to 512 bytes")
+    if not re.search(r"(?m)^CONFIG_LWIP_IPV6=n\s*$", sdkconfig_text):
+        fail("the bridge profile must keep IPv6 disabled to preserve the NucleoOS low-RAM profile")
+    if re.search(r"(?m)^CONFIG_LWIP_IPV6=y\s*$", sdkconfig_text):
+        fail("IPv6 must not be enabled in the PSRAM-less ROZA bridge profile")
 
     # Do not omit Arduino's object if any Launcher source starts using the
     # Arduino USBMSC class; in that case it must be integrated deliberately.
@@ -142,6 +197,8 @@ def main() -> int:
         )
 
     cmake_text = managed_cmake.read_text(encoding="utf-8")
+    asyncudp_text = managed_asyncudp.read_text(encoding="utf-8")
+    patched_asyncudp_text = patch_asyncudp_ipv4_only(asyncudp_text)
     if cmake_text.count(USB_SOURCE_ENTRY) != 1:
         fail(f"expected exactly one {USB_SOURCE_ENTRY!r} entry in Arduino CORE_SRCS")
     if cmake_text.count(FATFS_ANCHOR) != 1:
@@ -151,7 +208,11 @@ def main() -> int:
     cmake_text = add_once(cmake_text, FATFS_MARKER, FATFS_ANCHOR, FATFS_GUARD, "FatFs")
 
     managed_cmake.write_text(cmake_text, encoding="utf-8")
+    managed_asyncudp.write_text(patched_asyncudp_text, encoding="utf-8")
     check = managed_cmake.read_text(encoding="utf-8")
+    asyncudp_check = managed_asyncudp.read_text(encoding="utf-8")
+    if ASYNCUDP_NEW_BLOCK not in asyncudp_check or ASYNCUDP_OLD_BLOCK in asyncudp_check:
+        fail("post-write verification failed for the IPv4-only AsyncUDP compatibility block")
     for marker, block, label in (
         (USB_MARKER, USB_GUARD, "USB"),
         (FATFS_MARKER, FATFS_GUARD, "FatFs"),
@@ -161,7 +222,8 @@ def main() -> int:
 
     print(
         "ROZA compatibility guards applied: NucleoOS retains real TinyUSB MSC; "
-        "Arduino USBMSC is conditional; Arduino FatFs uses the verified fixed 512-byte sector path."
+        "Arduino USBMSC is conditional; FatFs stays fixed at 512 bytes; "
+        "AsyncUDP uses the IPv4-only ip_addr_t layout with lwIP IPv6 disabled."
     )
     return 0
 

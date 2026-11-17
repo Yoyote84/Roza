@@ -188,20 +188,16 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_MAX_CERTS=50
 # web-server-hardening / the keep_alive reaping in nucleo_httpd.
 CONFIG_LWIP_MAX_SOCKETS=13
 
-# IPv6: OFF. The whole network path is IPv4-only — nucleo_setup.c brings up only an IPv4 STA/AP,
-# esp_http_client dials IPv4 (Groq / weather / Wikipedia), and mDNS advertises fine over IPv4
-# alone. lwIP's IPv6 keeps statically-sized ND6 neighbour/router/prefix tables resident in the
-# scarce PSRAM-less SRAM for traffic we never originate, plus a few KB of flash. Compiling it out
-# reclaims that with zero feature loss (evilportal peer_ip() guards its lone AF_INET6 branch).
-# This is a BUILD option, not a runtime switch: the ND6 pools are sized at compile time, so the
-# Settings > Rete > IPv6 toggle only records the user's wish — re-enabling means flipping this
-# back to =y and rebuilding.
-# Arduino-ESP32 3.2.1's AsyncUDP core expects ip_addr_t.u_addr.ip4, which
-# ESP-IDF's IPv4-only ip_addr_t typedef omits when CONFIG_LWIP_IPV6=n.
-# Enable IPv6 only in this bridge profile so the real Arduino component compiles.
-# This is NOT a production NucleoOS setting: it changes RAM/flash requirements and must
-# be measured before any production integration on the PSRAM-less Cardputer ADV.
-CONFIG_LWIP_IPV6=y
+# IPv6: OFF, matching the pinned NucleoOS profile. The network path is IPv4-only:
+# nucleo_setup.c brings up IPv4 STA/AP, esp_http_client uses IPv4 and mDNS works over IPv4.
+# IPv6 would reserve static ND6 neighbour/router/prefix tables in scarce internal SRAM and
+# add flash without a current ROZA feature using it. The runtime Settings toggle cannot
+# override this build-time choice.
+#
+# Arduino-ESP32 3.2.1 has one unguarded ip_addr_t.u_addr.ip4 access in AsyncUDP::listenMulticast.
+# prepare-roza-arduino-usb.py patches that exact pinned block to use ip4_addr_set_any(&bind_addr)
+# when IPv6 is disabled, while preserving the upstream IPv6 branch. Source drift fails closed.
+CONFIG_LWIP_IPV6=n
 
 # SNTP: hold up to 4 NTP servers. nucleo_setup.c configures a 4-server cascade
 # (pool.ntp.org / cloudflare / google / apple) via ESP_NETIF_SNTP_DEFAULT_CONFIG_MULTIPLE(4, ...),
