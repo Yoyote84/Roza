@@ -48,3 +48,11 @@ Le validateur contrôle les libellés, types, sous-types, offsets, tailles, alig
 - Le canal de firmware ROZA signé et le catalogue de paquets ROZA signé restent à configurer. L'OTA firmware reste désactivée.
 
 Le paquet n'efface pas la flash pendant la CI et aucun matériel n'est connecté ni testé. Le script d'installation refuse tout manifeste qui ne déclare pas explicitement `hardware_tested=true` et `safe_to_flash=true`. Ne pas contourner cette barrière.
+
+## Avertissement sur les artefacts historiques
+
+Ne pas utiliser le paquet du run [#49 / 42751066014](https://github.com/Yoyote84/Roza/actions/runs/42751066014), construit sur le commit `218ca3f32d6d8d52d334fc66a78eb152bb2b66e9`. Son manifeste indique correctement `safe_to_flash=false` et `hardware_tested=false`, mais le `flash.sh` embarqué dans cet ancien artefact contient encore une condition d'approbation inversée : avec ces deux valeurs à `false`, il ne refuse pas le candidat et peut poursuivre vers la demande du port série puis les commandes esptool. Le paquet historique est donc à considérer comme **dangereux et obsolète**, pas seulement comme non validé.
+
+Le script source actuel `tools/installer/flash.sh` sur la branche de migration exige indépendamment `hardware_tested=true` et `safe_to_flash=true`, avant de vérifier esptool ou de demander un port. Le test `tests/test_flash_installer_guard.py` vérifie ces deux refus sans matériel. Cette correction n'est toutefois pas encore présente dans un nouvel artefact : aucune archive reconstruite depuis le HEAD actuel n'est disponible tant que le workflow reste désactivé.
+
+Le run [#38 / 42731777276](https://github.com/Yoyote84/Roza/actions/runs/42731777276) reste un build `engineering-diagnostic-only` antérieur, et ne constitue pas le paquet de fusion à utiliser.
