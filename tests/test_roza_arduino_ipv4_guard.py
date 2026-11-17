@@ -2,8 +2,11 @@
 """Host test for the pinned Arduino-ESP32 3.2.1 IPv4-only AsyncUDP guard."""
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import re
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -62,5 +65,81 @@ if re.search(r"(?m)^CONFIG_LWIP_IPV6=y\s*$", sdkconfig):
 workflow = (ROOT / ".github/workflows/roza-nucleoos-bridge.yml").read_text(encoding="utf-8")
 if "python3 tests/test_roza_arduino_ipv4_guard.py" not in workflow:
     raise SystemExit("Le test IPv4-only n'est pas exécuté par la CI de fusion.")
+
+
+def test_full_prepare_script_is_idempotent() -> None:
+    with tempfile.TemporaryDirectory(prefix="roza-arduino-prepare-") as tmp_name:
+        root = Path(tmp_name)
+        script_copy = root / "scripts" / "prepare-roza-arduino-usb.py"
+        script_copy.parent.mkdir(parents=True)
+        script_copy.write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+
+        managed = (
+            root
+            / "integration/nucleoos-bridge/managed_components/espressif__arduino-esp32"
+        )
+        (managed / "libraries/AsyncUDP/src").mkdir(parents=True)
+        (root / "nucleoos/firmware/components/nucleo_usbmsc").mkdir(parents=True)
+        (root / "integration/arduino-idf-smoke/components/launcher_platform").mkdir(parents=True)
+        (root / "launcher/src").mkdir(parents=True)
+
+        cmake = managed / "CMakeLists.txt"
+        cmake.write_text(
+            "set(CORE_SRCS\n"
+            "  cores/esp32/USBMSC.cpp\n"
+            ")\n"
+            "set(ARDUINO_ALL_LIBRARIES\n"
+            ")\n"
+            "idf_component_register(INCLUDE_DIRS ${includedirs} ${priv_includes} ${srcs} ${requires} ${priv_requires})\n",
+            encoding="utf-8",
+        )
+        asyncudp = managed / "libraries/AsyncUDP/src/AsyncUDP.cpp"
+        asyncudp.write_text(module.ASYNCUDP_OLD_BLOCK + "\n", encoding="utf-8")
+        (root / "nucleoos/firmware/components/nucleo_usbmsc/CMakeLists.txt").write_text(
+            "REQUIRES esp_tinyusb\n", encoding="utf-8"
+        )
+        (root / "nucleoos/firmware/components/nucleo_usbmsc/nucleo_usbmsc.c").write_text(
+            "tinyusb_msc_storage_init_sdmmc();\n"
+            "tinyusb_driver_install();\n",
+            encoding="utf-8",
+        )
+        (root / "integration/nucleoos-bridge/sdkconfig.defaults").write_text(
+            "CONFIG_TINYUSB_MSC_ENABLED=y\n"
+            "CONFIG_WL_SECTOR_SIZE_512=y\n"
+            "CONFIG_LWIP_IPV6=n\n",
+            encoding="utf-8",
+        )
+        (root / "integration/arduino-idf-smoke/components/launcher_platform/idf_component.yml").write_text(
+            'dependencies:\n  espressif/arduino-esp32: "3.2.1"\n',
+            encoding="utf-8",
+        )
+
+        original_file = module.__file__
+        module.__file__ = str(script_copy)
+        output = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(output):
+                if module.main() != 0:
+                    raise SystemExit("Le premier passage du script de préparation a échoué.")
+            first_cmake = cmake.read_text(encoding="utf-8")
+            first_asyncudp = asyncudp.read_text(encoding="utf-8")
+            with contextlib.redirect_stdout(output):
+                if module.main() != 0:
+                    raise SystemExit("Le second passage du script de préparation a échoué.")
+            if cmake.read_text(encoding="utf-8") != first_cmake:
+                raise SystemExit("Le second passage a dupliqué ou modifié les gardes CMake.")
+            if asyncudp.read_text(encoding="utf-8") != first_asyncudp:
+                raise SystemExit("Le second passage a modifié à nouveau AsyncUDP.")
+            if first_cmake.count(module.USB_MARKER) != 1:
+                raise SystemExit("La garde USB n'est pas unique après deux passages.")
+            if first_cmake.count(module.FATFS_MARKER) != 1:
+                raise SystemExit("La garde FatFs n'est pas unique après deux passages.")
+            if module.ASYNCUDP_NEW_BLOCK not in first_asyncudp:
+                raise SystemExit("La garde AsyncUDP IPv4-only manque après deux passages.")
+        finally:
+            module.__file__ = original_file
+
+
+test_full_prepare_script_is_idempotent()
 
 print("Arduino-ESP32 3.2.1 IPv4-only guard: OK")

@@ -199,7 +199,10 @@ def main() -> int:
     cmake_text = managed_cmake.read_text(encoding="utf-8")
     asyncudp_text = managed_asyncudp.read_text(encoding="utf-8")
     patched_asyncudp_text = patch_asyncudp_ipv4_only(asyncudp_text)
-    if cmake_text.count(USB_SOURCE_ENTRY) != 1:
+    core_srcs_match = re.search(r"(?ms)^set\(CORE_SRCS\s+(.*?)^\s*\)", cmake_text)
+    if core_srcs_match is None:
+        fail("Arduino CORE_SRCS block changed; refusing to guess the USBMSC source list")
+    if core_srcs_match.group(1).count(USB_SOURCE_ENTRY) != 1:
         fail(f"expected exactly one {USB_SOURCE_ENTRY!r} entry in Arduino CORE_SRCS")
     if cmake_text.count(FATFS_ANCHOR) != 1:
         fail("Arduino component registration anchor changed; refusing a blind FatFs patch")
