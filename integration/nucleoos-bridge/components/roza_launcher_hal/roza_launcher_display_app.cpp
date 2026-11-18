@@ -13,12 +13,13 @@ static bool s_target_ready;
 
 static void display_enter()
 {
-    // The upstream sprite stores its parent pointer at construction. Direct mode
-    // keeps that parent equal to NucleoOS's physical display for this app's lifetime.
-    roza_launcher_display_mode_enter();
+    // Keep NucleoOS's normal buffered draw path. The DisplayDrivers adapter resolves
+    // its target through nucleo_app_gfx(), so drawing and sprite blits land on the
+    // shared app canvas; NucleoOS performs the single final panel blit.
+    // This lightweight test app must not switch to direct draw or release the
+    // shared 32 KiB canvas.
     s_target_ready = roza_launcher_display_target() != nullptr;
     if (!s_target_ready) {
-        roza_launcher_display_mode_exit();
         nucleo_app_set_hint("Cible graphique indisponible");
         return;
     }
@@ -87,7 +88,6 @@ static void display_exit()
         s_sprite = nullptr;
     }
     s_target_ready = false;
-    roza_launcher_display_mode_exit();
 }
 
 static const nucleo_app_def_t s_app = {

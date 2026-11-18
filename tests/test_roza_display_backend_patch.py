@@ -85,13 +85,16 @@ def main() -> int:
         APP,
         "tft_display",
         "tft_sprite",
-        "roza_launcher_display_mode_enter()",
-        "roza_launcher_display_mode_exit()",
+        "roza_launcher_display_target()",
         "s_display.fillRect(",
         "s_sprite->pushSprite(",
         "nucleo_app_register(&s_app)",
     )
     for forbidden in (
+        "roza_launcher_display_mode_enter()",
+        "roza_launcher_display_mode_exit()",
+        "nucleo_app_set_direct_draw(",
+        "nucleo_app_release_buffers(",
         "s_display.init(",
         "s_display.begin(",
         "s_display.display(",
@@ -107,7 +110,7 @@ def main() -> int:
     print("ROZA Launcher M5GFX adapter: PASS")
     print(" - upstream backend is compiled against NucleoOS's current draw target")
     print(" - native app never calls standalone init/begin/display lifecycle hooks")
-    print(" - sprite parent remains stable in direct-draw mode and is freed on exit")
+    print(" - app draws through NucleoOS's shared buffered target; no direct-draw switch or canvas release")
     print(" - native app registration uses the single NucleoOS launcher")
     return 0
 
