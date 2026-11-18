@@ -22,6 +22,7 @@ on:
       - "scripts/check-roza-fusion-contract.py"
       - "scripts/create-roza-build-manifest.py"
       - "scripts/verify-roza-flash-image.py"
+      - "scripts/verify-roza-package-manifest.py"
       - "docs/FLASH-PREVIEW-NOT-READY.md"
       - "tests/**"
   workflow_dispatch:
@@ -206,6 +207,12 @@ jobs:
           test -s "$package/ROZA-Cardputer-ADV-FULL.bin"
           test -s "$package/ROZA-BUILD-INFO.json"
           test -s "$package/flash.sh"
+
+      - name: Verify all manifest references inside the assembled package
+        run: |
+          python3 -m py_compile scripts/verify-roza-package-manifest.py tests/test_roza_package_manifest.py
+          python3 tests/test_roza_package_manifest.py
+          python3 scripts/verify-roza-package-manifest.py dist/ROZA-Cardputer-ADV
 
       - name: Publish complete ROZA Cardputer ADV software test candidate
         uses: actions/upload-artifact@v4

@@ -10,7 +10,7 @@ La CI produit une véritable image brute fusionnée ESP32-S3 nommée `ROZA-Cardp
 - application NucleoOS avec surcouche ROZA : `0x20000` ;
 - flash cible : 8 Mio ; image fusionnée non rembourrée à 8 Mio.
 
-Le manifeste et le paquet contiennent les SHA-256 de l'image, de l'application, du bootloader, de la table de partitions, des données OTA et des fichiers d'installation.
+Le manifeste et le paquet contiennent les SHA-256 de l'image, de l'application, du bootloader, de la table de partitions, des données OTA et des fichiers d'installation. Tous les champs `path` de `artifacts`, `flash_image` et `partition_layout` sont relatifs à la racine du paquet ZIP ; `build_path` conserve séparément le chemin du workspace CI d'origine. Après assemblage, `verify-roza-package-manifest.py` vérifie que chaque fichier référencé existe dans l'archive, que sa taille et son SHA-256 correspondent, et que le candidat reste explicitement non flashable.
 
 ## Table de partitions unique
 

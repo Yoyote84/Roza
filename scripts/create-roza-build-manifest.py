@@ -12,6 +12,23 @@ PINNED = {
     "launcher": "4b06de691df15b0fe6a9f09f56d1d107bbf32b12",
     "nucleoos": "cb0f1a5356ddd6f96ec6b31bbcba5d55f52d8123",
 }
+PACKAGE_PATHS = {
+    "firmware_candidate": "ROZA-Cardputer-ADV-FULL.bin",
+    "merged_image_audit": "audit/ROZA-ESP32S3-FLASH-PREVIEW.bin",
+    "application": "audit/roza_nucleoos_launcher_bridge.bin",
+    "elf": "audit/roza_nucleoos_launcher_bridge.elf",
+    "bootloader": "audit/bootloader.bin",
+    "partition_table": "audit/partition-table.bin",
+    "ota_data_initial": "audit/ota_data_initial.bin",
+    "flash_args": "flash_args",
+    "partition_csv": "audit/partitions.csv",
+    "installer": "flash.sh",
+    "install_guide": "INSTALL.md",
+    "launcher_license": "LICENSE-Launcher-MIT.txt",
+    "nucleoos_license": "LICENSE-NucleoOS.txt",
+    "radiolib_license": "LICENSE-RadioLib-MIT.txt",
+}
+
 FLASH_BYTES = 8 * 1024 * 1024
 
 
@@ -60,7 +77,10 @@ def main() -> int:
         if not path.is_file():
             raise SystemExit("Artefact manquant : " + str(path))
         records[name] = {
-            "path": path.relative_to(root).as_posix(),
+            # "path" resolves inside the published ZIP; "build_path" records
+            # where the same bytes came from in the ephemeral CI workspace.
+            "path": PACKAGE_PATHS[name],
+            "build_path": path.relative_to(root).as_posix(),
             "size_bytes": path.stat().st_size,
             "sha256": digest(path),
         }
