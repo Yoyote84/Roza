@@ -254,6 +254,20 @@ static void testCharacterExperienceAndLevels() {
   assert(isValidCharacter(character));
 }
 
+static void testCharacterMissionRewardIsIdempotent() {
+  CharacterState character{};
+  assert(createCharacter(character, 1U, "DUSTIN"));
+  assert(awardCharacterMissionXpOnce(character, 0U, 100U));
+  assert(character.xp == 100U);
+  assert((character.missionRewardMask & 0x01U) != 0U);
+  assert(awardCharacterMissionXpOnce(character, 0U, 100U));
+  assert(character.xp == 100U);
+  assert(awardCharacterMissionXpOnce(character, 1U, 75U));
+  assert(character.xp == 175U);
+  assert(!awardCharacterMissionXpOnce(character, 3U, 50U));
+  assert(isValidCharacter(character));
+}
+
 static void testCharacterSaveCodec() {
   CharacterState original{};
   assert(createCharacter(original, 4U, "MAX MAYFIELD"));
@@ -292,6 +306,7 @@ int main() {
   testExplorationSaveCodec();
   testCharacterCreationAndAttributes();
   testCharacterExperienceAndLevels();
+  testCharacterMissionRewardIsIdempotent();
   testCharacterSaveCodec();
   puts("HAWKINS: tous les tests monde, exploration et personnage ont reussi.");
   return 0;
