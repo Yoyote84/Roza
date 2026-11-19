@@ -81,7 +81,7 @@ void encodePayload(const CharacterState& character, uint8_t* output) {
   for (size_t i = 0; i < kCharacterNameCapacity; ++i) {
     output[20U + i] = static_cast<uint8_t>(character.name[i]);
   }
-  output[32] = 0U;
+  output[32] = character.missionRewardMask;
   output[33] = 0U;
   output[34] = 0U;
   output[35] = 0U;
@@ -104,8 +104,8 @@ bool decodePayload(const uint8_t* input, CharacterState& character) {
     character.name[i] = static_cast<char>(input[20U + i]);
   }
   character.name[kCharacterNameCapacity] = '\0';
-  return input[32] == 0U && input[33] == 0U &&
-         input[34] == 0U && input[35] == 0U &&
+  character.missionRewardMask = input[32];
+  return input[33] == 0U && input[34] == 0U && input[35] == 0U &&
          isValidCharacter(character);
 }
 
@@ -177,7 +177,8 @@ bool isValidCharacter(const CharacterState& character) {
       character.level == 0U || character.level > kCharacterMaxLevel ||
       character.skillPoints > character.level - 1U ||
       character.nameLength == 0U ||
-      character.nameLength > kCharacterNameCapacity) {
+      character.nameLength > kCharacterNameCapacity ||
+      (character.missionRewardMask & 0xF8U) != 0U) {
     return false;
   }
   for (size_t i = 0; i < CharacterAttributeCount; ++i) {
@@ -226,6 +227,23 @@ uint8_t awardCharacterXp(CharacterState& character, uint16_t amount) {
     }
   }
   return gained;
+}
+
+bool awardCharacterMissionXpOnce(CharacterState& character, uint8_t missionId,
+                                 uint16_t amount) {
+  if (!isValidCharacter(character) || missionId >= 3U || amount == 0U) {
+    return false;
+  }
+  const uint8_t mask = static_cast<uint8_t>(1U << missionId);
+  if ((character.missionRewardMask & mask) != 0U) return true;
+
+  CharacterState updated = character;
+  updated.missionRewardMask = static_cast<uint8_t>(
+      updated.missionRewardMask | mask);
+  awardCharacterXp(updated, amount);
+  if (!isValidCharacter(updated)) return false;
+  character = updated;
+  return true;
 }
 
 bool encodeCharacterSave(const CharacterState& character, uint32_t sequence,
