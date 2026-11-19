@@ -258,12 +258,12 @@ static void testCharacterMissionRewardIsIdempotent() {
   CharacterState character{};
   assert(createCharacter(character, 1U, "DUSTIN"));
   assert(awardCharacterMissionXpOnce(character, 0U, 100U));
-  assert(character.xp == 100U);
+  assert(character.level == 2U && character.xp == 0U);
   assert((character.missionRewardMask & 0x01U) != 0U);
   assert(awardCharacterMissionXpOnce(character, 0U, 100U));
-  assert(character.xp == 100U);
+  assert(character.level == 2U && character.xp == 0U);
   assert(awardCharacterMissionXpOnce(character, 1U, 75U));
-  assert(character.xp == 175U);
+  assert(character.level == 2U && character.xp == 75U);
   assert(!awardCharacterMissionXpOnce(character, 3U, 50U));
   assert(isValidCharacter(character));
 }
