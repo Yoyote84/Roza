@@ -2,9 +2,9 @@
 # Tests natifs du moteur Hawkins, sans matériel ESP32.
 set -euo pipefail
 cd "$(dirname "$0")"
-if [ -z "\${CXX:-}" ]; then CXX=g++; fi
+if [ -z "${CXX:-}" ]; then CXX=g++; fi
 SANFLAGS=""
-if [ "\${SAN:-0}" = "1" ]; then
+if [ "${SAN:-0}" = "1" ]; then
   SANFLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
 fi
 "$CXX" -std=c++17 -Wall -Wextra -Werror $SANFLAGS \
@@ -13,3 +13,7 @@ fi
   ../../src/hawkins_exploration.cpp ../../src/hawkins_character.cpp \
   -o /tmp/roza-hawkinstest
 /tmp/roza-hawkinstest
+"$CXX" -std=c++17 -Wall -Wextra -Werror $SANFLAGS \
+  -I ../../src missions_test.cpp ../../src/hawkins_missions.cpp \
+  -o /tmp/roza-hawkins-missions-test
+/tmp/roza-hawkins-missions-test
