@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <string.h>
 
 namespace {
@@ -19,26 +20,33 @@ static bool parse_number(const char *text, float *value)
     if (!text || !*text || !value) return false;
     char *end = nullptr;
     const float parsed = strtof(text, &end);
-    if (end == text || *end != '\0') return false;
+    if (end == text || *end != '\0' || !isfinite(parsed)) return false;
     *value = parsed;
     return true;
 }
 
-static bool parse_coordinate(const char *raw, const char *hemisphere, double *value)
+static bool parse_coordinate(const char *raw, const char *hemisphere,
+                            int max_degrees, bool latitude, double *value)
 {
-    if (!raw || !*raw || !hemisphere || !*hemisphere || !value) return false;
+    if (!raw || !*raw || !hemisphere || !*hemisphere || hemisphere[1] != '\0' || !value) return false;
     char *end = nullptr;
     const double packed = strtod(raw, &end);
-    if (end == raw || *end != '\0' || packed < 0.0) return false;
+    if (end == raw || *end != '\0' || !isfinite(packed) || packed < 0.0) return false;
 
     const int degrees = static_cast<int>(packed / 100.0);
     const double minutes = packed - static_cast<double>(degrees) * 100.0;
-    if (minutes < 0.0 || minutes >= 60.0) return false;
+    if (minutes < 0.0 || minutes >= 60.0 || degrees > max_degrees ||
+        (degrees == max_degrees && minutes > 0.0)) return false;
 
     double decimal = static_cast<double>(degrees) + minutes / 60.0;
     const char direction = static_cast<char>(toupper(static_cast<unsigned char>(hemisphere[0])));
-    if (direction == 'S' || direction == 'W') decimal = -decimal;
-    else if (direction != 'N' && direction != 'E') return false;
+    if (latitude) {
+        if (direction == 'S') decimal = -decimal;
+        else if (direction != 'N') return false;
+    } else {
+        if (direction == 'W') decimal = -decimal;
+        else if (direction != 'E') return false;
+    }
     *value = decimal;
     return true;
 }
@@ -101,19 +109,18 @@ extern "C" bool roza_gnss_parse_sentence(const char *sentence, roza_gnss_fix_t *
         fix->satellites = atoi(fields[7]);
 
         float number = 0.0f;
-        if (parse_number(fields[8], &number)) fix->hdop = number;
+        if (parse_number(fields[8], &number) && number >= 0.0f) fix->hdop = number;
         if (parse_number(fields[9], &number)) fix->altitude_m = number;
         copy_field(fix->utc_time, sizeof(fix->utc_time), fields[1]);
 
         double coordinate = 0.0;
-        if (fix->has_fix &&
-            parse_coordinate(fields[2], fields[3], &coordinate)) {
-            fix->latitude_deg = coordinate;
-        }
-        if (fix->has_fix &&
-            parse_coordinate(fields[4], fields[5], &coordinate)) {
-            fix->longitude_deg = coordinate;
-        }
+        const bool latitude_ok = !fix->has_fix ||
+            parse_coordinate(fields[2], fields[3], 90, true, &coordinate);
+        if (fix->has_fix && latitude_ok) fix->latitude_deg = coordinate;
+        const bool longitude_ok = !fix->has_fix ||
+            parse_coordinate(fields[4], fields[5], 180, false, &coordinate);
+        if (fix->has_fix && longitude_ok) fix->longitude_deg = coordinate;
+        if (fix->has_fix && (!latitude_ok || !longitude_ok)) fix->has_fix = false;
         return true;
     }
 
@@ -122,18 +129,18 @@ extern "C" bool roza_gnss_parse_sentence(const char *sentence, roza_gnss_fix_t *
         fix->has_fix = fields[2][0] == 'A';
 
         double coordinate = 0.0;
-        if (fix->has_fix &&
-            parse_coordinate(fields[3], fields[4], &coordinate)) {
-            fix->latitude_deg = coordinate;
-        }
-        if (fix->has_fix &&
-            parse_coordinate(fields[5], fields[6], &coordinate)) {
-            fix->longitude_deg = coordinate;
-        }
+        const bool latitude_ok = !fix->has_fix ||
+            parse_coordinate(fields[3], fields[4], 90, true, &coordinate);
+        if (fix->has_fix && latitude_ok) fix->latitude_deg = coordinate;
+        const bool longitude_ok = !fix->has_fix ||
+            parse_coordinate(fields[5], fields[6], 180, false, &coordinate);
+        if (fix->has_fix && longitude_ok) fix->longitude_deg = coordinate;
+        if (fix->has_fix && (!latitude_ok || !longitude_ok)) fix->has_fix = false;
 
         float number = 0.0f;
-        if (parse_number(fields[7], &number)) fix->speed_kmh = number * 1.852f;
-        if (parse_number(fields[8], &number)) fix->course_deg = number;
+        if (parse_number(fields[7], &number) && number >= 0.0f) fix->speed_kmh = number * 1.852f;
+        if (parse_number(fields[8], &number) && number >= 0.0f && number <= 360.0f)
+            fix->course_deg = number;
         copy_field(fix->utc_time, sizeof(fix->utc_time), fields[1]);
         copy_field(fix->utc_date, sizeof(fix->utc_date), fields[9]);
         return true;

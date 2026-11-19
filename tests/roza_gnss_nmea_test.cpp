@@ -4,10 +4,20 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <string>
 
 static bool near(double actual, double expected, double tolerance)
 {
     return fabs(actual - expected) <= tolerance;
+}
+
+static std::string make_nmea_sentence(const char *payload)
+{
+    unsigned char checksum = 0;
+    for (const char *p = payload; *p; ++p) checksum ^= static_cast<unsigned char>(*p);
+    char suffix[8];
+    snprintf(suffix, sizeof(suffix), "*%02X", checksum);
+    return std::string("$") + payload + suffix;
 }
 
 int main()
@@ -41,6 +51,36 @@ int main()
 
     const char *unsupported = "$GPGSA,A,3,04,05,09,12,24,25,29,31,,,,1.8,1.0,1.5*33";
     assert(!roza_gnss_parse_sentence(unsupported, &fix));
+
+    roza_gnss_fix_reset(&fix);
+    const std::string invalid_lat = make_nmea_sentence(
+        "GPGGA,123519,9100.000,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,");
+    assert(roza_gnss_parse_sentence(invalid_lat.c_str(), &fix));
+    assert(!fix.has_fix && fix.latitude_deg == 0.0);
+
+    roza_gnss_fix_reset(&fix);
+    const std::string wrong_hemisphere = make_nmea_sentence(
+        "GPGGA,123519,4807.038,E,01131.000,E,1,08,0.9,545.4,M,46.9,M,,");
+    assert(roza_gnss_parse_sentence(wrong_hemisphere.c_str(), &fix));
+    assert(!fix.has_fix);
+
+    roza_gnss_fix_reset(&fix);
+    const std::string invalid_lon = make_nmea_sentence(
+        "GPGGA,123519,4807.038,N,18100.000,E,1,08,0.9,545.4,M,46.9,M,,");
+    assert(roza_gnss_parse_sentence(invalid_lon.c_str(), &fix));
+    assert(!fix.has_fix && fix.longitude_deg == 0.0);
+
+    roza_gnss_fix_reset(&fix);
+    const std::string nonfinite = make_nmea_sentence(
+        "GPGGA,123519,4807.038,N,01131.000,E,1,08,NaN,INF,M,46.9,M,,");
+    assert(roza_gnss_parse_sentence(nonfinite.c_str(), &fix));
+    assert(fix.has_fix && fix.hdop == 0.0f && fix.altitude_m == 0.0f);
+
+    roza_gnss_fix_reset(&fix);
+    const std::string invalid_speed_course = make_nmea_sentence(
+        "GPRMC,123519,A,4807.038,N,01131.000,E,NaN,999,230394,003.1,W");
+    assert(roza_gnss_parse_sentence(invalid_speed_course.c_str(), &fix));
+    assert(fix.has_fix && fix.speed_kmh == 0.0f && fix.course_deg == 0.0f);
 
     roza_gnss_fix_reset(&fix);
     assert(!fix.has_fix && fix.satellites == 0);
