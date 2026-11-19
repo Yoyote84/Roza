@@ -58,6 +58,8 @@ void encodePayload(const MissionState& state, uint8_t* output) {
   }
   write32(output + 7U, state.sectors);
   write32(output + 11U, state.discoveries);
+  write32(output + 15U, state.lastCellKey);
+  output[19] = state.hasLastCell;
 }
 
 bool decodePayload(const uint8_t* input, MissionState& state) {
@@ -68,6 +70,8 @@ bool decodePayload(const uint8_t* input, MissionState& state) {
   }
   state.sectors = read32(input + 7U);
   state.discoveries = read32(input + 11U);
+  state.lastCellKey = read32(input + 15U);
+  state.hasLastCell = input[19];
   return isValidMissionState(state);
 }
 
@@ -86,7 +90,8 @@ void initializeMissions(MissionState& state) {
 }
 
 bool isValidMissionState(const MissionState& state) {
-  if (state.schemaVersion != kMissionSchemaVersion) return false;
+  if (state.schemaVersion != kMissionSchemaVersion || state.hasLastCell > 1U ||
+      (state.hasLastCell == 0U && state.lastCellKey != 0U)) return false;
 
   for (size_t i = 0; i < kMissionCount; ++i) {
     if (state.status[i] > static_cast<uint8_t>(MissionStatus::Complete)) {
@@ -122,9 +127,13 @@ MissionStatus missionStatus(const MissionState& state, MissionId id) {
   return static_cast<MissionStatus>(state.status[index]);
 }
 
-uint8_t recordMissionSector(MissionState& state, bool discovery) {
-  if (!isValidMissionState(state)) return 0U;
+uint8_t recordMissionSector(MissionState& state, uint32_t cellKey,
+                            bool discovery) {
+  if (!isValidMissionState(state) || cellKey == 0U) return 0U;
+  if (state.hasLastCell != 0U && state.lastCellKey == cellKey) return 0U;
 
+  state.lastCellKey = cellKey;
+  state.hasLastCell = 1U;
   if (state.sectors < UINT32_MAX) ++state.sectors;
   if (discovery && state.discoveries < UINT32_MAX) ++state.discoveries;
 
