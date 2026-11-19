@@ -190,14 +190,15 @@ void drawMissionPage() {
                       TFT_BLACK);
       cv.drawString(statusText, SW - 6, y);
 
-      char progress[38];
+      char progress[48];
       const uint32_t value = i == static_cast<uint8_t>(
           hawkins::MissionId::ThreeSectors) ? missions.sectors
                                             : missions.discoveries;
-      snprintf(progress, sizeof(progress), "%s : %lu / %lu",
+      snprintf(progress, sizeof(progress), "%s : %lu/%lu  +%u XP",
                i == static_cast<uint8_t>(hawkins::MissionId::ThreeSectors)
                    ? "SECTEURS" : "SIGNAUX",
-               (unsigned long)value, (unsigned long)def.target);
+               (unsigned long)value, (unsigned long)def.target,
+               unsigned(hawkins::missionRewardXp(id)));
       cv.setTextDatum(top_left);
       cv.setTextColor(ICON_DIM, TFT_BLACK);
       cv.drawString(progress, 6, y + 11);
