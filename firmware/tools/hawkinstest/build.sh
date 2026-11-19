@@ -9,6 +9,6 @@ if [[ "${SAN:-0}" == "1" ]]; then
 fi
 "$CXX" -std=c++17 -Wall -Wextra -Werror $SANFLAGS \
   -I ../../src \
-  main.cpp ../../src/hawkins_world.cpp \
+  main.cpp ../../src/hawkins_world.cpp ../../src/hawkins_save_codec.cpp \
   -o /tmp/roza-hawkinstest
 /tmp/roza-hawkinstest

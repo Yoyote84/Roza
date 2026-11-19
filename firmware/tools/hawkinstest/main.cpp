@@ -1,4 +1,5 @@
 #include "hawkins_world.h"
+#include "hawkins_save_codec.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -108,6 +109,30 @@ static void testMetricsAndEventNames() {
   assert(eventTypeName(EventType::None)[0] != '\0');
 }
 
+
+static void testSaveCodecRoundTrip(){
+ WorldState original{};initializeWorld(original,0xAABBCCDDU,1800000000ULL);
+ advanceWorld(original,original.startEpochSeconds+900U*kSecondsPerDay);assert(isValidWorldState(original));
+ uint8_t encoded[kWorldSaveEncodedSize];assert(encodeWorldSave(original,17U,encoded,sizeof(encoded)));
+ WorldState restored{};uint32_t seq=0;assert(decodeWorldSave(encoded,sizeof(encoded),restored,seq));
+ assert(seq==17U);assert(restored.schemaVersion==original.schemaVersion);assert(restored.seed==original.seed);
+ assert(restored.startEpochSeconds==original.startEpochSeconds);assert(restored.simulatedDays==original.simulatedDays);
+ assert(restored.randomState==original.randomState);assert(restored.eventCount==original.eventCount);
+ assert(restored.latestEvent.sequence==original.latestEvent.sequence);assert(restored.latestEvent.type==original.latestEvent.type);
+ assert(restored.latestEvent.intensity==original.latestEvent.intensity);
+}
+static void testSaveCodecRejectsDamage(){
+ WorldState original{};initializeWorld(original,55U,1800000000ULL);
+ uint8_t encoded[kWorldSaveEncodedSize];assert(encodeWorldSave(original,1U,encoded,sizeof(encoded)));
+ WorldState restored{};uint32_t seq=0;
+ assert(!decodeWorldSave(encoded,sizeof(encoded)-1U,restored,seq));encoded[20]^=0x40U;
+ assert(!decodeWorldSave(encoded,sizeof(encoded),restored,seq));
+ assert(!encodeWorldSave(original,1U,encoded,sizeof(encoded)-1U));assert(!encodeWorldSave(original,0U,encoded,sizeof(encoded)));
+}
+static void testSaveCodecRejectsInvalidState(){
+ WorldState invalid{};initializeWorld(invalid,9U,1800000000ULL);invalid.tension=101U;
+ uint8_t encoded[kWorldSaveEncodedSize];assert(!encodeWorldSave(invalid,1U,encoded,sizeof(encoded)));
+}
 int main() {
   testInitialization();
   testTimeAndNoRewind();
@@ -115,6 +140,9 @@ int main() {
   testTenYearWorldDoesNotEnd();
   testBoundedCatchUp();
   testMetricsAndEventNames();
+  testSaveCodecRoundTrip();
+  testSaveCodecRejectsDamage();
+  testSaveCodecRejectsInvalidState();
   puts("HAWKINS: tous les tests du moteur de monde ont réussi.");
   return 0;
 }

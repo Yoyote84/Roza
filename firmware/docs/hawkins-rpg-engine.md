@@ -1,55 +1,42 @@
-# Moteur de monde persistant Hawkins — première étape
+# Moteur RPG Hawkins — étapes 1 et 2
 
-Ce module constitue le premier socle logiciel du JDR grandeur nature prévu pour le
-Cardputer ADV. Il est volontairement indépendant de l'interface et des pilotes
-matériels afin de pouvoir être testé sur ordinateur avant son intégration au jeu.
+Le jeu est développé dans le firmware ROZA existant, sans remplacer ses pilotes matériels.
+La base reste PlatformIO + Arduino-ESP32 sur Cardputer ADV ESP32-S3FN8, Flash 8 Mo, sans PSRAM.
 
-## Fichiers
+## Étape 1 — monde persistant déterministe
 
-- `src/hawkins_world.h` : structures d'état et API publique.
-- `src/hawkins_world.cpp` : simulation journalière déterministe et génération d'événements.
-- `tools/hawkinstest/` : tests natifs, exécutables sans carte ESP32.
+- hawkins_world.h/.cpp : état du monde, évolution journalière, statistiques et événements.
+- Une graine identique et les mêmes dates donnent la même évolution.
+- Aucun état de fin de campagne n'existe dans le moteur.
+- Le rattrapage est plafonné à 4096 jours par appel, sans plafonner la durée totale du monde.
 
-## Fonctionnement actuel
+## Étape 2 — sauvegarde, horloge et première interface
 
-1. `initializeWorld()` crée un monde à partir d'une graine et d'une date Unix fiable.
-2. `advanceWorld()` calcule les jours écoulés depuis le début de la campagne.
-3. Chaque jour fait évoluer la tension, le niveau d'anomalie et l'activité des factions.
-4. Certains jours produisent un événement : signal, anomalie électrique, trace de créature,
-   mouvement de faction, appel de détresse ou fluctuation de brèche.
-5. Une graine identique et les mêmes dates produisent la même évolution, ce qui facilite
-   les sauvegardes, les tests et la synchronisation future entre joueurs.
+- hawkins_save_codec.h/.cpp : format explicite little-endian, versionné, 58 octets, CRC-32.
+- hawkins_nvs.h/.cpp : deux emplacements NVS alternés ; la dernière sauvegarde valide est préservée pendant l'écriture de la suivante.
+- hawkins_runtime.h/.cpp : restauration du monde, synchronisation avec l'horloge ROZA, rattrapage et sauvegarde.
+- hawkins_app.h/.cpp : première page Hawkins dans un groupe RPG séparé du menu ROZA existant.
+- Tableau de bord : jour du monde, nombre d'événements, tension, anomalies, activité des factions et dernier événement.
 
-Le monde ne possède aucun état de fin de campagne. La limite de 4096 jours par appel
-est uniquement une protection contre un rattrapage trop long au démarrage ; les appels
-successifs rattrapent le reste sans perdre de jours.
+### Horloge
 
-## Limites à ce stade
+Le runtime utilise l'horloge système ROZA : base manuelle conservée en NVS, NTP lorsque le Wi-Fi est activé volontairement, ou UTC GNSS lorsqu'un Cap LoRa-1262 fournit une date GPS valide. Le jeu n'active pas le réseau.
 
-- Ce moteur n'est pas encore relié à un écran ou à une entrée du menu ROZA.
-- L'état du monde n'est pas encore sérialisé sur la microSD ou dans NVS : ne pas considérer
-  une partie comme sauvegardée entre deux redémarrages.
-- La date est fournie par l'appelant ; l'intégration GNSS, RTC ou date manuelle reste à faire.
-- Les secteurs 0 à 31 sont des identifiants abstraits, pas des coordonnées GPS.
-- Les événements sont des données de simulation ; aucune émission LoRa n'est effectuée.
-- Le générateur pseudo-aléatoire est destiné au jeu, jamais à la cryptographie.
+Si l'heure n'est pas valide, la sauvegarde reste consultable mais le monde ne progresse pas. Sans RTC ou synchronisation GNSS/NTP, le temps écoulé appareil éteint ne peut pas être connu de façon fiable ; le jeu ne l'invente pas.
 
-## Tests
+### Sauvegarde
 
-Depuis `firmware/` :
+Les instantanés vont dans la NVS interne, sous le namespace hawkins et les deux clés slot0/slot1. Le verrou NVS existant PrefsLock est réutilisé afin d'éviter les accès concurrents avec les services ROZA.
 
-```sh
-bash tools/hawkinstest/build.sh
-SAN=1 bash tools/hawkinstest/build.sh
-```
+Aucun formatage, effacement ou écriture n'est effectué sur la microSD. Les fonctions existantes de partage SPI entre SD et SX1262 ne sont pas touchées.
 
-La CI ROZA exécute également cette suite dans le workflow PlatformIO.
+### Contrôles
 
-## Étapes suivantes
+La suite native hawkinstest vérifie le monde déterministe, la progression sur dix ans, les sauvegardes encodées/décodées, la détection de corruption CRC et les états invalides. Elle est exécutée par la CI PlatformIO.
 
-1. Ajouter une sauvegarde versionnée et résistante aux coupures, sans écriture automatique
-   sur la microSD tant que son système de fichiers et son état n'ont pas été validés.
-2. Créer un journal d'événements et un mécanisme de récupération après redémarrage.
-3. Relier l'horloge au service de temps existant et aux sources GNSS/manuel.
-4. Intégrer une application Hawkins dans l'interface ROZA.
-5. Ajouter les personnages, les combats au tour par tour, puis les communications LoRa.
+### Limites actuelles
+
+- L'écran Hawkins est un tableau de bord, pas encore l'interface complète du personnage.
+- Les personnages, classes, inventaire, combats D20 et journal détaillé des événements restent à développer.
+- La date restaurée depuis manual_epoch est une base locale, pas un RTC : seule une source GNSS/NTP fraîche permet de rattraper précisément le temps réellement écoulé pendant une longue extinction.
+- Les essais physiques sur Cardputer ADV restent nécessaires ; la CI ne valide pas le matériel.

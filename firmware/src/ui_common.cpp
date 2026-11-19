@@ -261,7 +261,8 @@ void menuMove(int dx, int dy) {
 // [primary, cardBg, innerRing, pillBg, pillBorder]
 // ROZA : une seule identité visuelle pour tous les groupes.
 // La catégorie reste indiquée par son libellé ; la couleur ne change plus d'une page à l'autre.
-static const GroupTheme GROUP_THEMES[7] = {
+static const GroupTheme GROUP_THEMES[8] = {
+  { ROZA_OLIVE_LIGHT, ROZA_CARD, ROZA_OLIVE, ROZA_CARD, ROZA_OLIVE },
   { ROZA_OLIVE_LIGHT, ROZA_CARD, ROZA_OLIVE, ROZA_CARD, ROZA_OLIVE },
   { ROZA_OLIVE_LIGHT, ROZA_CARD, ROZA_OLIVE, ROZA_CARD, ROZA_OLIVE },
   { ROZA_OLIVE_LIGHT, ROZA_CARD, ROZA_OLIVE, ROZA_CARD, ROZA_OLIVE },
@@ -272,11 +273,11 @@ static const GroupTheme GROUP_THEMES[7] = {
 };
 
 const GroupTheme& getGroupTheme(int groupIdx) {
-  if (groupIdx < 0 || groupIdx >= 7) return GROUP_THEMES[0];
+  if (groupIdx < 0 || groupIdx >= 8) return GROUP_THEMES[0];
   return GROUP_THEMES[groupIdx];
 }
 
-// 顶部组 tab 条：7 个组名平分屏宽，当前组高亮并带精准自适应下划线与大类专属主题色
+// 顶部组 tab 条：8 个组名平分屏宽，当前组高亮并带精准自适应下划线与大类专属主题色
 static void drawGroupTabs() {
   const int tw = SW / GROUP_COUNT;
   int cur = menuGroupOf(menuIndex);
@@ -299,7 +300,7 @@ static void drawGroupTabs() {
   }
 }
 
-// 37 个 App 的简练功能一句话导览 (常量字符串，0 额外堆开销)
+// 41 个 App 的简练功能一句话导览 (常量字符串，0 额外堆开销)
 static const char* appDesc(AppId id) {
   switch (id) {
     case APP_TIME:      return "Horloge, chrono et minuterie";
@@ -340,6 +341,7 @@ static const char* appDesc(AppId id) {
     case APP_OKX:       return "Marches OKX";
     case APP_READER:    return "Lecteur de livres et textes";
     case APP_SETTINGS:  return "Parametres et veille";
+    case APP_HAWKINS:   return "JDR persistant et monde vivant";
     default:            return "";
   }
 }

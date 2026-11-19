@@ -198,15 +198,16 @@ const AppDef APPS[] = {
   {"GitHub",    APP_GITHUB},   {"Radio",    APP_RADIO},    {"FX",       APP_FX},
   {"OKX",       APP_OKX},      {"Reader",   APP_READER},   {"BadApple", APP_BADAPPLE},
   {"Apps",      APP_STORE},    {"Settings", APP_SETTINGS},
+  {"Hawkins",   APP_HAWKINS},
 };
 const int APP_COUNT = sizeof(APPS) / sizeof(APPS[0]);
 
 // ⚠️ 组名最多 6 个字符：tab 条是 SW/GROUP_COUNT 平分屏宽，6 组时每格 240/6 = 40px，
 // 而 Font0 是 6px/字符——"SIGNAL" 已经占到 36px，只剩 2px 边距。再加组或起更长的名字之前
 // 先算这笔账（ui_common.cpp 的 drawGroupTabs）。
-constexpr GroupDef GROUPS[] = { {"TOOLS", 0, 8}, {"SCAN", 8, 5}, {"NET", 13, 6},
+constexpr GroupDef GROUPS[] = { {"TOOL", 0, 8}, {"SCAN", 8, 5}, {"NET", 13, 6},
                                 {"HID", 19, 3}, {"SIG", 22, 4}, {"SKY", 26, 6},
-                                {"MORE", 32, 8} };
+                                {"MORE", 32, 8}, {"RPG", 40, 1} };
 const int GROUP_COUNT = sizeof(GROUPS) / sizeof(GROUPS[0]);
 
 const int MENU_COLS = 4;
