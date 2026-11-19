@@ -3,6 +3,7 @@
 #include "hawkins_nvs.h"
 #include "hawkins_exploration.h"
 #include "hawkins_character.h"
+#include "hawkins_missions.h"
 #include "gnss.h"
 #include "ui_common.h"
 
@@ -32,6 +33,12 @@ uint8_t characterCreationStep = 0U;  // 0=nom, 1=classe
 uint8_t selectedClass = 0U;
 char characterName[hawkins::kCharacterNameCapacity + 1U] = {};
 uint8_t characterNameLength = 0U;
+
+hawkins::MissionState missions{};
+uint32_t missionSequence = 0U;
+bool missionsReady = false;
+bool missionsStorageError = false;
+bool showMissions = false;
 
 void setGpsStatus(const char* text) {
   if (gpsStatusText != text) {
@@ -92,7 +99,7 @@ void drawExplorationPage(const hawkins::WorldState* world) {
   cv.setTextColor(ICON_DIM, TFT_BLACK);
   cv.drawString(line, 5, 112);
   cv.setTextDatum(bottom_left);
-  cv.drawString("P PERSO   E MONDE   S SAUVER", 5, SH - 2);
+  cv.drawString("P PERSO  E MONDE  M MISS.  S SAVE", 5, SH - 2);
 }
 
 void drawWorldPage(const hawkins::WorldState* world) {
@@ -109,7 +116,7 @@ void drawWorldPage(const hawkins::WorldState* world) {
     cv.drawString("Verifier la memoire interne NVS.", SW / 2, 88);
     cv.setTextDatum(bottom_left);
     cv.setTextColor(ICON_DIM, TFT_BLACK);
-    cv.drawString("P PERSO   E TERRAIN   S SAUVER", 5, SH - 2);
+    cv.drawString("P PERSO  E TERRAIN  M MISS.  S SAVE", 5, SH - 2);
     return;
   }
 
@@ -145,6 +152,64 @@ void drawWorldPage(const hawkins::WorldState* world) {
   cv.setTextDatum(bottom_left);
   cv.setTextColor(ICON_DIM, TFT_BLACK);
   cv.drawString("P PERSO   E TERRAIN   S SAUVER", 5, SH - 2);
+}
+
+void drawMissionPage() {
+  cv.fillScreen(TFT_BLACK);
+  drawPageHeader("HAWKINS / MISSIONS", "CAMPAGNE LOCALE", ACCENT);
+  cv.setFont(&fonts::Font0);
+  cv.setTextSize(1);
+
+  if (!missionsReady) {
+    cv.setTextDatum(middle_center);
+    cv.setTextColor(TFT_ORANGE, TFT_BLACK);
+    cv.drawString(missionsStorageError ? "ERREUR SAUVEGARDE MISSIONS"
+                                       : "MISSIONS INDISPONIBLES",
+                  SW / 2, 54);
+    cv.setTextColor(ICON_DIM, TFT_BLACK);
+    cv.drawString("Aucune donnee n'a ete effacee.", SW / 2, 72);
+  } else {
+    for (uint8_t i = 0U; i < hawkins::kMissionCount; ++i) {
+      const hawkins::MissionId id = static_cast<hawkins::MissionId>(i);
+      const hawkins::MissionDef& def = hawkins::missionDefinition(id);
+      const hawkins::MissionStatus status = hawkins::missionStatus(missions, id);
+      const int y = 23 + static_cast<int>(i) * 29;
+      cv.setTextDatum(top_left);
+      cv.setTextColor(status == hawkins::MissionStatus::Complete ? ACCENT
+                         : status == hawkins::MissionStatus::Active ? TFT_WHITE
+                                                                    : ICON_DIM,
+                      TFT_BLACK);
+      cv.drawString(def.title, 6, y);
+      const char* statusText =
+          status == hawkins::MissionStatus::Complete ? "TERMINEE" :
+          status == hawkins::MissionStatus::Active ? "ACTIVE" : "VERROU";
+      cv.setTextDatum(top_right);
+      cv.setTextColor(status == hawkins::MissionStatus::Complete ? ACCENT
+                         : status == hawkins::MissionStatus::Active ? TFT_WHITE
+                                                                    : ICON_DIM,
+                      TFT_BLACK);
+      cv.drawString(statusText, SW - 6, y);
+
+      char progress[38];
+      const uint32_t value = i == static_cast<uint8_t>(
+          hawkins::MissionId::ThreeSectors) ? missions.sectors
+                                            : missions.discoveries;
+      snprintf(progress, sizeof(progress), "%s : %lu / %lu",
+               i == static_cast<uint8_t>(hawkins::MissionId::ThreeSectors)
+                   ? "SECTEURS" : "SIGNAUX",
+               (unsigned long)value, (unsigned long)def.target);
+      cv.setTextDatum(top_left);
+      cv.setTextColor(ICON_DIM, TFT_BLACK);
+      cv.drawString(progress, 6, y + 11);
+      if (i + 1U < hawkins::kMissionCount) {
+        cv.drawFastHLine(6, y + 25, SW - 12, DIM_BORDER);
+      }
+    }
+  }
+
+  cv.setTextDatum(bottom_left);
+  cv.setTextColor(ICON_DIM, TFT_BLACK);
+  cv.drawString("M RETOUR   P PERSO   E TERRAIN", 5, SH - 2);
 }
 
 void drawCharacterAttributes(const hawkins::CharacterState& character,
@@ -254,7 +319,7 @@ void drawCharacterPage() {
   cv.drawString(line, 8, 116);
   cv.setTextDatum(bottom_left);
   cv.setTextColor(ICON_DIM, TFT_BLACK);
-  cv.drawString("P RETOUR   S SAUVER", 5, SH - 2);
+  cv.drawString("P RETOUR   S SAVE   M MISS.", 5, SH - 2);
 }
 
 bool savePlayerState(const hawkins::CharacterState& candidate) {
@@ -265,6 +330,49 @@ bool savePlayerState(const hawkins::CharacterState& candidate) {
   playerLoaded = true;
   playerStorageError = false;
   dirty = true;
+  return true;
+}
+
+void applyCompletedMissionRewards() {
+  if (!missionsReady || !playerLoaded) return;
+  for (uint8_t i = 0U; i < hawkins::kMissionCount; ++i) {
+    const hawkins::MissionId id = static_cast<hawkins::MissionId>(i);
+    if (hawkins::missionStatus(missions, id) != hawkins::MissionStatus::Complete) {
+      continue;
+    }
+    const uint8_t mask = static_cast<uint8_t>(1U << i);
+    if ((player.missionRewardMask & mask) != 0U) continue;
+
+    hawkins::CharacterState updated = player;
+    if (!hawkins::awardCharacterMissionXpOnce(
+            updated, i, hawkins::missionRewardXp(id)) ||
+        !savePlayerState(updated)) {
+      playerStorageError = true;
+      setGpsStatus("RECOMPENSE EN ATTENTE - ERREUR NVS");
+      return;
+    }
+  }
+}
+
+bool commitMissionProgress(uint32_t cellKey, bool discovery) {
+  if (!missionsReady) return false;
+  hawkins::MissionState updated = missions;
+  hawkins::recordMissionSector(updated, cellKey, discovery);
+  if (updated.sectors == missions.sectors &&
+      updated.discoveries == missions.discoveries &&
+      updated.lastCellKey == missions.lastCellKey &&
+      updated.hasLastCell == missions.hasLastCell) {
+    return true;  // La cellule a deja ete prise en compte avant une coupure.
+  }
+  uint32_t nextSequence = missionSequence;
+  if (!hawkins::missionSaveCommit(updated, &nextSequence)) {
+    missionsStorageError = true;
+    setGpsStatus("ERREUR SAUVEGARDE MISSIONS");
+    return false;
+  }
+  missions = updated;
+  missionSequence = nextSequence;
+  applyCompletedMissionRewards();
   return true;
 }
 
@@ -320,6 +428,7 @@ void handleCharacterCreationKey(char key) {
     }
     if (savePlayerState(created)) {
       setGpsStatus("PERSONNAGE CREE ET SAUVEGARDE");
+      applyCompletedMissionRewards();
     } else {
       playerStorageError = true;
       setGpsStatus("ERREUR SAUVEGARDE PERSONNAGE");
@@ -347,6 +456,9 @@ void hawkinsAppEnter() {
   explorerStorageError = false;
   showExploration = true;
   showCharacter = false;
+  showMissions = false;
+  missionsReady = false;
+  missionsStorageError = false;
   gpsStatusText = "GPS EN ATTENTE";
 
   const hawkins::ExplorationSaveLoadStatus exploreLoad =
@@ -367,6 +479,20 @@ void hawkinsAppEnter() {
   playerLoaded = characterLoad == hawkins::CharacterSaveLoadStatus::Loaded;
   playerStorageError = characterLoad == hawkins::CharacterSaveLoadStatus::Corrupt ||
                        characterLoad == hawkins::CharacterSaveLoadStatus::StorageError;
+
+  const hawkins::MissionSaveLoadStatus missionLoad =
+      hawkins::missionSaveLoad(missions, &missionSequence);
+  if (missionLoad == hawkins::MissionSaveLoadStatus::Loaded) {
+    missionsReady = true;
+  } else if (missionLoad == hawkins::MissionSaveLoadStatus::Empty) {
+    hawkins::initializeMissions(missions);
+    missionsReady = hawkins::missionSaveCommit(missions, &missionSequence);
+    missionsStorageError = !missionsReady;
+  } else {
+    missionsStorageError = true;
+  }
+  if (missionsReady && playerLoaded) applyCompletedMissionRewards();
+
   characterCreationStep = 0U;
   selectedClass = 0U;
   memset(characterName, 0, sizeof(characterName));
@@ -383,6 +509,13 @@ void hawkinsAppUpdate() {
     setGpsStatus(explorerStorageError ? "ERREUR MEMOIRE NVS"
                                       : "EXPLORATION INDISPONIBLE");
     candidateActive = false;
+    return;
+  }
+  if (!playerLoaded) {
+    gpsSats = 0U;
+    candidateActive = false;
+    setGpsStatus(playerStorageError ? "PROFIL INDISPONIBLE - NVS"
+                                    : "CREER PERSONNAGE AVANT JOUER");
     return;
   }
   if (!gnssCapConnected()) {
@@ -447,21 +580,34 @@ void hawkinsAppUpdate() {
     dirty = true;
     return;
   }
-  if (!hawkins::explorationSaveCommit(exploration, &explorationSequence)) {
-    explorerStorageError = true;
-    explorerReady = false;
-    setGpsStatus("ERREUR SAUVEGARDE GPS");
-    return;
-  }
-
   if (result == hawkins::ExplorationResult::OriginSet) {
+    if (!hawkins::explorationSaveCommit(exploration, &explorationSequence)) {
+      explorerStorageError = true;
+      explorerReady = false;
+      setGpsStatus("ERREUR SAUVEGARDE GPS");
+      return;
+    }
     setGpsStatus("POINT DE DEPART ENREGISTRE");
   } else {
+    const bool discovery =
+        result == hawkins::ExplorationResult::NewDiscovery;
+    if (!commitMissionProgress(candidateCellKey, discovery)) {
+      candidateActive = false;
+      setGpsStatus("MISSION NON SAUVEGARDEE - REESSAYER");
+      return;
+    }
+    if (!hawkins::explorationSaveCommit(exploration, &explorationSequence)) {
+      explorerStorageError = true;
+      explorerReady = false;
+      setGpsStatus("GPS EN ATTENTE DE SAUVEGARDE");
+      return;
+    }
+
     const bool daySaved = hawkins::hawkinsRuntimeAdvanceDays(1U);
-    const uint16_t reward =
-        result == hawkins::ExplorationResult::NewDiscovery ? 50U : 25U;
+    const uint16_t reward = discovery ? 50U : 25U;
     awardExplorationExperience(reward);
-    if (result == hawkins::ExplorationResult::NewDiscovery) {
+    applyCompletedMissionRewards();
+    if (discovery) {
       setGpsStatus(daySaved ? "SIGNAL ANORMAL DECOUVERT"
                             : "SIGNAL TROUVE - SAUVEGARDE MONDE");
     } else {
@@ -473,6 +619,19 @@ void hawkinsAppUpdate() {
 }
 
 void hawkinsAppKey(char key) {
+  if (showMissions) {
+    if (key == 'm' || key == 'M' || key == 'e' || key == 'E') {
+      showMissions = false;
+      dirty = true;
+      return;
+    }
+    if (key == 'p' || key == 'P') {
+      showCharacter = true;
+      dirty = true;
+      return;
+    }
+  }
+
   if (showCharacter && !playerLoaded && !playerStorageError) {
     handleCharacterCreationKey(key);
     return;
@@ -498,6 +657,9 @@ void hawkinsAppKey(char key) {
   if (key == 'p' || key == 'P') {
     showCharacter = true;
     dirty = true;
+  } else if (key == 'm' || key == 'M') {
+    showMissions = true;
+    dirty = true;
   } else if (key == 'e' || key == 'E') {
     showExploration = !showExploration;
     dirty = true;
@@ -507,7 +669,9 @@ void hawkinsAppKey(char key) {
         hawkins::explorationSaveCommit(exploration, &explorationSequence);
     const bool characterSaved = !playerLoaded ||
         savePlayerState(player);
-    setGpsStatus(worldSaved && exploreSaved && characterSaved
+    const bool missionsSaved = missionsReady &&
+        hawkins::missionSaveCommit(missions, &missionSequence);
+    setGpsStatus(worldSaved && exploreSaved && characterSaved && missionsSaved
                      ? "SAUVEGARDE LOCALE OK"
                      : "ERREUR DE SAUVEGARDE");
     dirty = true;
@@ -517,6 +681,10 @@ void hawkinsAppKey(char key) {
 void drawHawkinsApp() {
   if (showCharacter) {
     drawCharacterPage();
+    return;
+  }
+  if (showMissions) {
+    drawMissionPage();
     return;
   }
   const hawkins::WorldState* world = hawkins::hawkinsRuntimeWorld();
