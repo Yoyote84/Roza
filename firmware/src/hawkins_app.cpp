@@ -504,6 +504,11 @@ void hawkinsAppUpdate() {
   const uint32_t now = millis();
   if (lastSampleMs != 0U && now - lastSampleMs < 1000U) return;
   lastSampleMs = now;
+  if (missionsReady && playerLoaded &&
+      hawkins::missionStatus(missions, hawkins::MissionId::FirstSignal) !=
+          hawkins::MissionStatus::Locked) {
+    applyCompletedMissionRewards();
+  }
 
   if (!explorerReady) {
     setGpsStatus(explorerStorageError ? "ERREUR MEMOIRE NVS"
@@ -567,6 +572,7 @@ void hawkinsAppUpdate() {
     return;
   }
 
+  const hawkins::ExplorationState previousExploration = exploration;
   const hawkins::ExplorationResult result =
       hawkins::observeExplorationCell(exploration, candidateCellKey);
   candidateActive = false;
@@ -592,6 +598,7 @@ void hawkinsAppUpdate() {
     const bool discovery =
         result == hawkins::ExplorationResult::NewDiscovery;
     if (!commitMissionProgress(candidateCellKey, discovery)) {
+      exploration = previousExploration;
       candidateActive = false;
       setGpsStatus("MISSION NON SAUVEGARDEE - REESSAYER");
       return;
@@ -620,8 +627,14 @@ void hawkinsAppUpdate() {
 
 void hawkinsAppKey(char key) {
   if (showMissions) {
-    if (key == 'm' || key == 'M' || key == 'e' || key == 'E') {
+    if (key == 'm' || key == 'M') {
       showMissions = false;
+      dirty = true;
+      return;
+    }
+    if (key == 'e' || key == 'E') {
+      showMissions = false;
+      showExploration = true;
       dirty = true;
       return;
     }
@@ -640,6 +653,12 @@ void hawkinsAppKey(char key) {
   if (showCharacter) {
     if (key == 'p' || key == 'P') {
       showCharacter = false;
+      dirty = true;
+      return;
+    }
+    if (key == 'm' || key == 'M') {
+      showCharacter = false;
+      showMissions = true;
       dirty = true;
       return;
     }
