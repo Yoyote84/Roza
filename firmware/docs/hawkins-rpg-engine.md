@@ -1,4 +1,4 @@
-# Moteur RPG Hawkins — étapes 1 à 5
+# Moteur RPG Hawkins — étapes 1 à 6
 
 Le jeu est intégré au firmware ROZA existant. Il conserve les pilotes matériels de ROZA et ne remplace ni les fonctions GNSS, ni les fonctions LoRa, ni l'interface principale.
 La cible reste le Cardputer ADV ESP32-S3FN8, Flash 8 Mo, sans PSRAM.
@@ -36,11 +36,11 @@ La cible reste le Cardputer ADV ESP32-S3FN8, Flash 8 Mo, sans PSRAM.
 - Création locale : nom ASCII de 1 à 12 caractères, puis choix de classe au clavier. Aucun compte, service distant ou identifiant réseau.
 - Caractéristiques : Force, Endurance, Agilité, Intelligence, Perception et Charisme.
 - Les points de vie max sont dérivés de l'Endurance ; la capacité de stress est dérivée de la Perception.
-- Un secteur inédit rapporte 25 XP ; une découverte narrative rapporte 50 XP. Un passage de niveau ajoute un point de compétence non dépensé, réservé aux futurs arbres de compétences.
+- Un secteur inédit rapporte 25 XP ; une découverte narrative rapporte 50 XP. Un passage de niveau ajoute un point de compétence, dépensable dans l'écran Compétences de l'étape 6.
 - Le personnage doit être créé avant l'exploration récompensée : cela évite de perdre les XP si le joueur part en exploration sans profil.
 - Le profil est sauvegardé dans la NVS sous char0 et char1, avec format binaire versionné, CRC-32, alternance des emplacements et vérification de lecture.
 - Le profil est indépendant de l'exploration et du monde. La perte ou la corruption d'un emplacement ne déclenche aucun effacement automatique.
-- Depuis Hawkins, P ouvre le personnage, E alterne Terrain/Monde, M ouvre les missions et S force les sauvegardes.
+- Depuis Hawkins : P personnage, E Terrain/Monde, M missions, I inventaire, K compétences, Q rencontre scénarisée, D sauvegardes, S sauvegarde locale.
 - Les trois bits réservés du format de sauvegarde du personnage conservent les récompenses de mission déjà créditées. Les anciennes sauvegardes (bits à zéro) restent lisibles par cette version ; la taille et la version du format ne changent pas.
 
 ## Étape 5 — missions et récompenses hors ligne
@@ -58,11 +58,25 @@ La cible reste le Cardputer ADV ESP32-S3FN8, Flash 8 Mo, sans PSRAM.
 
 La progression du personnage dépend des secteurs réellement découverts et du moteur local. L'activation future du Wi-Fi ne déclenche ni synchronisation obligatoire ni téléchargement de contenu. Aucun service réseau n'est utilisé pour créer, afficher, faire évoluer ou sauvegarder le personnage.
 
+## Étape 6 — aventure, choix et sauvegarde microSD
+
+- `hawkins_adventure.h/.cpp` ajoute un inventaire, quatre types d'objets, quatre compétences et une première rencontre narrative à choix.
+- L'inventaire de départ comprend une trousse de soins, un thé calmant et une pile AA. Les trousses restaurent 8 PV (12 avec Premiers soins) ; le thé réduit le stress de 8 (12 avec Sang-froid). Les ressources de preuve et les piles sont conservées comme objets d'enquête.
+- Les quatre compétences dépensent réellement un point gagné au passage de niveau et exigent une caractéristique minimale : Premiers soins (Endurance 7), Sang-froid (Perception 7), Bricolage (Intelligence 8), Observation (Perception 8).
+- La première rencontre propose trois décisions : aider, enquêter ou se replier. Les attributs et compétences influencent la réussite ; XP, objets, PV et stress changent selon le choix. Le choix est enregistré et ne peut pas être rejoué pour obtenir plusieurs récompenses.
+- La progression d'aventure est sauvegardée en NVS dans `adv0` et `adv1`, avec séquence, CRC-32, alternance des emplacements et relecture de vérification.
+- L'option `D SD` ouvre le gestionnaire de sauvegarde. `A` active/désactive la copie automatique ; `B` crée une copie immédiate ; `R` puis `R` confirme la restauration ; `D` revient en jeu.
+- La sauvegarde SD regroupe les cinq blocs du jeu : monde, exploration, personnage, missions et aventure (inventaire, compétences et choix). Les archives sont dans `/HAWKINS/SLOT0.HWS` et `/HAWKINS/SLOT1.HWS` ; une écriture temporaire est relue et contrôlée avant de remplacer le slot le plus ancien. Chaque bloc conserve aussi son propre CRC.
+- L'option automatique est désactivée par défaut. L'activer crée et vérifie d'abord une sauvegarde complète ; ensuite chaque progression importante la recopie sur la carte. La touche B reste disponible pour une copie manuelle quand l'automatique est désactivée.
+- La NVS reste la sauvegarde de fonctionnement. Une carte absente, pleine, illisible ou retirée ne bloque donc pas la partie ; une erreur SD est signalée sans effacer la copie interne. La restauration contrôle l'intégralité de l'archive avant de commencer les écritures NVS ; une panne NVS pendant la restauration peut néanmoins laisser une restauration partielle, signalée à l'écran.
+- Aucune opération ne formate la carte ni ne supprime d'autres fichiers. ROZA doit d'abord monter la carte via son pilote SD existant ; une carte 128 Go non reconnue reste intacte et le jeu continue avec la NVS. Le type de système de fichiers et le fonctionnement de cette carte précise restent à confirmer sur le matériel.
+- Le Wi-Fi démarre en arrière-plan au lancement seulement si ROZA a déjà mémorisé un réseau. La connexion est non bloquante et les tentatives réseau n'interviennent pas dans le moteur du RPG. Sans identifiants mémorisés, la radio Wi-Fi ne démarre pas. Jeu, GNSS, inventaire, missions et sauvegardes internes restent hors ligne.
+
 ## Sauvegarde et stockage
 
-Les données du monde, de l'exploration et du personnage sont stockées dans la NVS interne. Le verrou PrefsLock existant est réutilisé pour éviter les accès concurrents au gestionnaire Preferences.
+Les états restent d'abord dans la NVS interne, protégée par les codecs CRC existants et par `PrefsLock`. La microSD est une copie de sauvegarde complète facultative : elle n'est jamais nécessaire pour charger ou faire progresser une partie. La copie SD utilise deux slots alternés, un fichier temporaire et une relecture avant validation. Les fichiers étrangers au dossier `/HAWKINS` ne sont pas touchés.
 
-Aucun formatage, effacement ou écriture n'est effectué sur la microSD. Les fonctions existantes de partage SPI entre la SD et le SX1262 ne sont pas modifiées.
+Ne jamais formater automatiquement une carte de 128 Go. Si `sdMounted` est faux, Hawkins laisse la carte tranquille et garde la sauvegarde NVS.
 
 ## Tests logiciels
 
@@ -72,13 +86,17 @@ La suite native hawkinstest vérifie :
 - la conversion de coordonnées en cellules et le rejet de coordonnées invalides ;
 - les visites, retours et découvertes ;
 - la création, les limites du nom, les attributs, les gains d'XP, les niveaux, les récompenses idempotentes et les sauvegardes CRC du personnage ;
-- le déverrouillage séquentiel, les doublons de secteurs, les sauvegardes CRC et la restauration des missions.
+- le déverrouillage séquentiel, les doublons de secteurs, les sauvegardes CRC et la restauration des missions ;
+- les objets consommables, le plafonnement des effets, les prérequis et la dépense des points de compétence, les conséquences à choix unique et la validation CRC de l'état d'aventure.
+
+La suite native ne simule pas le contrôleur SD ni une carte de 128 Go : les opérations de fichier doivent encore être validées sur la carte réelle et la compilation PlatformIO vérifie l'intégration ESP32.
 
 La compilation native ne remplace pas les essais physiques. Le GPS peut ne pas obtenir de fix en intérieur ou dans un environnement masqué.
 
-## Limites restantes
+## Vérifications matérielles restantes
 
-- Les missions scénarisées, les dialogues à choix, l'inventaire, les objets, les compétences dépensables, les combats et les interactions avec les factions restent à développer.
-- Les points de compétence sont comptés mais pas encore dépensables.
-- Les dégâts et le stress ne changent pas encore ; leur gestion est réservée au système de jeu suivant.
-- Les essais physiques sur Cardputer ADV + Cap LoRa-1262 restent nécessaires.
+- Tester l'obtention du fix GNSS en extérieur avec le Cap LoRa-1262 et valider la stabilité du parcours.
+- Vérifier que la carte microSD 128 Go est montée par le pilote ROZA. Le code ne la formate jamais ; le format actuellement présent sur la carte doit être reconnu par le pilote.
+- Tester une sauvegarde automatique, une copie manuelle, un retrait de carte, puis une restauration. Vérifier aussi le cas d'une carte pleine et d'une coupure pendant l'écriture.
+- Vérifier le démarrage Wi-Fi sur un réseau déjà enregistré, puis le fonctionnement complet du RPG sans point d'accès.
+- Les combats, le multijoueur et une mise à jour de contenu du scénario par Wi-Fi ne font pas partie de cette étape ; le Wi-Fi est ici une disponibilité réseau facultative, pas une dépendance ni un mécanisme de téléchargement de scénario.

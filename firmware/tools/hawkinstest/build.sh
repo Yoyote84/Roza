@@ -16,4 +16,9 @@ fi
 "$CXX" -std=c++17 -Wall -Wextra -Werror $SANFLAGS \
   -I ../../src missions_test.cpp ../../src/hawkins_missions.cpp \
   -o /tmp/roza-hawkins-missions-test
+
+"$CXX" -std=c++17 -Wall -Wextra -Werror $SANFLAGS \
+  -I ../../src adventure_test.cpp ../../src/hawkins_adventure.cpp \
+  ../../src/hawkins_character.cpp -o /tmp/roza-hawkins-adventure-test
+/tmp/roza-hawkins-adventure-test
 /tmp/roza-hawkins-missions-test

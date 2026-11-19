@@ -1218,11 +1218,10 @@ void setup() {
   bootMark("post-complete");
   ramMark("selftest");
 
-  // ROZA : aucun démarrage réseau au boot, même si des identifiants sont mémorisés.
-  // Le Wi-Fi ne démarre que lorsqu'une application/commande demandée par l'utilisateur
-  // appelle explicitement la connexion ou le scan. Après une connexion volontaire,
-  // wifiKeeperResume() autorise les reconnexions ultérieures.
-  // L'horloge reste autonome hors ligne ; aucune synchronisation NTP automatique.
+  // Connexion non bloquante facultative : uniquement les identifiants déjà mémorisés.
+  // Sans réseau enregistré, la radio reste inactive. Un délai ou un échec Wi-Fi ne bloque pas ROZA.
+  // Hawkins reste jouable, explorable et sauvegardable sans connexion.
+  bootWifiStart();
 
 
   lastActivityMs = millis();

@@ -4,6 +4,10 @@
 #include "hawkins_exploration.h"
 #include "hawkins_character.h"
 #include "hawkins_missions.h"
+#include "hawkins_adventure.h"
+#include "hawkins_adventure_store.h"
+#include "hawkins_sd_backup.h"
+#include "sd_files.h"
 #include "gnss.h"
 #include "ui_common.h"
 
@@ -39,6 +43,16 @@ uint32_t missionSequence = 0U;
 bool missionsReady = false;
 bool missionsStorageError = false;
 bool showMissions = false;
+
+hawkins::AdventureState adventure{};
+uint32_t adventureSequence = 0U;
+bool adventureReady = false;
+bool adventureStorageError = false;
+bool showInventory = false;
+bool showSkills = false;
+bool showFirstContact = false;
+bool showStorage = false;
+bool restoreConfirmation = false;
 
 void setGpsStatus(const char* text) {
   if (gpsStatusText != text) {
@@ -99,7 +113,7 @@ void drawExplorationPage(const hawkins::WorldState* world) {
   cv.setTextColor(ICON_DIM, TFT_BLACK);
   cv.drawString(line, 5, 112);
   cv.setTextDatum(bottom_left);
-  cv.drawString("P PERSO  E MONDE  M MISS.  S SAVE", 5, SH - 2);
+  cv.drawString("P PERSO M MISS I OBJ K COMP Q SCN D SD", 5, SH - 2);
 }
 
 void drawWorldPage(const hawkins::WorldState* world) {
@@ -116,7 +130,7 @@ void drawWorldPage(const hawkins::WorldState* world) {
     cv.drawString("Verifier la memoire interne NVS.", SW / 2, 88);
     cv.setTextDatum(bottom_left);
     cv.setTextColor(ICON_DIM, TFT_BLACK);
-    cv.drawString("P PERSO  E TERRAIN  M MISS.  S SAVE", 5, SH - 2);
+    cv.drawString("P PERSO M MISS I OBJ K COMP Q SCN D SD", 5, SH - 2);
     return;
   }
 
@@ -210,7 +224,7 @@ void drawMissionPage() {
 
   cv.setTextDatum(bottom_left);
   cv.setTextColor(ICON_DIM, TFT_BLACK);
-  cv.drawString("M RETOUR   P PERSO   E TERRAIN", 5, SH - 2);
+  cv.drawString("M RET I OBJ K COMP Q SCN D SD", 5, SH - 2);
 }
 
 void drawCharacterAttributes(const hawkins::CharacterState& character,
@@ -320,7 +334,156 @@ void drawCharacterPage() {
   cv.drawString(line, 8, 116);
   cv.setTextDatum(bottom_left);
   cv.setTextColor(ICON_DIM, TFT_BLACK);
-  cv.drawString("P RETOUR   S SAVE   M MISS.", 5, SH - 2);
+  cv.drawString("P RET M MISS I OBJ K COMP Q SCN", 5, SH - 2);
+}
+
+
+void drawInventoryPage() {
+  cv.fillScreen(TFT_BLACK);
+  drawPageHeader("HAWKINS / INVENTAIRE", "OBJETS", ACCENT);
+  cv.setFont(&fonts::Font0);
+  cv.setTextSize(1);
+  const hawkins::AdventureItem items[hawkins::kAdventureItemCount] = {
+      hawkins::AdventureItem::Medkit, hawkins::AdventureItem::CalmingTea,
+      hawkins::AdventureItem::SpareBattery, hawkins::AdventureItem::Evidence};
+  for (uint8_t i = 0U; i < hawkins::kAdventureItemCount; ++i) {
+    char line[42];
+    snprintf(line, sizeof(line), "%u  %s", unsigned(i + 1U),
+             hawkins::adventureItemName(items[i]));
+    cv.setTextDatum(top_left);
+    cv.setTextColor(i < 2U ? TFT_WHITE : ICON_DIM, TFT_BLACK);
+    cv.drawString(line, 7, 23 + int(i) * 21);
+    snprintf(line, sizeof(line), "QTE : %u", unsigned(adventure.items[i]));
+    cv.setTextDatum(top_right);
+    cv.setTextColor(ACCENT, TFT_BLACK);
+    cv.drawString(line, SW - 7, 23 + int(i) * 21);
+  }
+  cv.setTextDatum(bottom_left);
+  cv.setTextColor(ICON_DIM, TFT_BLACK);
+  cv.drawString("1 SOINS  2 CALME  I RETOUR", 5, SH - 2);
+}
+
+void drawSkillsPage() {
+  cv.fillScreen(TFT_BLACK);
+  drawPageHeader("HAWKINS / COMPETENCES", "TALENTS", ACCENT);
+  cv.setFont(&fonts::Font0);
+  cv.setTextSize(1);
+  for (uint8_t i = 0U; i < hawkins::kAdventureSkillCount; ++i) {
+    const hawkins::AdventureSkill skill = static_cast<hawkins::AdventureSkill>(i);
+    const hawkins::AdventureSkillDef& def = hawkins::adventureSkillDefinition(skill);
+    char line[44];
+    snprintf(line, sizeof(line), "%u %s  %s", unsigned(i + 1U), def.name,
+             hawkins::adventureHasSkill(adventure, skill) ? "OK" : "A ACHETER");
+    cv.setTextDatum(top_left);
+    cv.setTextColor(hawkins::adventureHasSkill(adventure, skill) ? ACCENT : TFT_WHITE,
+                    TFT_BLACK);
+    cv.drawString(line, 5, 21 + int(i) * 22);
+    snprintf(line, sizeof(line), "%s >= %u  PTS: %u",
+             hawkins::characterAttributeName(def.attribute),
+             unsigned(def.requiredValue), unsigned(player.skillPoints));
+    cv.setTextColor(ICON_DIM, TFT_BLACK);
+    cv.drawString(line, 15, 31 + int(i) * 22);
+  }
+  cv.setTextDatum(bottom_left);
+  cv.setTextColor(ICON_DIM, TFT_BLACK);
+  cv.drawString("1-4 DEBLOQUER  K RETOUR", 5, SH - 2);
+}
+
+void drawFirstContactPage() {
+  cv.fillScreen(TFT_BLACK);
+  drawPageHeader("HAWKINS / RADIO", "RENCONTRE", ACCENT);
+  cv.setFont(&fonts::Font0);
+  cv.setTextSize(1);
+  cv.setTextDatum(top_left);
+  cv.setTextColor(TFT_WHITE, TFT_BLACK);
+  cv.drawString("UN APPEL GRÉSILLE PRES DU LABO.", 5, 22);
+  cv.drawString("UNE VOIX DEMANDE DE L'AIDE.", 5, 35);
+  if ((adventure.storyFlags & 0x01U) != 0U) {
+    cv.setTextColor(ACCENT, TFT_BLACK);
+    cv.drawString("DECISION ENREGISTREE.", 5, 60);
+    cv.setTextColor(ICON_DIM, TFT_BLACK);
+    cv.drawString("Cette rencontre ne se rejoue pas.", 5, 76);
+  } else {
+    cv.setTextColor(ACCENT, TFT_BLACK);
+    cv.drawString("1 AIDER LA PERSONNE", 5, 59);
+    cv.setTextColor(TFT_WHITE, TFT_BLACK);
+    cv.drawString("2 ENQUETER SUR LE SIGNAL", 5, 76);
+    cv.drawString("3 SE REPLIER PRUDEMMENT", 5, 93);
+  }
+  cv.setTextDatum(bottom_left);
+  cv.setTextColor(ICON_DIM, TFT_BLACK);
+  cv.drawString("1 AIDER  2 ENQUETER  3 FUIR  Q RETOUR", 3, SH - 2);
+}
+
+void drawStoragePage() {
+  cv.fillScreen(TFT_BLACK);
+  drawPageHeader("HAWKINS / SAUVEGARDE", sdMounted ? "MICROSD" : "SANS SD",
+                 sdMounted ? ACCENT : TFT_ORANGE);
+  cv.setFont(&fonts::Font0);
+  cv.setTextSize(1);
+  char line[48];
+  cv.setTextDatum(top_left);
+  cv.setTextColor(TFT_WHITE, TFT_BLACK);
+  if (sdMounted) {
+    snprintf(line, sizeof(line), "CARTE : %llu MB",
+             static_cast<unsigned long long>(sdSizeMB));
+    cv.drawString(line, 6, 22);
+    snprintf(line, sizeof(line), "UTILISE : %llu MB",
+             static_cast<unsigned long long>(sdUsedMB));
+    cv.setTextColor(ICON_DIM, TFT_BLACK);
+    cv.drawString(line, 6, 35);
+  } else {
+    cv.drawString("CARTE NON MONTEE / FORMAT NON LU", 6, 27);
+    cv.drawString("AUCUNE DONNEE DE LA CARTE EFFACEE", 6, 40);
+  }
+  cv.setTextColor(ACCENT, TFT_BLACK);
+  snprintf(line, sizeof(line), "COPIE AUTO : %s",
+           hawkins::sdBackupEnabled() ? "OUI" : "NON");
+  cv.drawString(line, 6, 55);
+  cv.setTextColor(TFT_WHITE, TFT_BLACK);
+  snprintf(line, sizeof(line), "COPIE NUMERO : %lu",
+           static_cast<unsigned long>(hawkins::sdBackupSequence()));
+  cv.drawString(line, 6, 69);
+  cv.setTextColor(adventureStorageError ? TFT_ORANGE : ICON_DIM, TFT_BLACK);
+  cv.drawString(adventureStorageError ? "ERREUR NVS AVENTURE"
+                                     : hawkins::sdBackupStatusText(), 6, 83);
+  cv.setTextColor(TFT_WHITE, TFT_BLACK);
+  cv.drawString(gpsStatusText, 6, 96);
+  if (restoreConfirmation) {
+    cv.setTextColor(TFT_ORANGE, TFT_BLACK);
+    cv.drawString("R A NOUVEAU : RESTAURER LA PARTIE", 6, 111);
+  } else {
+    cv.setTextColor(ICON_DIM, TFT_BLACK);
+    cv.drawString("A AUTO  B COPIE  R RESTAURER", 6, 111);
+  }
+  cv.setTextDatum(bottom_left);
+  cv.setTextColor(ICON_DIM, TFT_BLACK);
+  cv.drawString("D RETOUR", 5, SH - 2);
+}
+
+bool saveAdventureAndCharacter(const hawkins::AdventureState& nextAdventure,
+                               const hawkins::CharacterState& nextPlayer) {
+  uint32_t nextPlayerSequence = playerSequence;
+  if (!hawkins::characterSaveCommit(nextPlayer, &nextPlayerSequence)) return false;
+  uint32_t nextAdventureSequence = adventureSequence;
+  if (!hawkins::adventureSaveCommit(nextAdventure, &nextAdventureSequence)) {
+    uint32_t rollbackSequence = playerSequence;
+    if (!hawkins::characterSaveCommit(player, &rollbackSequence)) {
+      playerStorageError = true;
+      setGpsStatus("ERREUR RESTAURATION DU PROFIL");
+    }
+    return false;
+  }
+  player = nextPlayer;
+  playerSequence = nextPlayerSequence;
+  adventure = nextAdventure;
+  adventureSequence = nextAdventureSequence;
+  adventureReady = true;
+  playerStorageError = false;
+  adventureStorageError = false;
+  hawkins::sdBackupAutoSave();
+  dirty = true;
+  return true;
 }
 
 bool savePlayerState(const hawkins::CharacterState& candidate) {
@@ -430,6 +593,7 @@ void handleCharacterCreationKey(char key) {
     if (savePlayerState(created)) {
       setGpsStatus("PERSONNAGE CREE ET SAUVEGARDE");
       applyCompletedMissionRewards();
+      hawkins::sdBackupAutoSave();
     } else {
       playerStorageError = true;
       setGpsStatus("ERREUR SAUVEGARDE PERSONNAGE");
@@ -493,6 +657,23 @@ void hawkinsAppEnter() {
     missionsStorageError = true;
   }
   if (missionsReady && playerLoaded) applyCompletedMissionRewards();
+
+  adventureReady = false;
+  adventureStorageError = false;
+  const hawkins::AdventureSaveLoadStatus adventureLoad =
+      hawkins::adventureSaveLoad(adventure, &adventureSequence);
+  if (adventureLoad == hawkins::AdventureSaveLoadStatus::Loaded) {
+    adventureReady = true;
+  } else if (adventureLoad == hawkins::AdventureSaveLoadStatus::Empty) {
+    hawkins::initializeAdventure(adventure);
+    adventureReady = hawkins::adventureSaveCommit(adventure, &adventureSequence);
+    adventureStorageError = !adventureReady;
+  } else {
+    adventureStorageError = true;
+  }
+  hawkins::sdBackupInit();
+  showInventory = showSkills = showFirstContact = showStorage = false;
+  restoreConfirmation = false;
 
   characterCreationStep = 0U;
   selectedClass = 0U;
@@ -595,6 +776,7 @@ void hawkinsAppUpdate() {
       return;
     }
     setGpsStatus("POINT DE DEPART ENREGISTRE");
+    hawkins::sdBackupAutoSave();
   } else {
     const bool discovery =
         result == hawkins::ExplorationResult::NewDiscovery;
@@ -615,6 +797,7 @@ void hawkinsAppUpdate() {
     const uint16_t reward = discovery ? 50U : 25U;
     awardExplorationExperience(reward);
     applyCompletedMissionRewards();
+    hawkins::sdBackupAutoSave();
     if (discovery) {
       setGpsStatus(daySaved ? "SIGNAL ANORMAL DECOUVERT"
                             : "SIGNAL TROUVE - SAUVEGARDE MONDE");
@@ -627,6 +810,128 @@ void hawkinsAppUpdate() {
 }
 
 void hawkinsAppKey(char key) {
+  if (showInventory) {
+    if (key == 'i' || key == 'I') {
+      showInventory = false;
+      dirty = true;
+      return;
+    }
+    if ((key == '1' || key == '2') && playerLoaded && adventureReady) {
+      hawkins::CharacterState nextPlayer = player;
+      hawkins::AdventureState nextAdventure = adventure;
+      const hawkins::AdventureItem item = key == '1'
+          ? hawkins::AdventureItem::Medkit : hawkins::AdventureItem::CalmingTea;
+      if (hawkins::adventureUseItem(nextAdventure, nextPlayer, item) &&
+          saveAdventureAndCharacter(nextAdventure, nextPlayer)) {
+        setGpsStatus("OBJET UTILISE");
+      } else {
+        setGpsStatus("OBJET INDISPONIBLE / ECHEC SAUVEGARDE");
+      }
+      dirty = true;
+      return;
+    }
+    return;
+  }
+
+  if (showSkills) {
+    if (key == 'k' || key == 'K') {
+      showSkills = false;
+      dirty = true;
+      return;
+    }
+    if (key >= '1' && key <= '4' && playerLoaded && adventureReady) {
+      hawkins::CharacterState nextPlayer = player;
+      hawkins::AdventureState nextAdventure = adventure;
+      const hawkins::AdventureSkill skill =
+          static_cast<hawkins::AdventureSkill>(key - '1');
+      if (hawkins::adventureUnlockSkill(nextAdventure, nextPlayer, skill) &&
+          saveAdventureAndCharacter(nextAdventure, nextPlayer)) {
+        setGpsStatus("COMPETENCE DEBLOQUEE");
+      } else {
+        setGpsStatus("POINT OU CARACTERISTIQUE INSUFFISANT");
+      }
+      dirty = true;
+      return;
+    }
+    return;
+  }
+
+  if (showFirstContact) {
+    if (key == 'q' || key == 'Q') {
+      showFirstContact = false;
+      dirty = true;
+      return;
+    }
+    if (key >= '1' && key <= '3' && playerLoaded && adventureReady &&
+        (adventure.storyFlags & 0x01U) == 0U) {
+      hawkins::CharacterState nextPlayer = player;
+      hawkins::AdventureState nextAdventure = adventure;
+      const hawkins::FirstContactChoice choice =
+          static_cast<hawkins::FirstContactChoice>(key - '1');
+      if (hawkins::adventureResolveFirstContact(nextAdventure, nextPlayer, choice) &&
+          saveAdventureAndCharacter(nextAdventure, nextPlayer)) {
+        setGpsStatus("CHOIX ENREGISTRE - HISTOIRE MODIFIEE");
+      } else {
+        setGpsStatus("CHOIX IMPOSSIBLE / ECHEC SAUVEGARDE");
+      }
+      dirty = true;
+      return;
+    }
+    return;
+  }
+
+  if (showStorage) {
+    if (restoreConfirmation) {
+      if (key == 'r' || key == 'R') {
+        if (hawkins::sdBackupRestore()) {
+          hawkins::hawkinsRuntimeInit();
+          hawkinsAppEnter();
+          showStorage = true;
+          setGpsStatus("RESTAURATION SD TERMINEE");
+        } else {
+          setGpsStatus(hawkins::sdBackupStatusText());
+          restoreConfirmation = false;
+        }
+        dirty = true;
+        return;
+      }
+      if (key == 'd' || key == 'D') {
+        restoreConfirmation = false;
+        dirty = true;
+        return;
+      }
+      return;
+    }
+    if (key == 'd' || key == 'D') {
+      showStorage = false;
+      dirty = true;
+      return;
+    }
+    if (key == 'a' || key == 'A') {
+      if (hawkins::sdBackupSetEnabled(!hawkins::sdBackupEnabled())) {
+        setGpsStatus(hawkins::sdBackupEnabled()
+                         ? "COPIE AUTOMATIQUE ACTIVE"
+                         : "COPIE AUTOMATIQUE DESACTIVEE");
+      } else {
+        setGpsStatus("SD ABSENTE OU COPIE IMPOSSIBLE");
+      }
+      dirty = true;
+      return;
+    }
+    if (key == 'b' || key == 'B') {
+      setGpsStatus(hawkins::sdBackupSaveNow()
+                       ? "COPIE SD VERIFIEE"
+                       : hawkins::sdBackupStatusText());
+      dirty = true;
+      return;
+    }
+    if (key == 'r' || key == 'R') {
+      restoreConfirmation = true;
+      dirty = true;
+      return;
+    }
+    return;
+  }
   if (showMissions) {
     if (key == 'm' || key == 'M') {
       showMissions = false;
@@ -665,6 +970,7 @@ void hawkinsAppKey(char key) {
     }
     if (key == 's' || key == 'S') {
       if (playerLoaded && savePlayerState(player)) {
+        hawkins::sdBackupAutoSave();
         setGpsStatus("PERSONNAGE SAUVEGARDE");
       } else {
         setGpsStatus("ERREUR SAUVEGARDE PERSONNAGE");
@@ -674,7 +980,19 @@ void hawkinsAppKey(char key) {
     }
   }
 
-  if (key == 'p' || key == 'P') {
+  if (key == 'i' || key == 'I') {
+    if (playerLoaded && adventureReady) showInventory = true;
+    dirty = true;
+  } else if (key == 'k' || key == 'K') {
+    if (playerLoaded && adventureReady) showSkills = true;
+    dirty = true;
+  } else if (key == 'q' || key == 'Q') {
+    if (playerLoaded && adventureReady) showFirstContact = true;
+    dirty = true;
+  } else if (key == 'd' || key == 'D') {
+    showStorage = true;
+    dirty = true;
+  } else if (key == 'p' || key == 'P') {
     showCharacter = true;
     dirty = true;
   } else if (key == 'm' || key == 'M') {
@@ -691,7 +1009,11 @@ void hawkinsAppKey(char key) {
         savePlayerState(player);
     const bool missionsSaved = missionsReady &&
         hawkins::missionSaveCommit(missions, &missionSequence);
-    setGpsStatus(worldSaved && exploreSaved && characterSaved && missionsSaved
+    const bool adventureSaved = adventureReady &&
+        hawkins::adventureSaveCommit(adventure, &adventureSequence);
+    const bool sdSaved = hawkins::sdBackupAutoSave();
+    setGpsStatus(worldSaved && exploreSaved && characterSaved && missionsSaved &&
+                         adventureSaved && sdSaved
                      ? "SAUVEGARDE LOCALE OK"
                      : "ERREUR DE SAUVEGARDE");
     dirty = true;
@@ -699,6 +1021,22 @@ void hawkinsAppKey(char key) {
 }
 
 void drawHawkinsApp() {
+  if (showInventory) {
+    drawInventoryPage();
+    return;
+  }
+  if (showSkills) {
+    drawSkillsPage();
+    return;
+  }
+  if (showFirstContact) {
+    drawFirstContactPage();
+    return;
+  }
+  if (showStorage) {
+    drawStoragePage();
+    return;
+  }
   if (showCharacter) {
     drawCharacterPage();
     return;
