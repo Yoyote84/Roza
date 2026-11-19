@@ -1,4 +1,4 @@
-name: ROZA Web Screen Viewer
+name: ROZA Web Screen Viewer + Cardputer ADV firmware
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - "firmware/src/**"
       - "firmware/tools/uisim/**"
       - "firmware/platformio.ini"
+      - "firmware/partitions_8MB.csv"
       - ".github/workflows/roza-web-viewer.yml"
   workflow_dispatch:
 
@@ -21,7 +22,7 @@ concurrency:
 
 jobs:
   build:
-    name: Render genuine ROZA screens
+    name: Build firmware and render ROZA screens
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -42,15 +43,91 @@ jobs:
         working-directory: firmware
         run: pio pkg install -e cardputer-adv
 
-      - name: Préparer les secrets factices de compilation
+      - name: Prepare build-only secrets
         working-directory: firmware
         run: cp src/secrets.h.example src/secrets.h
 
-      - name: Compiler le firmware Cardputer ADV
+      - name: Compile firmware Cardputer ADV
         working-directory: firmware
         run: pio run -e cardputer-adv
 
-      - name: Exécuter les tests natifs Hawkins
+      - name: Assemble flashable Cardputer ADV images
+        working-directory: firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD=".pio/build/cardputer-adv"
+          PACKAGE="$RUNNER_TEMP/roza-firmware-package"
+          mkdir -p "$PACKAGE"
+
+          for file in bootloader.bin partitions.bin firmware.bin; do
+            test -s "$BUILD/$file" || {
+              echo "::error::Missing expected PlatformIO output: $BUILD/$file"
+              find "$BUILD" -maxdepth 2 -type f -name '*.bin' -print
+              exit 1
+            }
+          done
+
+          ESPTOOL="$(find "$HOME/.platformio/packages/tool-esptoolpy" -maxdepth 1 -type f -name 'esptool.py' -print -quit)"
+          test -n "$ESPTOOL" || {
+            echo "::error::PlatformIO esptool.py was not found"
+            exit 1
+          }
+
+          # The partition CSV places the factory app at 0x10000.
+          # Merge bootloader + partition table + application into one image
+          # that can be flashed from address 0x0000 on the 8 MB ESP32-S3.
+          python "$ESPTOOL" --chip esp32s3 merge_bin \
+            --output "$PACKAGE/ROZA-Cardputer-ADV-Hawkins-factory.bin" \
+            --flash_mode keep \
+            --flash_size 8MB \
+            0x0 "$BUILD/bootloader.bin" \
+            0x8000 "$BUILD/partitions.bin" \
+            0x10000 "$BUILD/firmware.bin"
+
+          cp "$BUILD/firmware.bin" "$PACKAGE/ROZA-Cardputer-ADV-Hawkins-application.bin"
+          cp "$BUILD/bootloader.bin" "$PACKAGE/bootloader.bin"
+          cp "$BUILD/partitions.bin" "$PACKAGE/partitions.bin"
+
+          cat > "$PACKAGE/INSTALLATION.txt" <<'EOF'
+          ROZA / HAWKINS — M5Stack Cardputer ADV (ESP32-S3, 8 MB flash)
+
+          FICHIER CONSEILLE POUR UNE INSTALLATION COMPLETE
+          ROZA-Cardputer-ADV-Hawkins-factory.bin
+          Adresse de flash : 0x0000
+
+          IMAGE APPLICATION SEULE (uniquement si le bootloader et la table
+          de partitions ROZA correspondante sont deja installes)
+          ROZA-Cardputer-ADV-Hawkins-application.bin
+          Adresse de flash : 0x10000
+
+          Les fichiers bootloader.bin et partitions.bin sont fournis separement
+          pour diagnostic ou flash manuel :
+            bootloader.bin : 0x0000
+            partitions.bin : 0x8000
+            application   : 0x10000
+
+          La carte microSD sert au stockage des fichiers ; copier un .bin sur
+          la SD ne flashe pas le microcontroleur. Le flash se fait par USB-C
+          avec un outil compatible ESP32-S3.
+
+          Cette image est compilee pour le Cardputer ADV, 8 MB, sans PSRAM.
+          Les tests de compilation/logiciels ne remplacent pas un essai sur
+          le materiel reel.
+          EOF
+
+          (cd "$PACKAGE" && sha256sum *.bin > SHA256SUMS.txt)
+          ls -lh "$PACKAGE"
+
+      - name: Upload flashable firmware package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ROZA-Cardputer-ADV-Hawkins-${{ github.sha }}
+          path: ${{ runner.temp }}/roza-firmware-package/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Run native Hawkins tests
         working-directory: firmware
         run: bash tools/hawkinstest/build.sh
 
@@ -68,11 +145,16 @@ jobs:
           chmod +x build.sh
           ./build.sh
 
-      - name: Assemble static web app
+      - name: Assemble static web app and firmware download
         working-directory: firmware/tools/uisim
         run: |
           chmod +x web/build-site.sh
           ./web/build-site.sh "$GITHUB_WORKSPACE/site"
+          mkdir -p "$GITHUB_WORKSPACE/site/downloads"
+          cp "$RUNNER_TEMP/roza-firmware-package/ROZA-Cardputer-ADV-Hawkins-factory.bin" \
+            "$GITHUB_WORKSPACE/site/downloads/ROZA-Cardputer-ADV-Hawkins-factory.bin"
+          cp "$RUNNER_TEMP/roza-firmware-package/INSTALLATION.txt" \
+            "$GITHUB_WORKSPACE/site/downloads/INSTALLATION.txt"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -83,7 +165,7 @@ jobs:
           path: site
 
   deploy:
-    name: Publish web viewer
+    name: Publish web viewer and firmware
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
