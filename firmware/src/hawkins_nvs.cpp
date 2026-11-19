@@ -15,6 +15,8 @@ const char* kExploreSlot0 = "expl0";
 const char* kExploreSlot1 = "expl1";
 const char* kCharacterSlot0 = "char0";
 const char* kCharacterSlot1 = "char1";
+const char* kMissionSlot0 = "miss0";
+const char* kMissionSlot1 = "miss1";
 
 template <typename State>
 struct Slot {
@@ -67,6 +69,19 @@ bool readCharacterSlot(Preferences& store, const char* key,
   uint8_t bytes[kCharacterSaveEncodedSize];
   if (store.getBytes(key, bytes, length) != length) return false;
   slot.valid = decodeCharacterSave(bytes, length, slot.state, slot.sequence);
+  return true;
+}
+
+bool readMissionSlot(Preferences& store, const char* key,
+                     Slot<MissionState>& slot) {
+  slot = Slot<MissionState>{};
+  const size_t length = store.getBytesLength(key);
+  if (length == 0U) return true;
+  slot.present = true;
+  if (length != kMissionSaveEncodedSize) return true;
+  uint8_t bytes[kMissionSaveEncodedSize];
+  if (store.getBytes(key, bytes, length) != length) return false;
+  slot.valid = decodeMissionSave(bytes, length, slot.state, slot.sequence);
   return true;
 }
 
@@ -276,6 +291,75 @@ bool characterSaveCommit(const CharacterState& character, uint32_t* sequence) {
     if (prefs.getBytes(target, back, sizeof(back)) == sizeof(back) &&
         memcmp(encoded, back, sizeof(encoded)) == 0 &&
         decodeCharacterSave(back, sizeof(back), restored, restoredSequence) &&
+        restoredSequence == next) {
+      verified = true;
+    }
+  }
+  prefs.end();
+  if (verified && sequence) *sequence = next;
+  return verified;
+}
+
+MissionSaveLoadStatus missionSaveLoad(MissionState& state,
+                                      uint32_t* sequence) {
+  PrefsLock lock;
+  if (!openStore()) return MissionSaveLoadStatus::StorageError;
+  Slot<MissionState> a{}, b{};
+  const bool ok = readMissionSlot(prefs, kMissionSlot0, a) &&
+                  readMissionSlot(prefs, kMissionSlot1, b);
+  prefs.end();
+  if (!ok) return MissionSaveLoadStatus::StorageError;
+  if (!a.valid && !b.valid) {
+    return (a.present || b.present) ? MissionSaveLoadStatus::Corrupt
+                                    : MissionSaveLoadStatus::Empty;
+  }
+  const Slot<MissionState>& best = newestValid(a, b);
+  state = best.state;
+  if (sequence) *sequence = best.sequence;
+  return MissionSaveLoadStatus::Loaded;
+}
+
+bool missionSaveCommit(const MissionState& state, uint32_t* sequence) {
+  if (!isValidMissionState(state)) return false;
+  PrefsLock lock;
+  if (!openStore()) return false;
+  Slot<MissionState> a{}, b{};
+  if (!readMissionSlot(prefs, kMissionSlot0, a) ||
+      !readMissionSlot(prefs, kMissionSlot1, b)) {
+    prefs.end();
+    return false;
+  }
+  uint32_t next = 1U;
+  const char* target = kMissionSlot0;
+  if (a.valid && b.valid) {
+    const Slot<MissionState>& best = newestValid(a, b);
+    next = best.sequence + 1U;
+    target = (&best == &a) ? kMissionSlot1 : kMissionSlot0;
+  } else if (a.valid) {
+    next = a.sequence + 1U;
+    target = kMissionSlot1;
+  } else if (b.valid) {
+    next = b.sequence + 1U;
+    target = kMissionSlot0;
+  } else if (a.present && !b.present) {
+    target = kMissionSlot1;
+  }
+  if (next == 0U) next = 1U;
+  uint8_t encoded[kMissionSaveEncodedSize];
+  if (!encodeMissionSave(state, next, encoded, sizeof(encoded))) {
+    prefs.end();
+    return false;
+  }
+  const size_t written = prefs.putBytes(target, encoded, sizeof(encoded));
+  bool verified = false;
+  if (written == sizeof(encoded) &&
+      prefs.getBytesLength(target) == sizeof(encoded)) {
+    uint8_t back[kMissionSaveEncodedSize];
+    MissionState restored{};
+    uint32_t restoredSequence = 0U;
+    if (prefs.getBytes(target, back, sizeof(back)) == sizeof(back) &&
+        memcmp(encoded, back, sizeof(encoded)) == 0 &&
+        decodeMissionSave(back, sizeof(back), restored, restoredSequence) &&
         restoredSequence == next) {
       verified = true;
     }
