@@ -1,4 +1,4 @@
-# Moteur RPG Hawkins — étapes 1 à 3
+# Moteur RPG Hawkins — étapes 1 à 4
 
 Le jeu est intégré au firmware ROZA existant. Il conserve les pilotes matériels de ROZA et ne remplace ni les fonctions GNSS, ni les fonctions LoRa, ni l'interface principale.
 La cible reste le Cardputer ADV ESP32-S3FN8, Flash 8 Mo, sans PSRAM.
@@ -27,18 +27,27 @@ La cible reste le Cardputer ADV ESP32-S3FN8, Flash 8 Mo, sans PSRAM.
 - 24 identifiants de secteurs récents sont conservés pour reconnaître les retours. Le compteur global continue au-delà de cette fenêtre.
 - Seuls des identifiants hachés de cellules sont sauvegardés. Les coordonnées latitude/longitude brutes ne sont ni affichées ni écrites en NVS.
 - Les données d'exploration sont dans la NVS interne, sous deux emplacements expl0/expl1 avec CRC-32, vérification après écriture et conservation du précédent emplacement valide.
-- Le joueur peut ouvrir le tableau de bord du monde ou la page Terrain avec E. S force la sauvegarde locale.
-- Le Wi-Fi n'est jamais activé par Hawkins. Le GPS reçoit les signaux satellites sans réseau mobile ou Internet. Le SX1262 n'est pas utilisé pour cette étape.
+- Le Wi-Fi n'est jamais activé par Hawkins. Le SX1262 n'est pas utilisé pour cette étape.
 
-### Mode calendrier hors ligne
+## Étape 4 — personnage et progression
 
-Un nouveau monde peut être créé sans horloge réglée : il reçoit un calendrier fictif local. Dans ce mode, le temps du jeu avance lors des nouvelles explorations et ne saute pas de jours lors d'une future synchronisation Wi-Fi. Les mondes déjà initialisés avec une horloge fiable gardent leur progression temporelle antérieure.
+- hawkins_character.h/.cpp : création du personnage, six archétypes, six caractéristiques, points de vie, stress, expérience et niveaux.
+- Classes proposées : Explorateur, Technicien, Enquêteur, Protecteur, Médecin et Sensitif.
+- Création locale : nom ASCII de 1 à 12 caractères, puis choix de classe au clavier. Aucun compte, service distant ou identifiant réseau.
+- Caractéristiques : Force, Endurance, Agilité, Intelligence, Perception et Charisme.
+- Les points de vie max sont dérivés de l'Endurance ; la capacité de stress est dérivée de la Perception.
+- Un secteur inédit rapporte 25 XP ; une découverte narrative rapporte 50 XP. Un passage de niveau ajoute un point de compétence non dépensé, réservé aux futurs arbres de compétences.
+- Le profil est sauvegardé dans la NVS sous char0 et char1, avec format binaire versionné, CRC-32, alternance des emplacements et vérification de lecture.
+- Le profil est indépendant de l'exploration et du monde. La perte ou la corruption d'un emplacement ne déclenche aucun effacement automatique.
+- Depuis Hawkins, P ouvre le personnage, E alterne Terrain/Monde et S force les sauvegardes.
 
-Le Cardputer n'ayant pas de RTC, aucune durée d'extinction ne peut être devinée en mode hors ligne. Le jeu reste néanmoins utilisable, sauvegardable et progressif sans NTP.
+### Progression hors ligne
+
+La progression du personnage dépend des secteurs réellement découverts et du moteur local. L'activation future du Wi-Fi ne déclenche ni synchronisation obligatoire ni téléchargement de contenu. Aucun service réseau n'est utilisé pour créer, afficher, faire évoluer ou sauvegarder le personnage.
 
 ## Sauvegarde et stockage
 
-Les données du monde et de l'exploration sont stockées dans la NVS interne. Le verrou existant PrefsLock est réutilisé pour éviter les accès concurrents au gestionnaire Preferences.
+Les données du monde, de l'exploration et du personnage sont stockées dans la NVS interne. Le verrou PrefsLock existant est réutilisé pour éviter les accès concurrents au gestionnaire Preferences.
 
 Aucun formatage, effacement ou écriture n'est effectué sur la microSD. Les fonctions existantes de partage SPI entre la SD et le SX1262 ne sont pas modifiées.
 
@@ -49,12 +58,13 @@ La suite native hawkinstest vérifie :
 - la progression de journées sans horloge ;
 - la conversion de coordonnées en cellules et le rejet de coordonnées invalides ;
 - les visites, retours et découvertes ;
-- les sauvegardes encodées/décodées et la détection de corruption CRC.
+- la création, les limites du nom, les attributs, les gains d'XP, les niveaux et les sauvegardes CRC du personnage.
 
 La compilation native ne remplace pas les essais physiques. Le GPS peut ne pas obtenir de fix en intérieur ou dans un environnement masqué.
 
 ## Limites restantes
 
-- Le tableau Hawkins et le relevé de terrain sont en place ; le personnage, l'inventaire, les dialogues, les quêtes et les combats seront ajoutés dans les étapes suivantes.
-- La grille de 250 m est une grille de jeu, pas une carte routière ni un relevé topographique.
+- Le personnage, son profil et la progression XP sont en place ; l'inventaire, les objets, les dialogues, les quêtes, les compétences dépensables et les combats restent à développer.
+- Les points de compétence sont comptés mais pas encore dépensables.
+- Les dégâts et le stress ne changent pas encore ; leur gestion est réservée au système de jeu suivant.
 - Les essais physiques sur Cardputer ADV + Cap LoRa-1262 restent nécessaires.

@@ -1,10 +1,12 @@
 #include "hawkins_world.h"
 #include "hawkins_save_codec.h"
 #include "hawkins_exploration.h"
-#include <math.h>
+#include "hawkins_character.h"
 
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 using namespace hawkins;
 
@@ -24,15 +26,12 @@ static void testTimeAndNoRewind() {
   WorldState world{};
   const uint64_t start = 1800000000ULL;
   initializeWorld(world, 7U, start);
-
   AdvanceSummary result = advanceWorld(world, start + kSecondsPerDay - 1U);
   assert(result.daysProcessed == 0U);
   assert(world.simulatedDays == 0U);
-
   result = advanceWorld(world, start + 3U * kSecondsPerDay);
   assert(result.daysProcessed == 3U);
   assert(world.simulatedDays == 3U);
-
   result = advanceWorld(world, start + kSecondsPerDay);
   assert(result.daysProcessed == 0U);
   assert(world.simulatedDays == 3U);
@@ -44,11 +43,9 @@ static void testDeterministicEvolution() {
   const uint64_t start = 1800000000ULL;
   initializeWorld(a, 0x12345678U, start);
   initializeWorld(b, 0x12345678U, start);
-
   const uint64_t now = start + 900U * kSecondsPerDay;
   AdvanceSummary ar = advanceWorld(a, now);
   AdvanceSummary br = advanceWorld(b, now);
-
   assert(ar.daysProcessed == 900U);
   assert(br.daysProcessed == 900U);
   assert(a.simulatedDays == b.simulatedDays);
@@ -65,8 +62,6 @@ static void testTenYearWorldDoesNotEnd() {
   WorldState world{};
   const uint64_t start = 1800000000ULL;
   initializeWorld(world, 99U, start);
-
-  // Dix années civiles environ : le moteur n'a volontairement aucun état « terminé ».
   const uint64_t now = start + 3652ULL * kSecondsPerDay;
   AdvanceSummary result = advanceWorld(world, now);
   assert(result.daysProcessed == 3652U);
@@ -80,11 +75,9 @@ static void testBoundedCatchUp() {
   const uint64_t start = 1800000000ULL;
   initializeWorld(world, 42U, start);
   const uint64_t now = start + 9000ULL * kSecondsPerDay;
-
   AdvanceSummary first = advanceWorld(world, now);
   assert(first.daysProcessed == kMaxCatchUpDaysPerCall);
   assert(first.catchUpPending);
-
   uint32_t totalProcessed = first.daysProcessed;
   AdvanceSummary next = first;
   while (next.catchUpPending) {
@@ -111,26 +104,50 @@ static void testMetricsAndEventNames() {
   assert(eventTypeName(EventType::None)[0] != '\0');
 }
 
+static void testSaveCodecRoundTrip() {
+  WorldState original{};
+  initializeWorld(original, 0xAABBCCDDU, 1800000000ULL);
+  advanceWorld(original, original.startEpochSeconds + 900U * kSecondsPerDay);
+  assert(isValidWorldState(original));
+  uint8_t encoded[kWorldSaveEncodedSize];
+  assert(encodeWorldSave(original, 17U, encoded, sizeof(encoded)));
+  WorldState restored{};
+  uint32_t seq = 0U;
+  assert(decodeWorldSave(encoded, sizeof(encoded), restored, seq));
+  assert(seq == 17U);
+  assert(restored.schemaVersion == original.schemaVersion);
+  assert(restored.seed == original.seed);
+  assert(restored.startEpochSeconds == original.startEpochSeconds);
+  assert(restored.simulatedDays == original.simulatedDays);
+  assert(restored.randomState == original.randomState);
+  assert(restored.eventCount == original.eventCount);
+  assert(restored.latestEvent.sequence == original.latestEvent.sequence);
+  assert(restored.latestEvent.type == original.latestEvent.type);
+  assert(restored.latestEvent.intensity == original.latestEvent.intensity);
+}
 
-static void testSaveCodecRoundTrip(){
- WorldState original{};initializeWorld(original,0xAABBCCDDU,1800000000ULL);
- advanceWorld(original,original.startEpochSeconds+900U*kSecondsPerDay);assert(isValidWorldState(original));
- uint8_t encoded[kWorldSaveEncodedSize];assert(encodeWorldSave(original,17U,encoded,sizeof(encoded)));
- WorldState restored{};uint32_t seq=0;assert(decodeWorldSave(encoded,sizeof(encoded),restored,seq));
- assert(seq==17U);assert(restored.schemaVersion==original.schemaVersion);assert(restored.seed==original.seed);
- assert(restored.startEpochSeconds==original.startEpochSeconds);assert(restored.simulatedDays==original.simulatedDays);
- assert(restored.randomState==original.randomState);assert(restored.eventCount==original.eventCount);
- assert(restored.latestEvent.sequence==original.latestEvent.sequence);assert(restored.latestEvent.type==original.latestEvent.type);
- assert(restored.latestEvent.intensity==original.latestEvent.intensity);
+static void testSaveCodecRejectsDamage() {
+  WorldState original{};
+  initializeWorld(original, 55U, 1800000000ULL);
+  uint8_t encoded[kWorldSaveEncodedSize];
+  assert(encodeWorldSave(original, 1U, encoded, sizeof(encoded)));
+  WorldState restored{};
+  uint32_t seq = 0U;
+  assert(!decodeWorldSave(encoded, sizeof(encoded) - 1U, restored, seq));
+  encoded[20] ^= 0x40U;
+  assert(!decodeWorldSave(encoded, sizeof(encoded), restored, seq));
+  assert(!encodeWorldSave(original, 1U, encoded, sizeof(encoded) - 1U));
+  assert(!encodeWorldSave(original, 0U, encoded, sizeof(encoded)));
 }
-static void testSaveCodecRejectsDamage(){
- WorldState original{};initializeWorld(original,55U,1800000000ULL);
- uint8_t encoded[kWorldSaveEncodedSize];assert(encodeWorldSave(original,1U,encoded,sizeof(encoded)));
- WorldState restored{};uint32_t seq=0;
- assert(!decodeWorldSave(encoded,sizeof(encoded)-1U,restored,seq));encoded[20]^=0x40U;
- assert(!decodeWorldSave(encoded,sizeof(encoded),restored,seq));
- assert(!encodeWorldSave(original,1U,encoded,sizeof(encoded)-1U));assert(!encodeWorldSave(original,0U,encoded,sizeof(encoded)));
+
+static void testSaveCodecRejectsInvalidState() {
+  WorldState invalid{};
+  initializeWorld(invalid, 9U, 1800000000ULL);
+  invalid.tension = 101U;
+  uint8_t encoded[kWorldSaveEncodedSize];
+  assert(!encodeWorldSave(invalid, 1U, encoded, sizeof(encoded)));
 }
+
 static void testOfflineWorldAdvance() {
   WorldState world{};
   initializeWorld(world, 0x12345678U, 1ULL);
@@ -182,7 +199,6 @@ static void testExplorationSaveCodec() {
   observeExplorationCell(original, 400U);
   uint8_t encoded[kExplorationSaveEncodedSize];
   assert(encodeExplorationSave(original, 9U, encoded, sizeof(encoded)));
-
   ExplorationState restored{};
   uint32_t sequence = 0U;
   assert(decodeExplorationSave(encoded, sizeof(encoded), restored, sequence));
@@ -191,16 +207,75 @@ static void testExplorationSaveCodec() {
   assert(restored.discoveries == original.discoveries);
   assert(restored.lastCellKey == original.lastCellKey);
   assert(restored.knownCount == original.knownCount);
-
   encoded[24] ^= 0x20U;
   assert(!decodeExplorationSave(encoded, sizeof(encoded), restored, sequence));
   assert(!decodeExplorationSave(encoded, sizeof(encoded) - 1U, restored, sequence));
 }
 
-static void testSaveCodecRejectsInvalidState(){
- WorldState invalid{};initializeWorld(invalid,9U,1800000000ULL);invalid.tension=101U;
- uint8_t encoded[kWorldSaveEncodedSize];assert(!encodeWorldSave(invalid,1U,encoded,sizeof(encoded)));
+static void testCharacterCreationAndAttributes() {
+  CharacterState character{};
+  assert(createCharacter(character, 0U, "NANCY"));
+  assert(isValidCharacter(character));
+  assert(strcmp(character.name, "NANCY") == 0);
+  assert(character.level == 1U);
+  assert(character.xp == 0U);
+  assert(character.skillPoints == 0U);
+  assert(character.hitPoints == characterMaxHitPoints(character));
+  assert(character.stress == 0U);
+  assert(characterClassCount() == 6U);
+  assert(character.attributes[Agility] == 8U);
+  assert(characterMaxHitPoints(character) == 22U);
+  assert(characterMaxStress(character) == 24U);
+  assert(!createCharacter(character, 6U, "INVALID"));
+  assert(!createCharacter(character, 0U, ""));
+  assert(!createCharacter(character, 0U, "NAME WITH TOO LONG"));
+  assert(!createCharacter(character, 0U, "BAD/NAME"));
+  assert(!createCharacter(character, 0U, " LEADING"));
 }
+
+static void testCharacterExperienceAndLevels() {
+  CharacterState character{};
+  assert(createCharacter(character, 1U, "DUSTIN"));
+  assert(awardCharacterXp(character, 99U) == 0U);
+  assert(character.level == 1U && character.xp == 99U);
+  assert(awardCharacterXp(character, 1U) == 1U);
+  assert(character.level == 2U && character.xp == 0U);
+  assert(character.skillPoints == 1U);
+  assert(awardCharacterXp(character, 250U) == 1U);
+  assert(character.level == 3U && character.xp == 50U);
+  assert(character.skillPoints == 2U);
+  for (uint8_t i = character.level; i < kCharacterMaxLevel; ++i) {
+    awardCharacterXp(character, 2000U);
+  }
+  assert(character.level == kCharacterMaxLevel);
+  const uint32_t savedXp = character.xp;
+  awardCharacterXp(character, 500U);
+  assert(character.xp == savedXp);
+  assert(isValidCharacter(character));
+}
+
+static void testCharacterSaveCodec() {
+  CharacterState original{};
+  assert(createCharacter(original, 4U, "MAX MAYFIELD"));
+  awardCharacterXp(original, 135U);
+  uint8_t encoded[kCharacterSaveEncodedSize];
+  assert(encodeCharacterSave(original, 23U, encoded, sizeof(encoded)));
+  CharacterState restored{};
+  uint32_t sequence = 0U;
+  assert(decodeCharacterSave(encoded, sizeof(encoded), restored, sequence));
+  assert(sequence == 23U);
+  assert(strcmp(restored.name, original.name) == 0);
+  assert(restored.classId == original.classId);
+  assert(restored.level == original.level);
+  assert(restored.xp == original.xp);
+  assert(restored.skillPoints == original.skillPoints);
+  assert(memcmp(restored.attributes, original.attributes,
+                sizeof(original.attributes)) == 0);
+  encoded[24] ^= 0x10U;
+  assert(!decodeCharacterSave(encoded, sizeof(encoded), restored, sequence));
+  assert(!decodeCharacterSave(encoded, sizeof(encoded) - 1U, restored, sequence));
+}
+
 int main() {
   testInitialization();
   testTimeAndNoRewind();
@@ -215,6 +290,9 @@ int main() {
   testExplorationCellGrid();
   testExplorationVisitsAndDiscoveries();
   testExplorationSaveCodec();
-  puts("HAWKINS: tous les tests du moteur de monde ont réussi.");
+  testCharacterCreationAndAttributes();
+  testCharacterExperienceAndLevels();
+  testCharacterSaveCodec();
+  puts("HAWKINS: tous les tests monde, exploration et personnage ont reussi.");
   return 0;
 }
