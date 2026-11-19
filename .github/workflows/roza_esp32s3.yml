@@ -1,6 +1,7 @@
 # Github Actions Workflow for ROZA Firmware
 # Compile le firmware ROZA sur PlatformIO pour ESP32-S3
 # Publie une image fusionnee 8 Mio pour le flash complet du Cardputer ADV.
+# Le meme paquet est compile et valide sur chaque Pull Request.
 
 name: ROZA Firmware Build
 run-name: "Cardputer ADV flash image — ${{ github.sha }}"
