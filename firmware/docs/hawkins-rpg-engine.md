@@ -1,4 +1,4 @@
-# Moteur RPG Hawkins — étapes 1 à 4
+# Moteur RPG Hawkins — étapes 1 à 5
 
 Le jeu est intégré au firmware ROZA existant. Il conserve les pilotes matériels de ROZA et ne remplace ni les fonctions GNSS, ni les fonctions LoRa, ni l'interface principale.
 La cible reste le Cardputer ADV ESP32-S3FN8, Flash 8 Mo, sans PSRAM.
@@ -37,9 +37,22 @@ La cible reste le Cardputer ADV ESP32-S3FN8, Flash 8 Mo, sans PSRAM.
 - Caractéristiques : Force, Endurance, Agilité, Intelligence, Perception et Charisme.
 - Les points de vie max sont dérivés de l'Endurance ; la capacité de stress est dérivée de la Perception.
 - Un secteur inédit rapporte 25 XP ; une découverte narrative rapporte 50 XP. Un passage de niveau ajoute un point de compétence non dépensé, réservé aux futurs arbres de compétences.
+- Le personnage doit être créé avant l'exploration récompensée : cela évite de perdre les XP si le joueur part en exploration sans profil.
 - Le profil est sauvegardé dans la NVS sous char0 et char1, avec format binaire versionné, CRC-32, alternance des emplacements et vérification de lecture.
 - Le profil est indépendant de l'exploration et du monde. La perte ou la corruption d'un emplacement ne déclenche aucun effacement automatique.
-- Depuis Hawkins, P ouvre le personnage, E alterne Terrain/Monde et S force les sauvegardes.
+- Depuis Hawkins, P ouvre le personnage, E alterne Terrain/Monde, M ouvre les missions et S force les sauvegardes.
+- Les trois bits réservés du format de sauvegarde du personnage conservent les récompenses de mission déjà créditées. Les anciennes sauvegardes (bits à zéro) restent lisibles par cette version ; la taille et la version du format ne changent pas.
+
+## Étape 5 — missions et récompenses hors ligne
+
+- `hawkins_missions.h/.cpp` : trois missions locales en chaîne : premier signal, cartographie de trois secteurs, puis piste de deux signaux.
+- Le déverrouillage est séquentiel. Une mission suivante ne devient active qu'après l'achèvement de la précédente ; les compteurs déjà atteints sont pris en compte au déverrouillage.
+- Les missions suivent uniquement les nouveaux secteurs confirmés par le GNSS local. Aucun serveur, Wi-Fi ou téléchargement n'est requis.
+- La progression des missions est conservée dans la NVS interne sous `miss0` et `miss1`, avec format explicite little-endian, version, CRC-32, alternance et vérification après écriture.
+- Le dernier identifiant haché de cellule est enregistré avec la progression : si l'appareil redémarre entre la sauvegarde de mission et celle de l'exploration, la reprise ne compte pas deux fois le même secteur.
+- Récompenses : 100 XP pour le premier signal, 75 XP pour la cartographie et 150 XP pour la piste de l'anomalie.
+- Le profil contient un masque de récompenses déjà créditées. Le moteur refuse de créditer deux fois le même identifiant de mission ; le masque est sauvegardé avec le personnage avant de poursuivre.
+- La touche M affiche l'écran des missions, leurs états (verrouillée, active, terminée) et les compteurs de secteurs/signaux. P ouvre le personnage ; E revient au terrain.
 
 ### Progression hors ligne
 
@@ -58,13 +71,14 @@ La suite native hawkinstest vérifie :
 - la progression de journées sans horloge ;
 - la conversion de coordonnées en cellules et le rejet de coordonnées invalides ;
 - les visites, retours et découvertes ;
-- la création, les limites du nom, les attributs, les gains d'XP, les niveaux et les sauvegardes CRC du personnage.
+- la création, les limites du nom, les attributs, les gains d'XP, les niveaux, les récompenses idempotentes et les sauvegardes CRC du personnage ;
+- le déverrouillage séquentiel, les doublons de secteurs, les sauvegardes CRC et la restauration des missions.
 
 La compilation native ne remplace pas les essais physiques. Le GPS peut ne pas obtenir de fix en intérieur ou dans un environnement masqué.
 
 ## Limites restantes
 
-- Le personnage, son profil et la progression XP sont en place ; l'inventaire, les objets, les dialogues, les quêtes, les compétences dépensables et les combats restent à développer.
+- Les missions scénarisées, les dialogues à choix, l'inventaire, les objets, les compétences dépensables, les combats et les interactions avec les factions restent à développer.
 - Les points de compétence sont comptés mais pas encore dépensables.
 - Les dégâts et le stress ne changent pas encore ; leur gestion est réservée au système de jeu suivant.
 - Les essais physiques sur Cardputer ADV + Cap LoRa-1262 restent nécessaires.
