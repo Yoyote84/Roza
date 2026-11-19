@@ -42,6 +42,8 @@ struct CharacterState {
   uint8_t nameLength;
   uint8_t attributes[CharacterAttributeCount];
   char name[kCharacterNameCapacity + 1U];
+  // Bits 0..2 : récompenses de missions déjà créditées, pour éviter les doublons.
+  uint8_t missionRewardMask;
 };
 
 const CharacterClass& characterClass(uint8_t classId);
@@ -58,6 +60,9 @@ bool isValidCharacter(const CharacterState& character);
 // Ajoute des XP et applique automatiquement les niveaux gagnés.
 // Retourne le nombre de niveaux obtenus.
 uint8_t awardCharacterXp(CharacterState& character, uint16_t amount);
+// Crédit idempotent : un même identifiant de mission ne peut récompenser deux fois.
+bool awardCharacterMissionXpOnce(CharacterState& character, uint8_t missionId,
+                                 uint16_t amount);
 
 bool encodeCharacterSave(const CharacterState& character, uint32_t sequence,
                          uint8_t* output, size_t capacity);
