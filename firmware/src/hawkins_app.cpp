@@ -151,7 +151,7 @@ void drawWorldPage(const hawkins::WorldState* world) {
   }
   cv.setTextDatum(bottom_left);
   cv.setTextColor(ICON_DIM, TFT_BLACK);
-  cv.drawString("P PERSO   E TERRAIN   S SAUVER", 5, SH - 2);
+  cv.drawString("P PERSO  E TERRAIN  M MISS.  S SAVE", 5, SH - 2);
 }
 
 void drawMissionPage() {
