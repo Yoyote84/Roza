@@ -102,6 +102,8 @@ static void testMetricsAndEventNames() {
   assert(world.tension <= 100U);
   assert(world.anomalyLevel <= 100U);
   assert(world.factionActivity <= 100U);
+  assert(world.latestEvent.intensity <= 100U);
+  assert(world.latestEvent.sector < 32U);
   assert(eventTypeName(EventType::PortalFluctuation)[0] != '\0');
   assert(eventTypeName(EventType::None)[0] != '\0');
 }
