@@ -1196,7 +1196,7 @@ void setup() {
   ramMark("serial");        // 到这儿串口才活；上面四枪全靠攒着才看得到（见 ram_profile.h）
 
   tzInit();                             // 时区：从 NVS 恢复并立即应用
-  hawkinsRuntimeInit();                  // 恢复 Hawkins 世界快照（双槽 NVS）
+  hawkins::hawkinsRuntimeInit();                  // 恢复 Hawkins 世界快照（双槽 NVS）
   bootMark("timezone-ready");
   clockInit();                          // 时钟表盘风格：从 NVS 恢复
   // 停滞看门狗要付 3KB 常驻栈，所以跟着 Debug 走，不白占（理由见 bctrail.cpp）
@@ -1408,7 +1408,7 @@ void loop() {
 
   // GNSS & IMU & LoRa：串口流式输出（PC 主导模式或其他模式下开启）
   gnssPoll();
-  if (hawkinsRuntimeUpdate() && screen == SCREEN_HAWKINS) dirty = true;
+  if (hawkins::hawkinsRuntimeUpdate() && screen == SCREEN_HAWKINS) dirty = true;
   if (screen == SCREEN_HAWKINS) hawkinsAppUpdate();
   gnssStreamTick();
   imuStreamTick();
