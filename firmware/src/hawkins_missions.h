@@ -8,7 +8,7 @@ namespace hawkins {
 constexpr uint32_t kMissionSchemaVersion = 1U;
 constexpr uint8_t kMissionCount = 3U;
 constexpr size_t kMissionSaveHeaderSize = 16U;
-constexpr size_t kMissionSavePayloadSize = 15U;
+constexpr size_t kMissionSavePayloadSize = 20U;
 constexpr size_t kMissionSaveEncodedSize =
     kMissionSaveHeaderSize + kMissionSavePayloadSize;
 
@@ -30,6 +30,9 @@ struct MissionState {
   uint8_t status[kMissionCount];
   uint32_t sectors;
   uint32_t discoveries;
+  // Dernier identifiant de cellule traite : dedoublonne une reprise apres coupure.
+  uint32_t lastCellKey;
+  uint8_t hasLastCell;
 };
 
 struct MissionDef {
@@ -44,7 +47,8 @@ bool isValidMissionState(const MissionState& state);
 
 // Enregistre un nouveau secteur et renvoie le masque des missions terminees
 // par cet evenement. Chaque bit correspond a MissionId.
-uint8_t recordMissionSector(MissionState& state, bool discovery);
+uint8_t recordMissionSector(MissionState& state, uint32_t cellKey,
+                            bool discovery);
 uint16_t missionRewardXp(MissionId id);
 MissionStatus missionStatus(const MissionState& state, MissionId id);
 
