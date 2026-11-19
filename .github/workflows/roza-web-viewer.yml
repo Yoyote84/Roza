@@ -42,6 +42,14 @@ jobs:
         working-directory: firmware
         run: pio pkg install -e cardputer-adv
 
+      - name: Préparer les secrets factices de compilation
+        working-directory: firmware
+        run: cp src/secrets.h.example src/secrets.h
+
+      - name: Compiler le firmware Cardputer ADV
+        working-directory: firmware
+        run: pio run -e cardputer-adv
+
       - name: Exécuter les tests natifs Hawkins
         working-directory: firmware
         run: bash tools/hawkinstest/build.sh
