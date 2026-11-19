@@ -4,8 +4,6 @@ namespace hawkins {
 namespace {
 
 uint32_t nextRandom(WorldState& world) {
-  // xorshift32 : petit générateur déterministe, adapté aux événements de jeu.
-  // Il ne sert ni à la cryptographie ni à la génération de secrets.
   uint32_t x = world.randomState;
   x ^= x << 13;
   x ^= x >> 17;
@@ -91,21 +89,20 @@ void initializeWorld(WorldState& world, uint32_t seed, uint64_t startEpochSecond
   world.latestEvent = WorldEvent{};
 }
 
-AdvanceSummary advanceWorld(WorldState& world, uint64_t nowEpochSeconds) {
+AdvanceSummary advanceWorldByDays(WorldState& world, uint32_t days) {
   AdvanceSummary summary{};
   if (world.schemaVersion != kWorldSchemaVersion || world.startEpochSeconds == 0 ||
-      nowEpochSeconds < world.startEpochSeconds) {
+      world.randomState == 0U || days == 0U) {
     return summary;
   }
 
-  const uint64_t elapsedSeconds = nowEpochSeconds - world.startEpochSeconds;
-  const uint64_t targetDay64 = elapsedSeconds / kSecondsPerDay;
-  if (targetDay64 <= world.simulatedDays) return summary;
-
-  const uint64_t dueDays = targetDay64 - world.simulatedDays;
-  const uint32_t daysToProcess = dueDays > kMaxCatchUpDaysPerCall
-                                     ? kMaxCatchUpDaysPerCall
-                                     : static_cast<uint32_t>(dueDays);
+  const uint32_t maxAdditionalDays = UINT32_MAX - world.simulatedDays;
+  uint32_t daysToProcess = days > kMaxCatchUpDaysPerCall
+                               ? kMaxCatchUpDaysPerCall
+                               : days;
+  if (daysToProcess > maxAdditionalDays) {
+    daysToProcess = maxAdditionalDays;
+  }
 
   for (uint32_t i = 0; i < daysToProcess; ++i) {
     const uint32_t day = world.simulatedDays + 1U;
@@ -114,7 +111,27 @@ AdvanceSummary advanceWorld(WorldState& world, uint64_t nowEpochSeconds) {
   }
 
   summary.daysProcessed = daysToProcess;
-  summary.catchUpPending = targetDay64 > world.simulatedDays;
+  summary.catchUpPending = daysToProcess < days;
+  return summary;
+}
+
+AdvanceSummary advanceWorld(WorldState& world, uint64_t nowEpochSeconds) {
+  AdvanceSummary summary{};
+  if (world.schemaVersion != kWorldSchemaVersion || world.startEpochSeconds == 0 ||
+      nowEpochSeconds < world.startEpochSeconds) {
+    return summary;
+  }
+
+  const uint64_t elapsedSeconds = nowEpochSeconds - world.startEpochSeconds;
+  const uint64_t targetDay = elapsedSeconds / kSecondsPerDay;
+  if (targetDay <= world.simulatedDays) return summary;
+
+  const uint64_t dueDays = targetDay - world.simulatedDays;
+  const uint32_t requestedDays = dueDays > UINT32_MAX
+                                     ? UINT32_MAX
+                                     : static_cast<uint32_t>(dueDays);
+  summary = advanceWorldByDays(world, requestedDays);
+  summary.catchUpPending = targetDay > world.simulatedDays;
   return summary;
 }
 

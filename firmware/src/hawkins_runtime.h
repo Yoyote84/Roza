@@ -6,6 +6,8 @@ enum class RuntimeStatus:uint8_t{Empty,Ready,WaitingForClock,ClockBeforeWorld,Sa
 void hawkinsRuntimeInit();
 bool hawkinsRuntimeUpdate();
 bool hawkinsRuntimeSaveNow();
+// Progression narrative locale : une journée de jeu par secteur inédit.
+bool hawkinsRuntimeAdvanceDays(uint32_t days);
 const WorldState* hawkinsRuntimeWorld();
 RuntimeStatus hawkinsRuntimeStatus();
 const char* hawkinsRuntimeStatusText();

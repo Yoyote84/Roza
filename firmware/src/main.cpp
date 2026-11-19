@@ -1409,6 +1409,7 @@ void loop() {
   // GNSS & IMU & LoRa：串口流式输出（PC 主导模式或其他模式下开启）
   gnssPoll();
   if (hawkinsRuntimeUpdate() && screen == SCREEN_HAWKINS) dirty = true;
+  if (screen == SCREEN_HAWKINS) hawkinsAppUpdate();
   gnssStreamTick();
   imuStreamTick();
   loraSniffTick();

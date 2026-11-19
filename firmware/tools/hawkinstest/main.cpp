@@ -1,5 +1,7 @@
 #include "hawkins_world.h"
 #include "hawkins_save_codec.h"
+#include "hawkins_exploration.h"
+#include <math.h>
 
 #include <assert.h>
 #include <stdio.h>
@@ -129,6 +131,72 @@ static void testSaveCodecRejectsDamage(){
  assert(!decodeWorldSave(encoded,sizeof(encoded),restored,seq));
  assert(!encodeWorldSave(original,1U,encoded,sizeof(encoded)-1U));assert(!encodeWorldSave(original,0U,encoded,sizeof(encoded)));
 }
+static void testOfflineWorldAdvance() {
+  WorldState world{};
+  initializeWorld(world, 0x12345678U, 1ULL);
+  const AdvanceSummary first = advanceWorldByDays(world, 3U);
+  assert(first.daysProcessed == 3U);
+  assert(!first.catchUpPending);
+  assert(world.simulatedDays == 3U);
+  const AdvanceSummary capped = advanceWorldByDays(
+      world, kMaxCatchUpDaysPerCall + 5U);
+  assert(capped.daysProcessed == kMaxCatchUpDaysPerCall);
+  assert(capped.catchUpPending);
+  assert(world.simulatedDays == 3U + kMaxCatchUpDaysPerCall);
+}
+
+static void testExplorationCellGrid() {
+  uint32_t a = 0U, nearby = 0U, far = 0U;
+  assert(makeExplorationCellKey(48.8566, 2.3522, 77U, a));
+  assert(makeExplorationCellKey(48.8567, 2.3523, 77U, nearby));
+  assert(makeExplorationCellKey(48.8566, 2.3560, 77U, far));
+  assert(a == nearby);
+  assert(a != far);
+  assert(!makeExplorationCellKey(91.0, 0.0, 77U, far));
+  assert(!makeExplorationCellKey(0.0, NAN, 77U, far));
+}
+
+static void testExplorationVisitsAndDiscoveries() {
+  ExplorationState state{};
+  initializeExploration(state);
+  assert(isValidExplorationState(state));
+  assert(observeExplorationCell(state, 11U) == ExplorationResult::OriginSet);
+  assert(state.sectorsVisited == 0U);
+  assert(observeExplorationCell(state, 11U) == ExplorationResult::SameCell);
+  assert(observeExplorationCell(state, 12U) == ExplorationResult::NewSector);
+  assert(observeExplorationCell(state, 13U) == ExplorationResult::NewSector);
+  assert(observeExplorationCell(state, 14U) == ExplorationResult::NewDiscovery);
+  assert(state.sectorsVisited == 3U);
+  assert(state.discoveries == 1U);
+  assert(observeExplorationCell(state, 12U) == ExplorationResult::Revisited);
+  assert(state.sectorsVisited == 3U);
+  assert(isValidExplorationState(state));
+}
+
+static void testExplorationSaveCodec() {
+  ExplorationState original{};
+  initializeExploration(original);
+  observeExplorationCell(original, 100U);
+  observeExplorationCell(original, 200U);
+  observeExplorationCell(original, 300U);
+  observeExplorationCell(original, 400U);
+  uint8_t encoded[kExplorationSaveEncodedSize];
+  assert(encodeExplorationSave(original, 9U, encoded, sizeof(encoded)));
+
+  ExplorationState restored{};
+  uint32_t sequence = 0U;
+  assert(decodeExplorationSave(encoded, sizeof(encoded), restored, sequence));
+  assert(sequence == 9U);
+  assert(restored.sectorsVisited == original.sectorsVisited);
+  assert(restored.discoveries == original.discoveries);
+  assert(restored.lastCellKey == original.lastCellKey);
+  assert(restored.knownCount == original.knownCount);
+
+  encoded[24] ^= 0x20U;
+  assert(!decodeExplorationSave(encoded, sizeof(encoded), restored, sequence));
+  assert(!decodeExplorationSave(encoded, sizeof(encoded) - 1U, restored, sequence));
+}
+
 static void testSaveCodecRejectsInvalidState(){
  WorldState invalid{};initializeWorld(invalid,9U,1800000000ULL);invalid.tension=101U;
  uint8_t encoded[kWorldSaveEncodedSize];assert(!encodeWorldSave(invalid,1U,encoded,sizeof(encoded)));
@@ -143,6 +211,10 @@ int main() {
   testSaveCodecRoundTrip();
   testSaveCodecRejectsDamage();
   testSaveCodecRejectsInvalidState();
+  testOfflineWorldAdvance();
+  testExplorationCellGrid();
+  testExplorationVisitsAndDiscoveries();
+  testExplorationSaveCodec();
   puts("HAWKINS: tous les tests du moteur de monde ont réussi.");
   return 0;
 }

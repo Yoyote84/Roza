@@ -57,6 +57,9 @@ void initializeWorld(WorldState& world, uint32_t seed, uint64_t startEpochSecond
 // Une heure nulle ou antérieure au démarrage ne fait jamais reculer le monde.
 AdvanceSummary advanceWorld(WorldState& world, uint64_t nowEpochSeconds);
 
+// Avance le calendrier du jeu sans horloge murale, pour les parties 100 % hors ligne.
+AdvanceSummary advanceWorldByDays(WorldState& world, uint32_t days);
+
 const char* eventTypeName(EventType type);
 
 }  // namespace hawkins
