@@ -42,6 +42,10 @@ jobs:
         working-directory: firmware
         run: pio pkg install -e cardputer-adv
 
+      - name: Exécuter les tests natifs Hawkins
+        working-directory: firmware
+        run: bash tools/hawkinstest/build.sh
+
       - name: Prepare optional simulator-only credentials
         working-directory: firmware
         run: |

@@ -30,7 +30,7 @@ bool playerLoaded = false;
 bool playerStorageError = false;
 uint8_t characterCreationStep = 0U;  // 0=nom, 1=classe
 uint8_t selectedClass = 0U;
-char characterName[kCharacterNameCapacity + 1U] = {};
+char characterName[hawkins::kCharacterNameCapacity + 1U] = {};
 uint8_t characterNameLength = 0U;
 
 void setGpsStatus(const char* text) {
