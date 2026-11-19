@@ -272,6 +272,7 @@ static void testCharacterSaveCodec() {
   CharacterState original{};
   assert(createCharacter(original, 4U, "MAX MAYFIELD"));
   awardCharacterXp(original, 135U);
+  assert(awardCharacterMissionXpOnce(original, 1U, 20U));
   uint8_t encoded[kCharacterSaveEncodedSize];
   assert(encodeCharacterSave(original, 23U, encoded, sizeof(encoded)));
   CharacterState restored{};
