@@ -71,6 +71,12 @@ int main()
     assert(!fix.has_fix && fix.longitude_deg == 0.0);
 
     roza_gnss_fix_reset(&fix);
+    const std::string huge_coordinate = make_nmea_sentence(
+        "GPGGA,123519,999999999999999999999999999.0,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,");
+    assert(roza_gnss_parse_sentence(huge_coordinate.c_str(), &fix));
+    assert(!fix.has_fix);
+
+    roza_gnss_fix_reset(&fix);
     const std::string nonfinite = make_nmea_sentence(
         "GPGGA,123519,4807.038,N,01131.000,E,1,08,NaN,INF,M,46.9,M,,");
     assert(roza_gnss_parse_sentence(nonfinite.c_str(), &fix));

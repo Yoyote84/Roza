@@ -31,7 +31,8 @@ static bool parse_coordinate(const char *raw, const char *hemisphere,
     if (!raw || !*raw || !hemisphere || !*hemisphere || hemisphere[1] != '\0' || !value) return false;
     char *end = nullptr;
     const double packed = strtod(raw, &end);
-    if (end == raw || *end != '\0' || !isfinite(packed) || packed < 0.0) return false;
+    if (end == raw || *end != '\0' || !isfinite(packed) || packed < 0.0 ||
+        packed >= (static_cast<double>(max_degrees) + 1.0) * 100.0) return false;
 
     const int degrees = static_cast<int>(packed / 100.0);
     const double minutes = packed - static_cast<double>(degrees) * 100.0;
