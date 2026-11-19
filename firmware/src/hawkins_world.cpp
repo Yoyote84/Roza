@@ -67,7 +67,9 @@ void simulateOneDay(WorldState& world, uint32_t day, AdvanceSummary& summary) {
   event.sequence = ++world.eventCount;
   event.day = day;
   event.type = type;
-  event.intensity = static_cast<uint8_t>(1U + randomBelow(world, intensityRange));
+  uint32_t intensity = 1U + randomBelow(world, intensityRange);
+  if (intensity > 100U) intensity = 100U;
+  event.intensity = static_cast<uint8_t>(intensity);
   event.sector = static_cast<uint8_t>(randomBelow(world, 32U));
   world.latestEvent = event;
   summary.eventsCreated++;
