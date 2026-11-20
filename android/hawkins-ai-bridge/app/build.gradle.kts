@@ -34,4 +34,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation("com.github.mik3y:usb-serial-for-android:3.12.0")
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20240303")
 }
