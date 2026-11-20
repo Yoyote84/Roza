@@ -111,8 +111,8 @@ bool isValidMissionState(const MissionState& state) {
     return false;
   }
 
-  if (missionStatus(state, MissionId::FirstSignal) == MissionStatus::Complete &&
-      state.discoveries < kMissions[0].target) return false;
+  // Le premier signal est une scene narrative : sa completion depend du choix radio,
+  // pas d'une decouverte GPS. Les anciennes sauvegardes restent valides.
   if (missionStatus(state, MissionId::ThreeSectors) == MissionStatus::Complete &&
       state.sectors < kMissions[1].target) return false;
   if (missionStatus(state, MissionId::AnomalyTrail) == MissionStatus::Complete &&
