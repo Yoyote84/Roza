@@ -28,3 +28,10 @@ fi
   ../../src/hawkins_narrative_memory_codec.cpp \
   -o /tmp/roza-hawkins-narrative-test
 /tmp/roza-hawkins-narrative-test
+"$CXX" -std=c++17 -Wall -Wextra -Werror $SANFLAGS \
+  -I ../../src ai_context_test.cpp ../../src/hawkins_ai_context.cpp \
+  ../../src/hawkins_world.cpp ../../src/hawkins_exploration.cpp \
+  ../../src/hawkins_character.cpp ../../src/hawkins_adventure.cpp \
+  ../../src/hawkins_missions.cpp ../../src/hawkins_narrative_memory.cpp \
+  -o /tmp/roza-hawkins-ai-context-test
+/tmp/roza-hawkins-ai-context-test
