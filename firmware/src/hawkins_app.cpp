@@ -909,8 +909,8 @@ void hawkinsAppUpdate() {
     return;
   }
   if (result == hawkins::ExplorationResult::OriginSet) {
-    const bool localEvent = hawkins::generateLocalAreaEvent(
-        exploration, *world, candidateCellKey, false);
+    // Le premier fix GPS définit uniquement le point de départ. Il ne déclenche
+    // ni événement ni mission : le joueur commence réellement à explorer ensuite.
     if (!hawkins::explorationSaveCommit(exploration, &explorationSequence)) {
       exploration = previousExploration;
       explorerStorageError = true;
@@ -918,14 +918,18 @@ void hawkinsAppUpdate() {
       setGpsStatus("ERREUR SAUVEGARDE GPS");
       return;
     }
-    setGpsStatus(localEvent ? "EVENEMENT LOCAL DANS LA ZONE"
-                            : "POINT DE DEPART ENREGISTRE");
+    setGpsStatus("POINT DE DEPART ENREGISTRE");
     hawkins::sdBackupAutoSave();
   } else {
-    const bool discovery =
-        result == hawkins::ExplorationResult::NewDiscovery;
+    bool discovery = result == hawkins::ExplorationResult::NewDiscovery;
     const bool localEvent = hawkins::generateLocalAreaEvent(
         exploration, *world, candidateCellKey, discovery);
+    // Un signal aléatoire rencontré sur un nouveau secteur compte aussi comme
+    // une découverte de mission. Les signaux garantis ne sont comptés qu'une fois.
+    if (localEvent &&
+        exploration.lastEventType == hawkins::EventType::StrangeSignal) {
+      discovery = true;
+    }
     if (!commitMissionProgress(candidateCellKey, discovery)) {
       exploration = previousExploration;
       candidateActive = false;

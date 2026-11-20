@@ -348,6 +348,38 @@ static void testLocalAreaEventsStayAttachedToTheirGpsSector() {
   assert(isValidExplorationState(state));
 }
 
+static void testOrdinaryLocalSignalAdvancesDiscoveryCounter() {
+  WorldState world{};
+  initializeWorld(world, 1U, 1ULL);
+  ExplorationState state{};
+  initializeExploration(state);
+  assert(observeExplorationCell(state, 1U) == ExplorationResult::OriginSet);
+  assert(observeExplorationCell(state, 37U) == ExplorationResult::NewSector);
+  assert(state.discoveries == 0U);
+
+  // Avec cette graine/zone réelle, le tirage déterministe produit un signal.
+  assert(generateLocalAreaEvent(state, world, 37U, false));
+  assert(state.lastEventType == EventType::StrangeSignal);
+  assert(state.lastEventCellKey == 37U);
+  assert(state.discoveries == 1U);
+  assert(isValidExplorationState(state));
+
+  // L'indicateur discovery=true correspond à la découverte périodique déjà
+  // comptée par observeExplorationCell : aucun double comptage.
+  ExplorationState guaranteed{};
+  initializeExploration(guaranteed);
+  observeExplorationCell(guaranteed, 100U);
+  observeExplorationCell(guaranteed, 101U);
+  observeExplorationCell(guaranteed, 102U);
+  assert(observeExplorationCell(guaranteed, 103U) ==
+         ExplorationResult::NewDiscovery);
+  assert(guaranteed.discoveries == 1U);
+  WorldState guaranteedWorld{};
+  initializeWorld(guaranteedWorld, 99U, 1ULL);
+  assert(generateLocalAreaEvent(guaranteed, guaranteedWorld, 103U, true));
+  assert(guaranteed.discoveries == 1U);
+}
+
 static void testCharacterCreationAndAttributes() {
   CharacterState character{};
   assert(createCharacter(character, 0U, "NANCY"));
@@ -444,6 +476,7 @@ int main() {
   testExplorationMemoryTracks128RecentSectors();
   testLegacyExplorationSaveMigratesWithoutLosingVisits();
   testLocalAreaEventsStayAttachedToTheirGpsSector();
+  testOrdinaryLocalSignalAdvancesDiscoveryCounter();
   testCharacterCreationAndAttributes();
   testCharacterExperienceAndLevels();
   testCharacterMissionRewardIsIdempotent();

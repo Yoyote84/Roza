@@ -300,6 +300,13 @@ bool generateLocalAreaEvent(ExplorationState& state, const WorldState& world,
   ++state.areaEventCount;
   state.lastEventType = type;
   state.lastEventIntensity = static_cast<uint8_t>(intensity);
+  // Un signal apparu pendant un déplacement normal est une vraie découverte
+  // pour la mission "Piste de l'anomalie". Une découverte garantie a déjà
+  // incrémenté ce compteur dans observeExplorationCell().
+  if (type == EventType::StrangeSignal && !discovery &&
+      state.discoveries < UINT32_MAX) {
+    ++state.discoveries;
+  }
   return isValidExplorationState(state);
 }
 
