@@ -28,7 +28,7 @@ class HawkinsProtocolTest {
     @Test
     fun parserPreservesUtf8Text() {
         val frame = """HKA/1 {"type":"narrate","id":5,"context":{"memory":"Lia a aidé l'été dernier"}}"""
-        assertEquals("Lia a aide l'ete dernier",
+        assertEquals("Lia a aidé l'été dernier",
             HawkinsProtocol.parseFrame(frame)?.getJSONObject("context")?.getString("memory"))
     }
 
