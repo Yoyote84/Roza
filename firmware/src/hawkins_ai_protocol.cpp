@@ -14,9 +14,9 @@ bool copyBoundedText(const char* source, char* destination, size_t capacity) {
   if (length == 0U || length >= capacity) return false;
   for (size_t i = 0U; i < length; ++i) {
     const unsigned char c = static_cast<unsigned char>(source[i]);
-    if (c < 0x20U && c != '\n' && c != '\t') return false;
+    destination[i] = (c < 0x20U && c != '\n' && c != '\t')
+        ? ' ' : source[i];
   }
-  memcpy(destination, source, length);
   destination[length] = '\0';
   return true;
 }
@@ -55,41 +55,60 @@ bool buildHawkinsAiRequestLine(uint32_t requestId, const char* contextJson,
 }
 
 bool parseHawkinsAiMessage(const char* line, size_t length,
-                           HawkinsAiMessage& output) {
+                           HawkinsAiMessage& output,
+                           const char** errorCode) {
   output = HawkinsAiMessage{};
-  if (!line || length < kPrefixLength + 2U ||
-      length > kHawkinsAiMaxLine ||
-      memcmp(line, kPrefix, kPrefixLength) != 0) return false;
+  if (errorCode) *errorCode = "ok";
+  const auto fail = [errorCode](const char* code) {
+    if (errorCode) *errorCode = code;
+    return false;
+  };
+  if (!line) return fail("null_frame");
+  if (length < kPrefixLength + 2U) return fail("frame_too_short");
+  if (length > kHawkinsAiMaxLine) return fail("frame_too_long");
+  if (memcmp(line, kPrefix, kPrefixLength) != 0) return fail("bad_prefix");
 
   JsonDocument document;
   const DeserializationError error =
       deserializeJson(document, line + kPrefixLength, length - kPrefixLength);
-  if (error || !document.is<JsonObject>()) return false;
+  if (error) {
+    return fail(error == DeserializationError::NoMemory
+                    ? "json_no_memory" : "json_syntax");
+  }
+  if (!document.is<JsonObject>()) return fail("json_not_object");
 
   const char* type = document["type"].as<const char*>();
-  if (!type) return false;
+  if (!type) return fail("type_missing");
   if (strcmp(type, "hello") == 0) {
     const uint8_t version = document["version"] | 0U;
-    if (version != 1U) return false;
+    if (version != 1U) return fail("hello_version");
     output.kind = HawkinsAiMessageKind::Hello;
     return true;
   }
 
-  if (!document["id"].is<uint32_t>()) return false;
+  if (!document["id"].is<uint32_t>()) return fail("id_invalid");
   const uint32_t id = document["id"].as<uint32_t>();
-  if (id == 0U) return false;
+  if (id == 0U) return fail("id_zero");
 
   if (strcmp(type, "narration") == 0) {
     const char* text = document["text"].as<const char*>();
-    if (!copyBoundedText(text, output.text, sizeof(output.text)) ||
-        !document["choices"].is<JsonArray>()) return false;
+    if (!text) return fail("text_missing");
+    if (!copyBoundedText(text, output.text, sizeof(output.text))) {
+      return fail("text_empty_too_long_or_control");
+    }
+    if (!document["choices"].is<JsonArray>()) {
+      return fail("choices_missing_or_not_array");
+    }
     JsonArray choices = document["choices"].as<JsonArray>();
-    if (choices.size() > kHawkinsAiChoiceCount) return false;
+    if (choices.size() > kHawkinsAiChoiceCount) return fail("too_many_choices");
     for (JsonVariantConst choice : choices) {
+      if (!choice.is<const char*>()) return fail("choice_not_string");
       if (output.choiceCount >= kHawkinsAiChoiceCount ||
           !copyBoundedText(choice.as<const char*>(),
                            output.choices[output.choiceCount],
-                           sizeof(output.choices[0]))) return false;
+                           sizeof(output.choices[0]))) {
+        return fail("choice_empty_too_long_or_control");
+      }
       ++output.choiceCount;
     }
     output.kind = HawkinsAiMessageKind::Narration;
@@ -99,12 +118,15 @@ bool parseHawkinsAiMessage(const char* line, size_t length,
 
   if (strcmp(type, "error") == 0) {
     const char* message = document["message"].as<const char*>();
+    if (!message) return fail("error_message_missing");
     if (!copyBoundedText(message, output.text,
-                         kHawkinsAiErrorCapacity + 1U)) return false;
+                         kHawkinsAiErrorCapacity + 1U)) {
+      return fail("error_message_empty_too_long_or_control");
+    }
     output.kind = HawkinsAiMessageKind::Error;
     output.requestId = id;
     return true;
   }
-  return false;
+  return fail("unknown_type");
 }
 }  // namespace hawkins

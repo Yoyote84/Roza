@@ -1048,15 +1048,16 @@ void hawkinsAppAiUpdate() {
 bool hawkinsAppHandleSerialLine(const char* line, size_t length) {
   if (!line || length < 6U || memcmp(line, "HKA/1 ", 6U) != 0) return false;
   hawkins::HawkinsAiMessage message{};
-  if (!hawkins::parseHawkinsAiMessage(line, length, message)) {
-    Serial.printf("[hawkins-ai] trame HKA invalide: len=%u pending=%u id=%lu\n",
-                  static_cast<unsigned>(length), aiPending ? 1U : 0U,
-                  static_cast<unsigned long>(aiRequestId));
+  const char* parseError = "invalid_frame";
+  if (!hawkins::parseHawkinsAiMessage(line, length, message, &parseError)) {
+    Serial.printf("[hawkins-ai] trame HKA invalide: raison=%s len=%u pending=%u id=%lu\n",
+                  parseError, static_cast<unsigned>(length),
+                  aiPending ? 1U : 0U, static_cast<unsigned long>(aiRequestId));
     aiPending = false;
     aiChoiceCount = 0U;
     aiNarration[0] = '\0';
     aiStatusText = "REPONSE IA INVALIDE - VOIR USB";
-    sendAiProtocolAck(aiRequestId, "nack", "invalid_frame");
+    sendAiProtocolAck(aiRequestId, "nack", parseError);
     dirty = true;
     return true;
   }

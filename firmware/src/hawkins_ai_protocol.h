@@ -24,6 +24,7 @@ struct HawkinsAiMessage {
 bool buildHawkinsAiRequestLine(uint32_t requestId, const char* contextJson,
                                char* output, size_t capacity);
 bool parseHawkinsAiMessage(const char* line, size_t length,
-                           HawkinsAiMessage& output);
+                           HawkinsAiMessage& output,
+                           const char** errorCode = nullptr);
 
 }  // namespace hawkins

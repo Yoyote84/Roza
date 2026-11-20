@@ -61,6 +61,28 @@ static void testNarrationAcceptsFrenchUtf8() {
   assert(strcmp(message.text, "La lumiere vacille dans le couloir. Quelqu'un frappe a la porte.") == 0);
 }
 
+static void testNarrationNormalizesControlCharacters() {
+  const char line[] =
+      "HKA/1 {\"type\":\"narration\",\"id\":9,\"text\":\"Ligne 1\\rLigne 2\",\"choices\":[\"A\\u0001B\"]}";
+  HawkinsAiMessage message{};
+  const char* errorCode = nullptr;
+  assert(hawkins::parseHawkinsAiMessage(
+      line, sizeof(line) - 1U, message, &errorCode));
+  assert(strcmp(errorCode, "ok") == 0);
+  assert(strcmp(message.text, "Ligne 1 Ligne 2") == 0);
+  assert(strcmp(message.choices[0], "A B") == 0);
+}
+
+static void testNarrationExposesPreciseParseFailure() {
+  const char line[] =
+      "HKA/1 {\"type\":\"narration\",\"id\":9,\"text\":\"Bonjour\"}";
+  HawkinsAiMessage message{};
+  const char* errorCode = nullptr;
+  assert(!hawkins::parseHawkinsAiMessage(
+      line, sizeof(line) - 1U, message, &errorCode));
+  assert(strcmp(errorCode, "choices_missing_or_not_array") == 0);
+}
+
 static void testInvalidAndUnknownMessages() {
   HawkinsAiMessage message{};
   const char noPrefix[] = "{\"type\":\"hello\",\"version\":1}";
@@ -102,6 +124,8 @@ int main() {
   testHelloHeartbeat();
   testNarration();
   testNarrationAcceptsFrenchUtf8();
+  testNarrationNormalizesControlCharacters();
+  testNarrationExposesPreciseParseFailure();
   testInvalidAndUnknownMessages();
   testRejectsEmptyAndOversizedNarration();
   testRejectsControlCharacters();
