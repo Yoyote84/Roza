@@ -46,9 +46,11 @@ void initializeMissions(MissionState& state);
 bool isValidMissionState(const MissionState& state);
 
 // Enregistre un nouveau secteur et renvoie le masque des missions terminees
-// par cet evenement. Chaque bit correspond a MissionId.
+// par cet evenement. La premiere mission reste active jusqu'a la reponse au signal.
 uint8_t recordMissionSector(MissionState& state, uint32_t cellKey,
                             bool discovery);
+// Termine la mission radio apres validation du choix du joueur. Operation idempotente.
+bool completeFirstSignal(MissionState& state);
 uint16_t missionRewardXp(MissionId id);
 MissionStatus missionStatus(const MissionState& state, MissionId id);
 

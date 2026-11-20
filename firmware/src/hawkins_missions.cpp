@@ -6,7 +6,7 @@ namespace hawkins {
 namespace {
 
 const MissionDef kMissions[kMissionCount] = {
-    {"LE PREMIER SIGNAL", "Decouvrir un premier signal anormal", 1U},
+    {"LE PREMIER SIGNAL", "Repondre au premier appel radio", 1U},
     {"CARTOGRAPHIE", "Explorer trois secteurs distincts", 3U},
     {"PISTE DE L'ANOMALIE", "Trouver deux signaux", 2U},
 };
@@ -127,6 +127,38 @@ MissionStatus missionStatus(const MissionState& state, MissionId id) {
   return static_cast<MissionStatus>(state.status[index]);
 }
 
+namespace {
+
+uint8_t completeReadyMissions(MissionState& state) {
+  uint8_t completedMask = 0U;
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    // Mission 0 = scene radio : elle est terminee par le choix du joueur,
+    // jamais automatiquement par une decouverte GPS.
+    for (uint8_t i = 1U; i < kMissionCount; ++i) {
+      if (state.status[i] != static_cast<uint8_t>(MissionStatus::Active)) {
+        continue;
+      }
+      const uint32_t progress =
+          i == static_cast<uint8_t>(MissionId::ThreeSectors)
+              ? state.sectors : state.discoveries;
+      if (progress < kMissions[i].target) continue;
+
+      state.status[i] = static_cast<uint8_t>(MissionStatus::Complete);
+      completedMask = static_cast<uint8_t>(completedMask | (1U << i));
+      if (i + 1U < kMissionCount &&
+          state.status[i + 1U] == static_cast<uint8_t>(MissionStatus::Locked)) {
+        state.status[i + 1U] = static_cast<uint8_t>(MissionStatus::Active);
+      }
+      changed = true;
+    }
+  }
+  return completedMask;
+}
+
+}  // namespace
+
 uint8_t recordMissionSector(MissionState& state, uint32_t cellKey,
                             bool discovery) {
   if (!isValidMissionState(state) || cellKey == 0U) return 0U;
@@ -137,29 +169,29 @@ uint8_t recordMissionSector(MissionState& state, uint32_t cellKey,
   if (state.sectors < UINT32_MAX) ++state.sectors;
   if (discovery && state.discoveries < UINT32_MAX) ++state.discoveries;
 
-  uint8_t completedMask = 0U;
-  bool changed = true;
-  while (changed) {
-    changed = false;
-    for (uint8_t i = 0; i < kMissionCount; ++i) {
-      if (state.status[i] != static_cast<uint8_t>(MissionStatus::Active)) {
-        continue;
-      }
-      const uint32_t progress =
-          i == static_cast<uint8_t>(MissionId::ThreeSectors)
-              ? state.sectors
-              : state.discoveries;
-      if (progress < kMissions[i].target) continue;
-
-      state.status[i] = static_cast<uint8_t>(MissionStatus::Complete);
-      completedMask = static_cast<uint8_t>(completedMask | (1U << i));
-      if (i + 1U < kMissionCount) {
-        state.status[i + 1U] = static_cast<uint8_t>(MissionStatus::Active);
-      }
-      changed = true;
-    }
+  if (missionStatus(state, MissionId::FirstSignal) != MissionStatus::Complete) {
+    return 0U;
   }
-  return completedMask;
+  return completeReadyMissions(state);
+}
+
+bool completeFirstSignal(MissionState& state) {
+  if (!isValidMissionState(state)) return false;
+  const MissionStatus first = missionStatus(state, MissionId::FirstSignal);
+  if (first == MissionStatus::Locked) return false;
+
+  if (first == MissionStatus::Active) {
+    state.status[static_cast<uint8_t>(MissionId::FirstSignal)] =
+        static_cast<uint8_t>(MissionStatus::Complete);
+  }
+  if (state.status[static_cast<uint8_t>(MissionId::ThreeSectors)] ==
+      static_cast<uint8_t>(MissionStatus::Locked)) {
+    state.status[static_cast<uint8_t>(MissionId::ThreeSectors)] =
+        static_cast<uint8_t>(MissionStatus::Active);
+  }
+
+  completeReadyMissions(state);
+  return isValidMissionState(state);
 }
 
 uint16_t missionRewardXp(MissionId id) {

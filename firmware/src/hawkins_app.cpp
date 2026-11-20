@@ -205,14 +205,19 @@ void drawMissionPage() {
       cv.drawString(statusText, SW - 6, y);
 
       char progress[48];
-      const uint32_t value = i == static_cast<uint8_t>(
-          hawkins::MissionId::ThreeSectors) ? missions.sectors
-                                            : missions.discoveries;
-      snprintf(progress, sizeof(progress), "%s : %lu/%lu  +%u XP",
-               i == static_cast<uint8_t>(hawkins::MissionId::ThreeSectors)
-                   ? "SECTEURS" : "SIGNAUX",
-               (unsigned long)value, (unsigned long)def.target,
-               unsigned(hawkins::missionRewardXp(id)));
+      if (id == hawkins::MissionId::FirstSignal) {
+        snprintf(progress, sizeof(progress), "RADIO : %s  +%u XP",
+                 status == hawkins::MissionStatus::Complete
+                     ? "REPONSE ENREGISTREE" : "CHOIX A FAIRE",
+                 unsigned(hawkins::missionRewardXp(id)));
+      } else {
+        const uint32_t value = id == hawkins::MissionId::ThreeSectors
+                                   ? missions.sectors : missions.discoveries;
+        snprintf(progress, sizeof(progress), "%s : %lu/%lu  +%u XP",
+                 id == hawkins::MissionId::ThreeSectors ? "SECTEURS" : "SIGNAUX",
+                 (unsigned long)value, (unsigned long)def.target,
+                 unsigned(hawkins::missionRewardXp(id)));
+      }
       cv.setTextDatum(top_left);
       cv.setTextColor(ICON_DIM, TFT_BLACK);
       cv.drawString(progress, 6, y + 11);
@@ -553,6 +558,31 @@ void applyCompletedMissionRewards() {
   }
 }
 
+bool completeFirstSignalMission() {
+  if (!missionsReady) return false;
+  if (hawkins::missionStatus(missions, hawkins::MissionId::FirstSignal) ==
+      hawkins::MissionStatus::Complete) {
+    return true;
+  }
+
+  hawkins::MissionState updated = missions;
+  if (!hawkins::completeFirstSignal(updated)) return false;
+  uint32_t nextSequence = missionSequence;
+  if (!hawkins::missionSaveCommit(updated, &nextSequence)) {
+    missionsStorageError = true;
+    setGpsStatus("MISSION RADIO NON SAUVEGARDEE");
+    return false;
+  }
+
+  missions = updated;
+  missionSequence = nextSequence;
+  missionsStorageError = false;
+  // La copie SD facultative suit la NVS, jamais l'inverse.
+  hawkins::sdBackupAutoSave();
+  applyCompletedMissionRewards();
+  return true;
+}
+
 bool commitMissionProgress(uint32_t cellKey, bool discovery) {
   if (!missionsReady) return false;
   hawkins::MissionState updated = missions;
@@ -707,6 +737,14 @@ void hawkinsAppEnter() {
     adventureStorageError = true;
   }
   hawkins::sdBackupInit();
+  if (playerLoaded && adventureReady &&
+      (adventure.storyFlags & 0x01U) != 0U) {
+    // Reprise idempotente si l'appareil s'est eteint apres le choix de Lia
+    // mais avant l'enregistrement de la mission et de sa recompense.
+    if (!completeFirstSignalMission()) {
+      setGpsStatus("CHOIX CONSERVE - MISSION A REPRENDRE");
+    }
+  }
   showInventory = showSkills = showFirstContact = showStorage = false;
   restoreConfirmation = false;
 
@@ -905,7 +943,15 @@ void hawkinsAppKey(char key) {
           static_cast<hawkins::FirstContactChoice>(key - '1');
       if (hawkins::adventureResolveFirstContact(nextAdventure, nextPlayer, choice) &&
           saveAdventureAndCharacter(nextAdventure, nextPlayer)) {
-        setGpsStatus("CHOIX ENREGISTRE - HISTOIRE MODIFIEE");
+        if (completeFirstSignalMission()) {
+          setGpsStatus(playerStorageError
+                           ? "CHOIX OK - RECOMPENSE A REPRENDRE"
+                           : "CHOIX ENREGISTRE - CARTOGRAPHIE ACTIVE");
+        } else {
+          // Le choix reste enregistre ; la reconciliation reprendra la mission
+          // au prochain chargement sans autoriser un second choix/recompense.
+          setGpsStatus("CHOIX CONSERVE - MISSION A REPRENDRE");
+        }
       } else {
         setGpsStatus("CHOIX IMPOSSIBLE / ECHEC SAUVEGARDE");
       }
