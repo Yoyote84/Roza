@@ -81,22 +81,11 @@ bool parseHawkinsAiMessage(const char* line, size_t length,
 
   if (strcmp(type, "narration") == 0) {
     const char* text = document["text"].as<const char*>();
-    if (!copyBoundedText(text, output.text, sizeof(output.text)) ||
-        !document["choices"].is<JsonArray>()) return false;
-    JsonArray choices = document["choices"].as<JsonArray>();
-    if (choices.size() > kHawkinsAiChoiceCount) return false;
-    for (JsonVariantConst choice : choices) {
-      if (output.choiceCount >= kHawkinsAiChoiceCount ||
-          !copyBoundedText(choice.as<const char*>(),
-                           output.choices[output.choiceCount],
-                           sizeof(output.choices[0]))) return false;
-      ++output.choiceCount;
-    }
+    if (!copyBoundedText(text, output.text, sizeof(output.text))) return false;
     output.kind = HawkinsAiMessageKind::Narration;
     output.requestId = id;
     return true;
   }
-
   if (strcmp(type, "error") == 0) {
     const char* message = document["message"].as<const char*>();
     if (!copyBoundedText(message, output.text,

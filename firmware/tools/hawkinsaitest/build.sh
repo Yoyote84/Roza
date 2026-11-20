@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
-CXX_BIN=g++
+CXX_BIN="\${CXX:-g++}"
 JSON_INC="../../.pio/libdeps/cardputer-adv/ArduinoJson/src"
 if [ ! -f "$JSON_INC/ArduinoJson.h" ]; then
   echo "ArduinoJson absent : executer d'abord platformio run -e cardputer-adv."

@@ -37,17 +37,14 @@ static void testHelloHeartbeat() {
   assert(message.requestId == 0U && message.text[0] == '\0');
 }
 
-static void testNarrationAndChoices() {
+static void testNarration() {
   const char line[] =
-      "HKA/1 {\"type\":\"narration\",\"id\":7,\"text\":\"La lumiere vacille.\","
-      "\"choices\":[\"Suivre le bruit\",\"Appeler Lia\",\"Se cacher\"]}";
+      "HKA/1 {\"type\":\"narration\",\"id\":7,\"text\":\"La lumiere vacille.\"}";
   HawkinsAiMessage message{};
   assert(hawkins::parseHawkinsAiMessage(line, sizeof(line) - 1U, message));
   assert(message.kind == HawkinsAiMessageKind::Narration);
   assert(message.requestId == 7U);
   assert(strcmp(message.text, "La lumiere vacille.") == 0);
-  assert(message.choiceCount == 3U);
-  assert(strcmp(message.choices[1], "Appeler Lia") == 0);
 }
 
 static void testInvalidAndUnknownMessages() {
@@ -56,7 +53,7 @@ static void testInvalidAndUnknownMessages() {
   assert(!hawkins::parseHawkinsAiMessage(noPrefix, sizeof(noPrefix) - 1U, message));
   const char wrongVersion[] = "HKA/1 {\"type\":\"hello\",\"version\":2}";
   assert(!hawkins::parseHawkinsAiMessage(wrongVersion, sizeof(wrongVersion) - 1U, message));
-  const char noId[] = "HKA/1 {\"type\":\"narration\",\"text\":\"Salut\",\"choices\":[]}";
+  const char noId[] = "HKA/1 {\"type\":\"narration\",\"text\":\"Salut\"}";
   assert(!hawkins::parseHawkinsAiMessage(noId, sizeof(noId) - 1U, message));
   const char unknown[] = "HKA/1 {\"type\":\"inventory_change\",\"id\":1}";
   assert(!hawkins::parseHawkinsAiMessage(unknown, sizeof(unknown) - 1U, message));
@@ -66,41 +63,33 @@ static void testInvalidAndUnknownMessages() {
 
 static void testRejectsEmptyAndOversizedNarration() {
   HawkinsAiMessage message{};
-  const char empty[] =
-      "HKA/1 {\"type\":\"narration\",\"id\":3,\"text\":\"\",\"choices\":[]}";
+  const char empty[] = "HKA/1 {\"type\":\"narration\",\"id\":3,\"text\":\"\"}";
   assert(!hawkins::parseHawkinsAiMessage(empty, sizeof(empty) - 1U, message));
 
   char line[700];
   size_t offset = static_cast<size_t>(
-      snprintf(line, sizeof(line),
-               "HKA/1 {\"type\":\"narration\",\"id\":3,\"text\":\""));
-  for (unsigned i = 0U; i < 301U; ++i) line[offset++] = 'x';
+      snprintf(line, sizeof(line), "HKA/1 {\"type\":\"narration\",\"id\":3,\"text\":\""));
+  for (unsigned i = 0U; i < 500U; ++i) line[offset++] = 'x';
   line[offset++] = '"';
-  const char suffix[] = ",\"choices\":[]}";
-  memcpy(line + offset, suffix, sizeof(suffix) - 1U);
-  offset += sizeof(suffix) - 1U;
+  line[offset++] = '}';
   assert(!hawkins::parseHawkinsAiMessage(line, offset, message));
 }
 
-static void testRejectsControlCharactersAndExcessChoices() {
-  const char control[] =
-      "HKA/1 {\"type\":\"narration\",\"id\":2,\"text\":\"ok\\u0001no\",\"choices\":[]}";
+static void testRejectsControlCharacters() {
+  const char line[] =
+      "HKA/1 {\"type\":\"narration\",\"id\":2,\"text\":\"ok\\u0001no\"}";
   HawkinsAiMessage message{};
-  assert(!hawkins::parseHawkinsAiMessage(control, sizeof(control) - 1U, message));
-  const char tooMany[] =
-      "HKA/1 {\"type\":\"narration\",\"id\":2,\"text\":\"ok\","
-      "\"choices\":[\"1\",\"2\",\"3\",\"4\"]}";
-  assert(!hawkins::parseHawkinsAiMessage(tooMany, sizeof(tooMany) - 1U, message));
+  assert(!hawkins::parseHawkinsAiMessage(line, sizeof(line) - 1U, message));
 }
 
 int main() {
   testRequestBuildsBoundedEnvelope();
   testRequestRejectsInvalidInputAndOverflow();
   testHelloHeartbeat();
-  testNarrationAndChoices();
+  testNarration();
   testInvalidAndUnknownMessages();
   testRejectsEmptyAndOversizedNarration();
-  testRejectsControlCharactersAndExcessChoices();
+  testRejectsControlCharacters();
   puts("HAWKINS AI USB: toutes les validations du protocole ont reussi.");
   return 0;
 }
