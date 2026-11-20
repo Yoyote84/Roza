@@ -83,7 +83,6 @@ void sendAiProtocolAck(uint32_t id, const char* type, const char* status) {
   if (length > 0 && static_cast<size_t>(length) < sizeof(frame)) {
     Serial.write(reinterpret_cast<const uint8_t*>(frame),
                  static_cast<size_t>(length));
-    Serial.flush();
   }
 }
 

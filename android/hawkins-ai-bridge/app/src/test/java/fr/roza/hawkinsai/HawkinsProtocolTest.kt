@@ -36,8 +36,6 @@ class HawkinsProtocolTest {
     fun parserIgnoresLegacySerialOutput() {
         assertEquals(null, HawkinsProtocol.parseFrame("[boot-diag] ready"))
     }
-}
-
 
     @Test
     fun cardputerAcknowledgementIsRecognized() {
@@ -55,3 +53,4 @@ class HawkinsProtocolTest {
         assertEquals("nack", message?.getString("type"))
         assertEquals("invalid_frame", message?.getString("status"))
     }
+}
