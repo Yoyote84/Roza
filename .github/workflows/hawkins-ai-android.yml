@@ -31,6 +31,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Add precise native GGUF load diagnostics to pinned llama.cpp
+        run: python3 android/hawkins-ai-bridge/patch_llama_android.py
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:

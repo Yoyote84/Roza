@@ -17,6 +17,7 @@ import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import com.arm.aichat.AiChat
+import com.arm.aichat.gguf.GgufMetadataReader
 import com.arm.aichat.InferenceEngine
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
@@ -263,10 +264,42 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
                             it is InferenceEngine.State.Error
                     }
                 }
+                val metadata = withContext(Dispatchers.IO) {
+                    FileInputStream(file).use {
+                        GgufMetadataReader.create().readStructuredMetadata(it)
+                    }
+                }
+                val architecture = metadata.architecture?.architecture?.takeIf { it.isNotBlank() }
+                    ?: "inconnue"
+                appendLog(
+                    "GGUF valide : architecture=$architecture, version=${metadata.version.label}, " +
+                        "tenseurs=${metadata.tensorCount}, métadonnées=${metadata.kvCount}."
+                )
+                setStatus("GGUF reconnu ($architecture). Chargement du modèle...")
                 val current = localEngine.state.value
                 if (current is InferenceEngine.State.Error) throw current.exception
                 withContext(Dispatchers.IO) {
-                    localEngine.loadModel(file.absolutePath)
+                    try {
+                        localEngine.loadModel(file.absolutePath)
+                    } catch (loadError: Exception) {
+                        val nativeLog = runCatching {
+                            localEngine.lastModelLoadDiagnostic().trim()
+                        }.getOrDefault("")
+                        val message = buildString {
+                            append(
+                                "Échec du chargement natif GGUF. Le code actuel de la bibliothèque " +
+                                    "renvoie une exception générique, qui ne prouve pas à elle seule " +
+                                    "une architecture incompatible."
+                            )
+                            if (nativeLog.isNotBlank()) {
+                                append("\n\nDiagnostic llama.cpp :\n")
+                                append(nativeLog.takeLast(4500))
+                            } else {
+                                append("\nAucun journal natif n'a été remonté.")
+                            }
+                        }
+                        throw java.io.IOException(message, loadError)
+                    }
                     localEngine.setSystemPrompt(SYSTEM_PROMPT)
                 }
                 preferences.edit().putString("loaded_model_signature", signature).apply()
@@ -275,9 +308,11 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
                 appendLog("Moteur llama.cpp : modele charge en memoire.")
             } catch (error: Exception) {
                 modelReady = false
-                setStatus("Echec du chargement : " +
-                    (error.message ?: error.javaClass.simpleName))
-                appendLog(error.stackTraceToString().take(1200))
+                val detail = error.message ?: error.javaClass.simpleName
+                setStatus("Échec du chargement : " +
+                    detail.lineSequence().firstOrNull().orEmpty().take(150))
+                appendLog(detail.takeLast(5000))
+                appendLog(error.stackTraceToString().take(1000))
             }
         }
     }

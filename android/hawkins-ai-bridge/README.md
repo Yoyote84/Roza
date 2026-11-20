@@ -39,3 +39,16 @@ Chaque trame commence par HKA/1, contient un objet JSON UTF-8 et se termine par 
 Le contexte envoyé au modèle comprend des statistiques déjà enregistrées et le résumé mémoire narratif. Les coordonnées GPS brutes ne sont jamais envoyées. Le champ player_action contient le choix de narration fait par le joueur, pas une commande de modification des sauvegardes.
 
 Réponse attendue : {"type":"narration","id":12,"text":"La radio craque...","choices":["Repondre","Suivre le bruit","Se cacher"]}.
+
+
+## Diagnostic de chargement GGUF
+
+Le workflow applique `patch_llama_android.py` au sous-module llama.cpp épinglé avant la compilation. Ce correctif conserve les messages natifs émis pendant le chargement du modèle et les affiche dans le journal de l'application en cas d'échec. L'application analyse également les métadonnées GGUF et affiche l'architecture détectée. Cela évite de présenter tous les échecs natifs comme une prétendue incompatibilité d'architecture.
+
+Pour compiler localement après un checkout avec sous-modules :
+
+```bash
+python3 android/hawkins-ai-bridge/patch_llama_android.py
+cd android/hawkins-ai-bridge
+gradle :app:assembleDebug
+```
