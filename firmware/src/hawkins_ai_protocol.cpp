@@ -68,12 +68,37 @@ bool parseHawkinsAiMessage(const char* line, size_t length,
   if (length > kHawkinsAiMaxLine) return fail("frame_too_long");
   if (memcmp(line, kPrefix, kPrefixLength) != 0) return fail("bad_prefix");
 
+  // The CDC reader passes a reusable, non-NUL-terminated byte buffer. Parse a
+  // bounded private copy so ArduinoJson never sees bytes beyond this frame and
+  // so a previous/next USB packet cannot affect JSON tokenization.
+  static char jsonBuffer[kHawkinsAiMaxLine + 1U];
+  size_t jsonLength = length - kPrefixLength;
+  const char* jsonSource = line + kPrefixLength;
+
+  while (jsonLength > 0U) {
+    const unsigned char last = static_cast<unsigned char>(jsonSource[jsonLength - 1U]);
+    if (last == '\r' || last == '\n' || last == '\0' || last == ' ' || last == '\t') {
+      --jsonLength;
+    } else {
+      break;
+    }
+  }
+  if (jsonLength == 0U) return fail("json_empty");
+  for (size_t i = 0U; i < jsonLength; ++i) {
+    if (jsonSource[i] == '\0') return fail("json_embedded_nul");
+  }
+  memcpy(jsonBuffer, jsonSource, jsonLength);
+  jsonBuffer[jsonLength] = '\0';
+
   JsonDocument document;
-  const DeserializationError error =
-      deserializeJson(document, line + kPrefixLength, length - kPrefixLength);
+  const DeserializationError error = deserializeJson(document, jsonBuffer);
   if (error) {
-    return fail(error == DeserializationError::NoMemory
-                    ? "json_no_memory" : "json_syntax");
+    if (error == DeserializationError::NoMemory) return fail("json_no_memory");
+    if (error == DeserializationError::IncompleteInput) return fail("json_incomplete_input");
+    if (error == DeserializationError::InvalidInput) return fail("json_invalid_input");
+    if (error == DeserializationError::TooDeep) return fail("json_too_deep");
+    if (error == DeserializationError::EmptyInput) return fail("json_empty_input");
+    return fail("json_deserialization_error");
   }
   if (!document.is<JsonObject>()) return fail("json_not_object");
 

@@ -61,6 +61,39 @@ static void testNarrationAcceptsFrenchUtf8() {
   assert(strcmp(message.text, "La lumiere vacille dans le couloir. Quelqu'un frappe a la porte.") == 0);
 }
 
+static void testParserHandlesNonNullTerminatedCdcBuffer() {
+  const char json[] =
+      "HKA/1 {\"type\":\"narration\",\"id\":11,\"text\":\"Il dit \\\"bonjour\\\".\\\\\",\"choices\":[\"Ecouter\",\"Partir\"]}";
+  const size_t exactLength = sizeof(json) - 1U;
+  char cdcBuffer[sizeof(json) + 8U];
+  memset(cdcBuffer, 0x5A, sizeof(cdcBuffer));
+  memcpy(cdcBuffer, json, exactLength);
+  HawkinsAiMessage message{};
+  const char* errorCode = nullptr;
+  assert(hawkins::parseHawkinsAiMessage(cdcBuffer, exactLength, message, &errorCode));
+  assert(strcmp(errorCode, "ok") == 0);
+  assert(message.requestId == 11U);
+  assert(strcmp(message.text, "Il dit \"bonjour\".\\") == 0);
+  assert(message.choiceCount == 2U);
+}
+
+static void testParserTrimsCdcLineEnding() {
+  const char json[] =
+      "HKA/1 {\"type\":\"narration\",\"id\":12,\"text\":\"La radio grésille.\",\"choices\":[\"Répondre\"]}";
+  char line[sizeof(json) + 2U];
+  const size_t jsonLength = sizeof(json) - 1U;
+  memcpy(line, json, jsonLength);
+  line[jsonLength] = '\r';
+  line[jsonLength + 1U] = '\n';
+  HawkinsAiMessage message{};
+  const char* errorCode = nullptr;
+  assert(hawkins::parseHawkinsAiMessage(
+      line, jsonLength + 2U, message, &errorCode));
+  assert(strcmp(errorCode, "ok") == 0);
+  assert(message.requestId == 12U);
+  assert(strcmp(message.choices[0], "Répondre") == 0);
+}
+
 static void testNarrationNormalizesControlCharacters() {
   const char line[] =
       "HKA/1 {\"type\":\"narration\",\"id\":9,\"text\":\"Ligne 1\\rLigne 2\",\"choices\":[\"A\\u0001B\"]}";
@@ -124,6 +157,8 @@ int main() {
   testHelloHeartbeat();
   testNarration();
   testNarrationAcceptsFrenchUtf8();
+  testParserHandlesNonNullTerminatedCdcBuffer();
+  testParserTrimsCdcLineEnding();
   testNarrationNormalizesControlCharacters();
   testNarrationExposesPreciseParseFailure();
   testInvalidAndUnknownMessages();
