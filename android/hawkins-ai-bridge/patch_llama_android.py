@@ -193,6 +193,23 @@ if "CPU backend registration check:" not in cpp_text:
         "CPU backend registration check",
     )
 
+# Respect the requested generation limit exactly. current_position has already
+# been advanced by user_prompt_size, so adding that size again doubled the
+# output allowance and made short narration requests unnecessarily slow.
+if "stop_generation_position = current_position + user_prompt_size + n_predict;" in cpp_text:
+    cpp_text = replace_once(
+        cpp_text,
+        """    current_position += user_prompt_size;
+    stop_generation_position = current_position + user_prompt_size + n_predict;
+""",
+        """    current_position += user_prompt_size;
+    stop_generation_position = current_position + n_predict;
+""",
+        "exact generation token limit",
+    )
+elif "stop_generation_position = current_position + n_predict;" not in cpp_text:
+    raise SystemExit("Cannot verify llama.cpp generation token limit patch.")
+
 cpp.write_text(cpp_text, encoding="utf-8")
 iface.write_text(iface_text, encoding="utf-8")
 impl.write_text(impl_text, encoding="utf-8")

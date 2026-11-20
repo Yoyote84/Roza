@@ -23,6 +23,7 @@ import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.hoho.android.usbserial.util.SerialInputOutputManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -419,7 +420,8 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
     private fun handleNarrationRequest(request: JSONObject) {
         val id = request.optLong("id", 0L)
         if (id <= 0L) return
-        if (!modelReady || engine == null) {
+        val activeEngine = engine
+        if (!modelReady || activeEngine == null) {
             writeBytes(HawkinsProtocol.encodeError(
                 id, "Charge d'abord le modele GGUF dans Hawkins AI."
             ))
@@ -434,7 +436,13 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
             writeBytes(HawkinsProtocol.encodeError(id, "Contexte de partie invalide."))
             return
         }
+
+        runOnUiThread {
+            setStatus("Demande #${id} recue. Generation IA locale en cours...")
+            appendLog("Demande #${id} recue du Cardputer; contexte ${context.toString().length} caracteres.")
+        }
         generationJob = appScope.launch(Dispatchers.IO) {
+            var tokenCount = 0
             try {
                 val prompt = buildString {
                     append("Etat courant transmis par le Cardputer (JSON faisant autorite) :\n")
@@ -445,8 +453,17 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
                 }
                 val generated = StringBuilder()
                 withTimeout(GENERATION_TIMEOUT_MS) {
-                    engine!!.sendUserPrompt(prompt, 220).collect { token ->
-                        if (generated.length < 6000) generated.append(token)
+                    activeEngine.sendUserPrompt(prompt, 220).collect { token ->
+                        if (token.isNotEmpty()) {
+                            tokenCount++
+                            if (generated.length < 6000) generated.append(token)
+                            if (tokenCount == 1 || tokenCount % 16 == 0) {
+                                val count = tokenCount
+                                runOnUiThread {
+                                    setStatus("IA locale en cours : ${count} fragments generes...")
+                                }
+                            }
+                        }
                     }
                 }
                 val parsed = parseNarratorOutput(generated.toString())
@@ -459,18 +476,27 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
                 if (narration.isBlank()) error("Le modele a renvoye une narration vide.")
                 writeBytes(HawkinsProtocol.encodeNarration(id, narration, choices))
                 runOnUiThread {
-                    setStatus("Scene generee localement et envoyee au Cardputer.")
+                    setStatus("Scene generee et envoyee au Cardputer.")
+                    appendLog("Reponse #${id} envoyee : ${tokenCount} fragments, ${narration.length} caracteres.")
+                }
+            } catch (timeout: TimeoutCancellationException) {
+                writeBytes(HawkinsProtocol.encodeError(
+                    id, "Generation trop longue apres 240 secondes. Relancer avec R."
+                ))
+                runOnUiThread {
+                    setStatus("Delai IA depasse. Une erreur a ete renvoyee au Cardputer.")
+                    appendLog("Demande #${id} interrompue apres 240 secondes.")
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
+                val detail = error.message ?: error.javaClass.simpleName
                 writeBytes(HawkinsProtocol.encodeError(
-                    id, "Generation locale impossible : " +
-                        (error.message ?: "erreur modele")
+                    id, "Generation locale impossible : ${detail}"
                 ))
                 runOnUiThread {
-                    setStatus("Erreur d'inference : " +
-                        (error.message ?: error.javaClass.simpleName))
+                    setStatus("Erreur d'inference : ${detail}")
+                    appendLog("Erreur pour la demande #${id} : ${detail}")
                 }
             }
         }

@@ -59,3 +59,8 @@ gradle :app:assembleDebug
 Le moteur llama.cpp charge ses backends dynamiques depuis `ApplicationInfo.nativeLibraryDir`. L'application configure donc `jniLibs.useLegacyPackaging = true` pour qu'Android extraie les bibliothèques natives lors de l'installation. Sans extraction, le moteur peut trouver zéro plugin CPU dans ce répertoire même si les fichiers apparaissent dans l'archive APK.
 
 Le pont JNI vérifie que le backend CPU est enregistré et tente, en secours, le chargement explicite du plugin ARMv8.0 générique. La CI vérifie également que le plugin CPU ARM64 est présent et compressé dans l'APK pour garantir son extraction à l'installation.
+
+
+## Génération de narration et délais
+
+Le binding Android limite maintenant la sortie au nombre de tokens demandé : la position courante inclut déjà le prompt utilisateur, donc la longueur de ce prompt ne doit pas être ajoutée une seconde fois à la limite de génération. L'application indique aussi la réception d'une requête du Cardputer et la progression du flux de tokens. En cas d'expiration des 240 secondes, elle renvoie une trame `error` au Cardputer au lieu de le laisser attendre jusqu'à son propre délai de sécurité.
