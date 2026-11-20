@@ -19,7 +19,9 @@ enum class NarrativeRecordType : uint8_t {
   ItemUsed,
   SkillUnlocked,
   PlotChanged,
-  NpcContact
+  NpcContact,
+  AiNarration,
+  AiChoice
 };
 struct NarrativeRecord {
   uint32_t sequence;

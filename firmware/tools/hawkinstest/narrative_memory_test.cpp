@@ -58,6 +58,20 @@ static void testRecordRingAndChronology() {
   assert(isValidNarrativeMemory(memory));
 }
 
+static void testAiConversationMarkersPersist() {
+  NarrativeMemory memory{};
+  initializeNarrativeMemory(memory);
+  assert(narrativeRecord(memory, NarrativeRecordType::AiNarration, 0U, 3U, 0U));
+  assert(narrativeRecord(memory, NarrativeRecordType::AiChoice, 0U, 2U, 0U));
+  const NarrativeRecord* narration = narrativeRecordAt(memory, 0U);
+  const NarrativeRecord* choice = narrativeRecordAt(memory, 1U);
+  assert(narration && narration->type == static_cast<uint8_t>(NarrativeRecordType::AiNarration));
+  assert(narration->detail == 3U);
+  assert(choice && choice->type == static_cast<uint8_t>(NarrativeRecordType::AiChoice));
+  assert(choice->detail == 2U);
+  assert(isValidNarrativeMemory(memory));
+}
+
 static void testInvalidStateRejected() {
   NarrativeMemory memory{};
   initializeNarrativeMemory(memory);
@@ -98,10 +112,13 @@ static void testCodecRoundTripAndCrc() {
   assert(narrativeSetPlot(original, 0U, true));
   assert(narrativeAdjustNpcRelationship(original, 0U, 12));
   for (uint16_t i = 0U; i < 15U; ++i) {
-    assert(narrativeRecord(original,
-        i == 0U ? NarrativeRecordType::FirstContact
-                : NarrativeRecordType::SectorDiscovery,
-        0x1000U + i, i, static_cast<uint8_t>(i)));
+    const NarrativeRecordType type =
+        i == 0U ? NarrativeRecordType::FirstContact :
+        i == 1U ? NarrativeRecordType::AiNarration :
+        i == 2U ? NarrativeRecordType::AiChoice :
+                  NarrativeRecordType::SectorDiscovery;
+    assert(narrativeRecord(original, type, 0x1000U + i, i,
+                           static_cast<uint8_t>(i)));
   }
   uint8_t bytes[kNarrativeSaveEncodedSize] = {};
   assert(encodeNarrativeMemorySave(original, 42U, bytes, sizeof(bytes)));
@@ -135,6 +152,7 @@ int main() {
   testInitializeAndValidate();
   testRelationshipsAndPlots();
   testRecordRingAndChronology();
+  testAiConversationMarkersPersist();
   testInvalidStateRejected();
   testSummary();
   testCodecRoundTripAndCrc();

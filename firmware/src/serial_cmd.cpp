@@ -1,4 +1,6 @@
 #include "serial_cmd.h"
+#include "hawkins_app.h"
+#include <cstring>
 
 #include <M5Unified.h>
 #include <WiFi.h>
@@ -1078,27 +1080,37 @@ static void handleSerialCmd(const String& raw) {
 }
 
 void serialCmdPoll() {
-  // 逐字节攒，收到换行才执行。以前用的是 readStringUntil('\n')——它在只收到半行时
-  // 会一直等到默认 1s 超时，交互式手敲指令的话每敲一个字符就卡主循环 1s。
-  static char buf[192];
-  static size_t len = 0;
-  static bool  discard = false;       // 本行已超长，丢到行尾为止
+  // HKA/1 est route par ce lecteur CDC unique ; aucun second Serial.read().
+  static char buf[1793];
+  static size_t len = 0U;
+  static bool discard = false;
   while (Serial.available()) {
-    char c = (char)Serial.read();
+    const char c = static_cast<char>(Serial.read());
     if (c == '\n' || c == '\r') {
-      bool skip = discard;
+      const bool skip = discard;
       discard = false;
-      size_t n = len; len = 0;
-      if (!skip && n) { buf[n] = 0; handleSerialCmd(String(buf)); }
-      return;                         // 一次只执行一条，剩下的下一轮 loop 再取
+      const size_t n = len;
+      len = 0U;
+      if (!skip && n > 0U) {
+        if (n >= 6U && memcmp(buf, "HKA/1 ", 6U) == 0) {
+          if (!hawkinsAppHandleSerialLine(buf, n)) {
+            Serial.println("[hawkins-ai] trame ignoree");
+          }
+        } else if (n < 192U) {
+          buf[n] = '\0';
+          handleSerialCmd(String(buf));
+        } else {
+          Serial.println("[serial] commande trop longue");
+        }
+      }
+      return;
     }
     if (discard) continue;
-    // ⚠️ 这里以前只是 len = 0，于是超长行的后半截会从头累积、被当成一条新指令执行。
-    // 必须置 discard 一直丢到换行为止，光清 len 是不够的。
-    // 已知代价：一次性灌 300+ 字节会把 USB-CDC 的接收环冲掉一部分，要是丢的正好是换行，
-    // 就会连带吃掉紧跟其后的那一条指令（实测就是这样）。这是分隔符丢失的固有后果，
-    // 不是解析器的问题——再发一次即可。
-    if (len < sizeof(buf) - 1) buf[len++] = c;
-    else { discard = true; len = 0; }
+    if (len < sizeof(buf) - 1U) {
+      buf[len++] = c;
+    } else {
+      discard = true;
+      len = 0U;
+    }
   }
 }

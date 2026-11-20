@@ -1,122 +1,88 @@
-# Hawkins — choix du moteur IA hors ligne (étape 4/5)
+# Décision d'architecture — narrateur IA Hawkins hors ligne
 
-État : **recherche et architecture retenue à valider ; moteur pas encore intégré**.
+Date de décision : 20 novembre 2026  
+Étape : 4 — intégration logicielle du narrateur local
 
-Ce document consigne le choix issu de l'étude des modèles français, des projets de maîtres du jeu IA et des runtimes compatibles avec le matériel réel.
+## Décision
 
-## 1. Contrainte du Cardputer ADV
+Le narrateur IA fonctionne sur le téléphone Android, pas sur le Cardputer. Le M5Stack Cardputer ADV (ESP32-S3 sans PSRAM) conserve la logique du jeu, le personnage, les règles, les missions et les sauvegardes. Le Samsung Galaxy Z Flip6 exécute le modèle GGUF localement avec llama.cpp. Les deux appareils échangent par USB série CDC, via un câble USB-C compatible données / USB Host.
 
-La cible ROZA est un ESP32-S3FN8 avec 8 Mo de Flash, 512 Ko de SRAM interne et sans PSRAM. La microSD est un stockage bloc/FAT ; elle n'ajoute pas de RAM et ne peut pas être considérée comme une mémoire directement adressable par un moteur qui attend des pointeurs vers un modèle en Flash mappée.
+Aucun serveur Wi-Fi, routeur, partage de connexion, cloud ou accès Internet n'est nécessaire au moment de jouer. Le modèle est importé préalablement dans l'application Android ; l'inférence reste ensuite locale.
 
-Le projet `therezor/cardputer-ai` démontre qu'un petit LLM de 8 M de paramètres peut tourner sur le même type de carte, avec poids Q4 intégrés à la Flash et un contexte très court. Son modèle TinyTalk est surtout entraîné pour de l'anglais simple et ne remplit pas le besoin d'un maître du jeu francophone complet. Il constitue une preuve technique, pas le modèle final Hawkins.
+## Composants retenus
 
-## 2. Modèles étudiés
+- Moteur d'inférence : binding Android officiel de llama.cpp dans examples/llama.android/lib.
+- Révision du moteur : dépôt ggml-org/llama.cpp, commit épinglé d5bbcd1f31dba754f716a26c3a4784502a6b9ede par le sous-module android/llama.cpp.
+- Transport USB : usb-serial-for-android 3.12.0, qui fournit la détection série CDC/ACM côté Android USB Host.
+- Modèle candidat : Qwen3.5-4B-Instruct Q4_K_M, GGUF multilingue, à importer dans l'application. Le modèle n'est pas livré dans l'APK et n'est pas téléchargé par l'application.
+- Android : application compagnon dédiée, ABI arm64-v8a, API minimale 33, Java 17, NDK 29.0.13113456 et CMake 3.31.6.
 
-### Choix principal à tester : Qwen3.5-4B Instruct en GGUF Q4_K_M
+Les versions du moteur et des dépendances sont épinglées pour rendre la compilation répétable. La compatibilité effective du fichier GGUF et les performances thermiques doivent être vérifiées sur le téléphone à l'étape 5.
 
-- Modèle multilingue, français pris en charge.
-- Raisonnement et capacité à suivre des instructions structurées.
-- GGUF Q4_K_M, environ 2,7 Go selon la version proposée par Firn.
-- Licence Apache 2.0 pour la version GGUF référencée.
-- Ce n'est pas un modèle exclusivement français ni un modèle déjà spécialisé dans Hawkins ; le comportement JDR doit être apporté par le contexte, les règles, les exemples et les tests ROZA.
+## Répartition des responsabilités
 
-Références :
-- https://huggingface.co/SoAIHQ/Qwen3.5-4B-GGUF
-- https://github.com/janik96v/firn-local-ai
+### Cardputer — autorité du jeu
 
-### Alternative de français natif : RODIN-1B-Instruct
+Le firmware conserve :
+- l'état du monde et ses événements ;
+- les secteurs visités et les découvertes ;
+- le personnage, les PV, le stress, l'XP et les compétences ;
+- les missions, les objets, les drapeaux scénaristiques et les relations PNJ ;
+- la mémoire narrative et les sauvegardes NVS / microSD.
 
-- Modèle conversationnel entraîné uniquement en français, 1,24 milliard de paramètres.
-- Des versions GGUF Q4_K_M existent (environ 860 Mo).
-- Licence Apache 2.0.
-- Intéressant pour comparer le style et la qualité du français avec Qwen.
-- Plus petit, mais sa fiche précise qu'il s'agit d'un modèle expérimental/démonstratif et non d'un grand modèle de raisonnement avancé. Il ne faut pas présumer qu'il suivra mieux des règles de JDR complexes.
+Le Cardputer construit un instantané borné à partir des données déjà enregistrées. Les coordonnées GPS brutes ne sont jamais envoyées au téléphone : seul un identifiant de maille haché peut figurer dans le contexte.
 
-Références :
-- https://huggingface.co/rodin-llm/rodin-1b-instruct
-- https://huggingface.co/mradermacher/rodin-1b-instruct-GGUF
+### Téléphone — narrateur
 
-### Projet JDR spécialisé : Amazigh Odyssey — Game Master
+L'application :
+- importe un modèle GGUF choisi par l'utilisateur dans son stockage privé ;
+- charge le modèle dans llama.cpp ;
+- attend les demandes envoyées par le Cardputer ;
+- produit une narration française et jusqu'à trois choix ;
+- renvoie seulement ce texte et ces choix.
 
-- Adaptateur LoRA francophone dédié à la narration, aux PNJ, à l'exploration et aux combats.
-- L'adaptateur fait environ 456 Mo, mais dépend de Mistral Nemo Instruct 12B.
-- Licence Apache 2.0 annoncée pour l'adaptateur.
-- Son modèle de base 12B et son empreinte mémoire rendent ce montage inadapté à la carte ESP32 et trop ambitieux pour un premier déploiement mobile à 12 Go.
-- Son intérêt pour ROZA est méthodologique : format des scènes, exemples de PNJ, choix, conséquences, combats et évaluation d'un maître du jeu. Le LoRA ne peut pas être appliqué directement à Qwen3.5.
+Le modèle ne peut pas écrire dans les sauvegardes, modifier des statistiques ou déclarer une mission terminée. Le Cardputer demeure l'autorité et n'accepte aucune commande d'état issue du modèle.
 
-Référence :
-- https://huggingface.co/Ym512/amazigh-odyssey-gm
+## Protocole USB HKA/1
 
-### Projets de maîtres du jeu
+Transport : USB série CDC, 115200 bauds, 8 bits, sans parité, 1 bit d'arrêt. Chaque trame commence par le préfixe ASCII HKA/1, contient un objet JSON UTF-8 et se termine par LF.
 
-Personal Dungeon Master et DM Loremind montrent des architectures utiles : mémoire de campagne, PNJ, fiches, règles, scènes, jets et contexte documentaire. Ce sont des logiciels de bureau/serveur qui s'appuient sur un moteur IA séparé, pas des firmwares installables sur le Cardputer.
+Le Cardputer réutilise le lecteur série central de ROZA. Il ne crée pas de second consommateur de Serial.read(). Les autres commandes série historiques restent limitées à leur longueur d'origine.
 
-Références :
-- https://github.com/danielbsimpson/personal-dungeon-master
-- https://github.com/IGMLcreation/LoreMind
+### Téléphone vers Cardputer
 
-## 3. Runtime Android retenu comme candidat : Firn
+- hello version 1 : battement de présence envoyé toutes les cinq secondes.
+- narration : identifiant de requête, texte borné et tableau de zéro à trois choix.
+- error : identifiant de requête et message d'erreur borné.
 
-Firn (anciennement AIpaca) est une application Android open source qui exécute des modèles GGUF localement avec llama.cpp et accélération GPU Adreno. Son catalogue de modèles cite Qwen3.5-4B Q4_K_M (~2,7 Go). L'application expose aussi une API REST locale compatible OpenAI.
+### Cardputer vers téléphone
 
-Fonctions pertinentes :
-- inference locale sans cloud ;
-- modèles GGUF importés ou téléchargés dans le téléphone ;
-- GPU Adreno/OpenCL ;
-- serveur HTTPS sur le port 8443 ;
-- appairage client par PIN et clé Ed25519 ;
-- certificats TLS auto-signés avec empreinte SHA-256 à épingler.
+- narrate : identifiant unique et instantané JSON du monde / personnage / missions / mémoire / action choisie.
 
-Limite réseau importante : le serveur Firn écoute l'interface Wi-Fi/Ethernet du téléphone, **pas l'interface hotspot ni VPN**. Pour que le Cardputer le contacte, le téléphone et le Cardputer doivent être sur le même réseau Wi-Fi classique. Ce réseau local peut fonctionner sans accès Internet ; le Wi-Fi du Cardputer restera désactivé hors session IA.
+Le firmware vérifie le préfixe, la version, la structure JSON, les limites de taille et l'identifiant de la requête courante. Les trames invalides, inconnues, trop longues ou tardives sont ignorées. Une demande expire après deux minutes.
 
-Autre limite API : dans `/v1/chat/completions`, les champs inconnus tels que `tools` sont ignorés. ROZA ne doit donc pas supposer que les outils internes de l'agent Firn sont disponibles via cette route. Le contrat de sortie Hawkins sera un JSON borné que le firmware parse et valide lui-même.
+## Déroulement en jeu
 
-Références :
-- https://github.com/janik96v/firn-local-ai
-- https://github.com/janik96v/firn-local-ai/blob/main/docs/api-client-guide.md
-- https://github.com/janik96v/firn-local-ai/releases/latest
+1. Le téléphone envoie des battements hello pendant que la liaison USB est ouverte.
+2. Dans l'écran Hawkins, le joueur appuie sur A pour ouvrir le narrateur.
+3. Le Cardputer envoie l'état de jeu utile, sans coordonnées GPS brutes.
+4. Le téléphone exécute le modèle local et retourne un texte plus des choix.
+5. Le joueur choisit 1, 2 ou 3 sur le clavier du Cardputer. Le choix est transmis comme player_action lors de la demande suivante.
+6. Le jeu continue à valider et sauvegarder ses propres règles. Une déconnexion ou une erreur IA ne bloque pas le moteur principal.
 
-Le Galaxy Z Flip6 (Snapdragon 8 Gen 3, 12 Go de RAM selon sa fiche Samsung) est un hôte plausible pour ce modèle 4B. Aucune mesure de vitesse, température ou autonomie n'a encore été faite sur cet appareil ; le résultat doit être mesuré en pratique.
+## Compilation et tests
 
-## 4. Architecture Hawkins proposée
+- Le workflow firmware compile l'ESP32-S3 et exécute hawkinsaitest : construction des trames, parsing, battement, choix, identifiants, messages invalides, contrôle de taille et caractères de contrôle.
+- Le workflow Hawkins AI Android construit l'APK debug et exécute les tests Kotlin du protocole.
+- Les deux workflows publient leurs propres résultats ; un APK CI ne constitue pas un test USB matériel.
 
-Le Cardputer reste l'application de jeu, le maître de l'état et l'unique source de vérité :
+## Limites connues et étape 5
 
-1. Le firmware prépare le contexte avec `formatHawkinsAiContext` et la mémoire narrative existante.
-2. Il envoie une requête à Firn sur le réseau local, avec le prompt système Hawkins en français.
-3. Le modèle retourne uniquement narration, dialogues, choix et propositions typées.
-4. Le firmware parse une réponse JSON bornée, rejette les champs inconnus/mal formés et valide chaque proposition avec les règles existantes.
-5. Seul le moteur Hawkins peut modifier PV, stress, XP, inventaire, compétences, missions, relations ou sauvegardes.
-6. La mémoire de campagne reste persistante dans la NVS et les archives SD du Cardputer ; la mémoire générale de Firn n'est pas utilisée pour stocker la partie.
+Étape 4 prépare le firmware, le protocole et l'application Android. Elle ne prouve pas encore :
+- que le Z Flip6 reconnaît le Cardputer ADV comme port CDC/ACM avec le câble précis utilisé ;
+- que l'alimentation USB entre les deux appareils est stable ;
+- que le fichier GGUF choisi est accepté par la révision llama.cpp épinglée ;
+- le débit de génération, la température, la consommation et la stabilité pendant une session longue ;
+- le comportement physique de l'écran et du clavier pendant les échanges.
 
-Exemple de contrat de réponse à implémenter et tester (pas encore un format livré) :
-
-```json
-{
-  "narration": "Lia baisse la voix...",
-  "choices": [
-    {"id": 1, "label": "Lui demander ce qu'elle a entendu"}
-  ],
-  "proposals": [
-    {"type": "npc_dialogue", "npc": "lia", "text": "Tu dois m'écouter."}
-  ]
-}
-```
-
-Les propositions ne sont jamais des ordres de mutation. Un objet consommé, un soin, une récompense ou une mission terminée doit passer par la fonction du moteur correspondante et par ses vérifications.
-
-## 5. Travaux obligatoires avant de déclarer l'étape 4 terminée
-
-- Faire approuver le mode de calcul : le modèle tourne sur le téléphone, tandis que le Cardputer conserve le jeu. C'est le compromis réaliste pour un maître du jeu de bonne qualité ; le modèle n'est alors pas chargé depuis la microSD ni exécuté dans les 512 Ko de SRAM de l'ESP32.
-- Intégrer côté firmware le client réseau local, l'appairage Firn, la cryptographie Ed25519, l'épinglage du certificat SHA-256 et la gestion d'horloge. Aucun mode TLS non vérifié ne sera conservé.
-- Ajouter un écran de configuration minimal (adresse locale, appairage et statut), sans refaire l'interface générale.
-- Implémenter le contrat JSON Hawkins, les limites de taille/temps, le refus sûr en cas de perte Wi-Fi, de réponse invalide ou de modèle absent.
-- Ajouter des tests natifs : réponses valides, JSON tronqué, propositions inconnues, actions hors limites, réémission après timeout et absence d'impact sur sauvegardes en cas d'échec IA.
-- Tester une batterie de scènes en français (dialogue PNJ, découverte GPS, exploration, choix, combat/conséquences) et mesurer latence, débit, mémoire et température sur le téléphone.
-- Vérifier sur le Cardputer que Wi-Fi désactivé, tout le jeu existant reste fonctionnel ; aucune API ni Internet ne doit être requis pour continuer la campagne.
-
-## Décision provisoire
-
-**Qwen3.5-4B Q4_K_M hébergé par Firn est le premier couple modèle/runtime à expérimenter.** RODIN-1B-Instruct est le comparatif français léger. Amazigh Odyssey est une référence JDR pour concevoir les prompts, les données et les évaluations, pas le modèle à installer.
-
-L'étape 4 reste en cours tant que le client Cardputer, l'appairage sécurisé, les réponses structurées, les validations du moteur et les essais réels ne sont pas terminés.
+Ces vérifications nécessitent les deux appareils et constituent l'étape 5. Le jeu doit continuer à fonctionner sans téléphone ; l'IA est un module facultatif.

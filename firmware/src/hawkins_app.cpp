@@ -1,5 +1,6 @@
 #include "hawkins_app.h"
 #include "hawkins_runtime.h"
+#include "hawkins_ai_protocol.h"
 #include "hawkins_nvs.h"
 #include "hawkins_exploration.h"
 #include "hawkins_character.h"
@@ -59,6 +60,18 @@ bool showSkills = false;
 bool showFirstContact = false;
 bool showStorage = false;
 bool restoreConfirmation = false;
+
+bool showAiNarration = false;
+bool aiPhoneSeen = false;
+bool aiPending = false;
+uint32_t aiLastHeartbeatMs = 0U;
+uint32_t aiRequestAtMs = 0U;
+uint32_t aiRequestId = 0U;
+char aiNarration[hawkins::kHawkinsAiTextCapacity + 1U] = {};
+char aiChoices[hawkins::kHawkinsAiChoiceCount][hawkins::kHawkinsAiChoiceCapacity + 1U] = {};
+uint8_t aiChoiceCount = 0U;
+char aiUserAction[hawkins::kHawkinsAiChoiceCapacity + 1U] = {};
+const char* aiStatusText = "IA LOCALE EN ATTENTE";
 
 void setGpsStatus(const char* text) {
   if (gpsStatusText != text) {
@@ -132,7 +145,7 @@ void drawExplorationPage(const hawkins::WorldState* world) {
   }
   cv.drawString(line, 5, 112);
   cv.setTextDatum(bottom_left);
-  cv.drawString("P PERSO M MISS I OBJ K COMP Q SCN D SD", 5, SH - 2);
+  cv.drawString("P PERSO M MISS I OBJ K COMP A IA Q SCN", 5, SH - 2);
 }
 
 void drawWorldPage(const hawkins::WorldState* world) {
@@ -184,7 +197,7 @@ void drawWorldPage(const hawkins::WorldState* world) {
   }
   cv.setTextDatum(bottom_left);
   cv.setTextColor(ICON_DIM, TFT_BLACK);
-  cv.drawString("P PERSO  E TERRAIN  M MISS.  S SAVE", 5, SH - 2);
+  cv.drawString("P PERSO E TERRAIN M MISS A IA S SAVE", 5, SH - 2);
 }
 
 const char* currentMovementObjective() {
@@ -213,6 +226,203 @@ const char* currentMovementObjective() {
     return "CHERCHER UN SIGNAL EN BOUGEANT";
   }
   return "OBJECTIFS ACTUELS TERMINES";
+}
+
+
+const char* missionStatusLabel(hawkins::MissionId id) {
+  if (!missionsReady) return "indisponible";
+  switch (hawkins::missionStatus(missions, id)) {
+    case hawkins::MissionStatus::Locked: return "verrouillee";
+    case hawkins::MissionStatus::Active: return "active";
+    case hawkins::MissionStatus::Complete: return "terminee";
+  }
+  return "inconnue";
+}
+
+void escapeJsonText(const char* source, char* output, size_t capacity) {
+  size_t used = 0U;
+  if (!output || capacity == 0U) return;
+  output[0] = '\0';
+  if (!source) return;
+  for (size_t i = 0U; source[i] != '\0' && used + 2U < capacity; ++i) {
+    const char c = source[i];
+    if (c == '"' || c == '\\') output[used++] = '\\';
+    if (static_cast<unsigned char>(c) < 0x20U) output[used++] = ' ';
+    else output[used++] = c;
+  }
+  output[used] = '\0';
+}
+
+bool requestAiNarration() {
+  if (aiPending) {
+    aiStatusText = "UNE REPONSE EST DEJA EN COURS";
+    dirty = true;
+    return false;
+  }
+  if (!aiPhoneSeen || millis() - aiLastHeartbeatMs > 15000U) {
+    aiStatusText = "BRANCHER LE Z FLIP6 EN USB";
+    dirty = true;
+    return false;
+  }
+
+  char memorySummary[hawkins::kNarrativeSummaryCapacity] = {};
+  if (!narrativeReady ||
+      !hawkins::formatNarrativeMemorySummary(
+          narrative, memorySummary, sizeof(memorySummary))) {
+    snprintf(memorySummary, sizeof(memorySummary), "%s",
+             "memoire narrative indisponible");
+  }
+
+  const hawkins::WorldState* world = hawkins::hawkinsRuntimeWorld();
+  const uint32_t day = world ? world->simulatedDays : 0U;
+  const uint8_t tension = world ? world->tension : 0U;
+  const uint8_t anomaly = world ? world->anomalyLevel : 0U;
+  const uint8_t factions = world ? world->factionActivity : 0U;
+  const char* eventName = world ? hawkins::eventTypeName(world->latestEvent.type)
+                                : "AUCUN";
+  const uint8_t eventIntensity = world ? world->latestEvent.intensity : 0U;
+  const char* playerName = playerLoaded ? player.name : "NON CREE";
+  const char* className = playerLoaded
+      ? hawkins::characterClass(player.classId).name : "AUCUNE";
+  const uint8_t level = playerLoaded ? player.level : 0U;
+  const uint32_t xp = playerLoaded ? player.xp : 0U;
+  const uint8_t hp = playerLoaded ? player.hitPoints : 0U;
+  const uint8_t hpMax = playerLoaded ? hawkins::characterMaxHitPoints(player) : 0U;
+  const uint8_t stress = playerLoaded ? player.stress : 0U;
+  const uint8_t firstChoice = adventureReady ? adventure.firstContactChoice : 0U;
+  const uint8_t medkits = adventureReady
+      ? adventure.items[static_cast<uint8_t>(hawkins::AdventureItem::Medkit)] : 0U;
+  const uint8_t calmingTea = adventureReady
+      ? adventure.items[static_cast<uint8_t>(hawkins::AdventureItem::CalmingTea)] : 0U;
+  const uint8_t evidence = adventureReady
+      ? adventure.items[static_cast<uint8_t>(hawkins::AdventureItem::Evidence)] : 0U;
+
+  char escapedAction[hawkins::kHawkinsAiChoiceCapacity * 3U + 1U];
+  escapeJsonText(aiUserAction, escapedAction, sizeof(escapedAction));
+  char context[1400];
+  const int contextLength = snprintf(
+      context, sizeof(context),
+      "{\"game\":\"HAWKINS\",\"language\":\"fr\",\"day\":%lu,"
+      "\"world\":{\"tension\":%u,\"anomaly\":%u,\"factions\":%u,"
+      "\"event\":\"%s\",\"event_intensity\":%u},"
+      "\"exploration\":{\"sectors\":%lu,\"discoveries\":%lu,"
+      "\"cell\":\"%08lX\",\"objective\":\"%s\"},"
+      "\"player\":{\"created\":%s,\"name\":\"%s\",\"class\":\"%s\","
+      "\"level\":%u,\"xp\":%lu,\"hp\":%u,\"hp_max\":%u,\"stress\":%u},"
+      "\"missions\":{\"first_signal\":\"%s\",\"three_sectors\":\"%s\","
+      "\"anomaly_trail\":\"%s\"},"
+      "\"adventure\":{\"first_contact_choice\":%u,\"medkits\":%u,"
+      "\"calming_tea\":%u,\"evidence\":%u,\"skills_mask\":%u},"
+      "\"player_action\":\"%s\",\"memory\":\"%s\"}",
+      static_cast<unsigned long>(day), unsigned(tension), unsigned(anomaly),
+      unsigned(factions), eventName, unsigned(eventIntensity),
+      static_cast<unsigned long>(exploration.sectorsVisited),
+      static_cast<unsigned long>(exploration.discoveries),
+      static_cast<unsigned long>(exploration.lastCellKey),
+      currentMovementObjective(), playerLoaded ? "true" : "false",
+      playerName, className, unsigned(level), static_cast<unsigned long>(xp),
+      unsigned(hp), unsigned(hpMax), unsigned(stress),
+      missionStatusLabel(hawkins::MissionId::FirstSignal),
+      missionStatusLabel(hawkins::MissionId::ThreeSectors),
+      missionStatusLabel(hawkins::MissionId::AnomalyTrail),
+      unsigned(firstChoice), unsigned(medkits), unsigned(calmingTea),
+      unsigned(evidence), unsigned(adventureReady ? adventure.unlockedSkills : 0U),
+      escapedAction, memorySummary);
+  if (contextLength < 0 ||
+      static_cast<size_t>(contextLength) >= sizeof(context)) {
+    aiStatusText = "CONTEXTE IA TROP LONG";
+    dirty = true;
+    return false;
+  }
+
+  ++aiRequestId;
+  if (aiRequestId == 0U) ++aiRequestId;
+  char line[hawkins::kHawkinsAiMaxLine + 1U];
+  if (!hawkins::buildHawkinsAiRequestLine(
+          aiRequestId, context, line, sizeof(line))) {
+    aiStatusText = "ERREUR PREPARATION CONTEXTE";
+    dirty = true;
+    return false;
+  }
+  Serial.write(reinterpret_cast<const uint8_t*>(line), strlen(line));
+  aiPending = true;
+  aiRequestAtMs = millis();
+  aiUserAction[0] = '\0';
+  aiNarration[0] = '\0';
+  aiChoiceCount = 0U;
+  aiStatusText = "LE MAITRE DU JEU REFLECHIT...";
+  dirty = true;
+  return true;
+}
+
+void drawAiNarrationPage() {
+  cv.fillScreen(TFT_BLACK);
+  drawPageHeader("HAWKINS / NARRATEUR", "IA LOCALE USB", ACCENT);
+  cv.setFont(&fonts::Font0);
+  cv.setTextSize(1);
+  cv.setTextDatum(top_left);
+  cv.setTextColor(aiPending ? TFT_ORANGE : ACCENT, TFT_BLACK);
+  cv.drawString(aiStatusText, 5, 19);
+
+  if (aiNarration[0] != '\0') {
+    // Fontes embarque : affichage ASCII pour rester lisible sur le petit LCD.
+    char display[hawkins::kHawkinsAiTextCapacity + 1U] = {};
+    size_t in = 0U, out = 0U;
+    while (aiNarration[in] != '\0' && out + 1U < sizeof(display)) {
+      const unsigned char c = static_cast<unsigned char>(aiNarration[in++]);
+      if (c < 0x80U) display[out++] = static_cast<char>(c);
+      else if (c == 0xC3U && aiNarration[in] != '\0') {
+        const unsigned char accent = static_cast<unsigned char>(aiNarration[in++]);
+        char plain = '?';
+        switch (accent) {
+          case 0x80: case 0xA0: plain = 'a'; break;
+          case 0x87: case 0xA7: plain = 'c'; break;
+          case 0x88: case 0x89: case 0xA8: case 0xA9: case 0xAA:
+          case 0xAB: plain = 'e'; break;
+          case 0x8E: case 0x8F: case 0xAE: case 0xAF: plain = 'i'; break;
+          case 0x94: case 0xB4: plain = 'o'; break;
+          case 0x99: case 0x9A: case 0xB9: case 0xBA: plain = 'u'; break;
+          default: plain = '?'; break;
+        }
+        display[out++] = plain;
+      } else {
+        display[out++] = '?';
+        if ((c & 0xF0U) == 0xE0U) in += 2U;
+        else if ((c & 0xF8U) == 0xF0U) in += 3U;
+      }
+    }
+    display[out] = '\0';
+    int y = 33;
+    size_t position = 0U;
+    while (display[position] != '\0' && y <= 75) {
+      char row[38];
+      size_t n = 0U;
+      while (display[position] != '\0' && n < sizeof(row) - 1U &&
+             display[position] != '\n') {
+        row[n++] = display[position++];
+      }
+      if (display[position] == '\n') ++position;
+      row[n] = '\0';
+      cv.setTextColor(TFT_WHITE, TFT_BLACK);
+      cv.drawString(row, 5, y);
+      y += 11;
+    }
+  } else if (!aiPending) {
+    cv.setTextColor(ICON_DIM, TFT_BLACK);
+    cv.drawString("AUCUNE NARRATION POUR LE MOMENT", 5, 47);
+  }
+
+  for (uint8_t i = 0U; i < aiChoiceCount && i < 3U; ++i) {
+    char choiceLine[61];
+    snprintf(choiceLine, sizeof(choiceLine), "%u %s",
+             unsigned(i + 1U), aiChoices[i]);
+    cv.setTextDatum(top_left);
+    cv.setTextColor(ACCENT, TFT_BLACK);
+    cv.drawString(choiceLine, 5, 84 + int(i) * 12);
+  }
+  cv.setTextDatum(bottom_left);
+  cv.setTextColor(ICON_DIM, TFT_BLACK);
+  cv.drawString("1-3 CHOISIR  R RELANCER  Q RETOUR", 5, SH - 2);
 }
 
 void drawMissionPage() {
@@ -503,7 +713,7 @@ void drawFirstContactPage() {
 
   cv.setTextDatum(bottom_left);
   cv.setTextColor(ICON_DIM, TFT_BLACK);
-  cv.drawString(resolved ? "Q RETOUR" : "1-3 CHOISIR  Q RETOUR", 3, SH - 2);
+  cv.drawString(resolved ? "A IA  Q RETOUR" : "1-3 CHOIX  A IA  Q RETOUR", 3, SH - 2);
 }
 
 void drawStoragePage() {
@@ -809,7 +1019,53 @@ void awardExplorationExperience(uint16_t amount) {
 
 }  // namespace
 
+void hawkinsAppAiUpdate() {
+  if (aiPending && millis() - aiRequestAtMs > 120000U) {
+    aiPending = false;
+    aiStatusText = "DELAI DEPASSE - VERIFIER LE TELEPHONE";
+    dirty = true;
+  }
+  if (aiPhoneSeen && millis() - aiLastHeartbeatMs > 15000U && !aiPending &&
+      strcmp(aiStatusText, "TELEPHONE DECONNECTE") != 0) {
+    aiStatusText = "TELEPHONE DECONNECTE";
+    dirty = true;
+  }
+}
+
+bool hawkinsAppHandleSerialLine(const char* line, size_t length) {
+  if (!line || length < 6U || memcmp(line, "HKA/1 ", 6U) != 0) return false;
+  hawkins::HawkinsAiMessage message{};
+  if (!hawkins::parseHawkinsAiMessage(line, length, message)) return true;
+  if (message.kind == hawkins::HawkinsAiMessageKind::Hello) {
+    aiPhoneSeen = true;
+    aiLastHeartbeatMs = millis();
+    if (!aiPending && strcmp(aiStatusText, "TELEPHONE DECONNECTE") == 0) {
+      aiStatusText = "TELEPHONE USB CONNECTE";
+    }
+    return true;
+  }
+  if (!aiPending || message.requestId != aiRequestId) return true;
+  aiPending = false;
+  if (message.kind == hawkins::HawkinsAiMessageKind::Narration) {
+    snprintf(aiNarration, sizeof(aiNarration), "%s", message.text);
+    aiChoiceCount = message.choiceCount;
+    for (uint8_t i = 0U; i < aiChoiceCount; ++i) {
+      snprintf(aiChoices[i], sizeof(aiChoices[i]), "%s", message.choices[i]);
+    }
+    aiStatusText = "SCENE GENEREE SUR LE TELEPHONE";
+    addNarrativeRecord(hawkins::NarrativeRecordType::AiNarration, 0U,
+                       static_cast<uint16_t>(aiChoiceCount), 0U);
+  } else if (message.kind == hawkins::HawkinsAiMessageKind::Error) {
+    snprintf(aiNarration, sizeof(aiNarration), "%s", message.text);
+    aiChoiceCount = 0U;
+    aiStatusText = "ERREUR DU NARRATEUR LOCAL";
+  }
+  dirty = true;
+  return true;
+}
+
 void hawkinsAppEnter() {
+  showAiNarration = false;
   candidateActive = false;
   lastSampleMs = 0U;
   explorerReady = false;
@@ -915,6 +1171,7 @@ void hawkinsAppEnter() {
 }
 
 void hawkinsAppUpdate() {
+  hawkinsAppAiUpdate();
   const uint32_t now = millis();
   if (lastSampleMs != 0U && now - lastSampleMs < 1000U) return;
   lastSampleMs = now;
@@ -1137,7 +1394,36 @@ void hawkinsAppKey(char key) {
     return;
   }
 
+  if (showAiNarration) {
+    if (key == 'q' || key == 'Q' || key == 'a' || key == 'A') {
+      showAiNarration = false;
+      dirty = true;
+      return;
+    }
+    if (key == 'r' || key == 'R') {
+      requestAiNarration();
+      return;
+    }
+    if (key >= '1' && key <= '3' &&
+        static_cast<uint8_t>(key - '1') < aiChoiceCount && !aiPending) {
+      const uint8_t selected = static_cast<uint8_t>(key - '1');
+      snprintf(aiUserAction, sizeof(aiUserAction), "%s", aiChoices[selected]);
+      if (requestAiNarration()) {
+        addNarrativeRecord(hawkins::NarrativeRecordType::AiChoice, 0U,
+                           static_cast<uint16_t>(selected + 1U), 0U);
+      }
+      return;
+    }
+    return;
+  }
+
   if (showFirstContact) {
+    if (key == 'a' || key == 'A') {
+      showAiNarration = true;
+      requestAiNarration();
+      dirty = true;
+      return;
+    }
     if (key == 'q' || key == 'Q') {
       showFirstContact = false;
       dirty = true;
@@ -1275,7 +1561,11 @@ void hawkinsAppKey(char key) {
     }
   }
 
-  if (key == 'i' || key == 'I') {
+  if (key == 'a' || key == 'A') {
+    showAiNarration = true;
+    requestAiNarration();
+    dirty = true;
+  } else if (key == 'i' || key == 'I') {
     if (playerLoaded && adventureReady) showInventory = true;
     dirty = true;
   } else if (key == 'k' || key == 'K') {
@@ -1316,6 +1606,10 @@ void hawkinsAppKey(char key) {
 }
 
 void drawHawkinsApp() {
+  if (showAiNarration) {
+    drawAiNarrationPage();
+    return;
+  }
   if (showInventory) {
     drawInventoryPage();
     return;

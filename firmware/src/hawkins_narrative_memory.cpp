@@ -34,7 +34,7 @@ bool isValidNarrativeMemory(const NarrativeMemory& memory) {
     if (record.sequence == 0U || record.sequence >= memory.nextSequence ||
         record.sequence > memory.totalRecords ||
         record.type < static_cast<uint8_t>(NarrativeRecordType::FirstContact) ||
-        record.type > static_cast<uint8_t>(NarrativeRecordType::NpcContact) ||
+        record.type > static_cast<uint8_t>(NarrativeRecordType::AiChoice) ||
         record.intensity > 100U) {
       return false;
     }
@@ -48,7 +48,7 @@ bool isValidNarrativeMemory(const NarrativeMemory& memory) {
 bool narrativeRecord(NarrativeMemory& memory, NarrativeRecordType type,
                      uint32_t cellKey, uint16_t detail, uint8_t intensity) {
   const uint8_t rawType = static_cast<uint8_t>(type);
-  if (!isValidNarrativeMemory(memory) || rawType < 1U || rawType > 8U ||
+  if (!isValidNarrativeMemory(memory) || rawType < 1U || rawType > 10U ||
       intensity > 100U || memory.nextSequence == UINT32_MAX ||
       memory.totalRecords == UINT32_MAX) {
     return false;
