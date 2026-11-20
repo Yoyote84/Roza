@@ -1020,7 +1020,7 @@ void awardExplorationExperience(uint16_t amount) {
 }  // namespace
 
 void hawkinsAppAiUpdate() {
-  if (aiPending && millis() - aiRequestAtMs > 120000U) {
+  if (aiPending && millis() - aiRequestAtMs > 270000U) {
     aiPending = false;
     aiStatusText = "DELAI DEPASSE - VERIFIER LE TELEPHONE";
     dirty = true;
