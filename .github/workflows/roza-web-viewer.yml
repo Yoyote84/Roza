@@ -6,6 +6,7 @@ on:
     paths:
       - "firmware/src/**"
       - "firmware/tools/hawkinstest/**"
+      - "firmware/tools/hawkinsaitest/**"
       - "firmware/tools/uisim/**"
       - "firmware/platformio.ini"
       - "firmware/partitions_8MB.csv"
@@ -131,6 +132,10 @@ jobs:
       - name: Run native Hawkins tests
         working-directory: firmware
         run: bash tools/hawkinstest/build.sh
+
+      - name: Run native Hawkins AI USB protocol tests
+        working-directory: firmware
+        run: bash tools/hawkinsaitest/build.sh
 
       - name: Prepare optional simulator-only credentials
         working-directory: firmware
