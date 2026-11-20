@@ -577,9 +577,9 @@ bool completeFirstSignalMission() {
   missions = updated;
   missionSequence = nextSequence;
   missionsStorageError = false;
-  // La copie SD facultative suit la NVS, jamais l'inverse.
-  hawkins::sdBackupAutoSave();
   applyCompletedMissionRewards();
+  // La copie SD facultative suit la NVS et la recompense, jamais l'inverse.
+  hawkins::sdBackupAutoSave();
   return true;
 }
 
@@ -759,6 +759,16 @@ void hawkinsAppUpdate() {
   const uint32_t now = millis();
   if (lastSampleMs != 0U && now - lastSampleMs < 1000U) return;
   lastSampleMs = now;
+  if (missionsReady && playerLoaded && adventureReady &&
+      (adventure.storyFlags & 0x01U) != 0U &&
+      hawkins::missionStatus(missions, hawkins::MissionId::FirstSignal) ==
+          hawkins::MissionStatus::Active) {
+    if (completeFirstSignalMission()) {
+      setGpsStatus(playerStorageError
+                       ? "MISSION REPRISE - RECOMPENSE A REPRENDRE"
+                       : "MISSION REPRISE - CARTOGRAPHIE ACTIVE");
+    }
+  }
   if (missionsReady && playerLoaded &&
       hawkins::missionStatus(missions, hawkins::MissionId::FirstSignal) !=
           hawkins::MissionStatus::Locked) {
@@ -944,9 +954,14 @@ void hawkinsAppKey(char key) {
       if (hawkins::adventureResolveFirstContact(nextAdventure, nextPlayer, choice) &&
           saveAdventureAndCharacter(nextAdventure, nextPlayer)) {
         if (completeFirstSignalMission()) {
+          const bool mappingAlreadyComplete =
+              hawkins::missionStatus(missions, hawkins::MissionId::ThreeSectors) ==
+              hawkins::MissionStatus::Complete;
           setGpsStatus(playerStorageError
                            ? "CHOIX OK - RECOMPENSE A REPRENDRE"
-                           : "CHOIX ENREGISTRE - CARTOGRAPHIE ACTIVE");
+                           : mappingAlreadyComplete
+                                 ? "CHOIX ENREGISTRE - PISTE ACTIVE"
+                                 : "CHOIX ENREGISTRE - CARTOGRAPHIE ACTIVE");
         } else {
           // Le choix reste enregistre ; la reconciliation reprendra la mission
           // au prochain chargement sans autoriser un second choix/recompense.
