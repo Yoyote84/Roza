@@ -24,7 +24,10 @@ La cible reste le Cardputer ADV ESP32-S3FN8, Flash 8 Mo, sans PSRAM.
 - Le pilote GNSS existant du Cap LoRa-1262 est réutilisé ; aucune API web, géolocalisation IP, tuile distante ou connexion Wi-Fi n'est sollicitée par Hawkins.
 - Un point GPS doit être valide, compter au moins cinq satellites et rester stable pendant 10 secondes avant d'être pris en compte.
 - Le premier point fixe l'origine. Les nouveaux secteurs font progresser le calendrier d'une journée ; une découverte narrative est garantie tous les trois nouveaux secteurs.
-- 24 identifiants de secteurs récents sont conservés pour reconnaître les retours. Le compteur global continue au-delà de cette fenêtre.
+- 128 identifiants de secteurs récents sont conservés dans une mémoire circulaire (contre 24 auparavant), afin de reconnaître davantage de retours. Le compteur global continue au-delà de cette fenêtre.
+- Les sauvegardes d'exploration v1 (24 secteurs) sont migrées à la lecture vers le format v2 sans effacer la progression connue. Les deux emplacements NVS alternés restent protégés par CRC ; les archives SD acceptent également l'ancien bloc d'exploration.
+- Les événements locaux sont générés de manière déterministe à l'entrée d'une maille GPS réelle et enregistrent l'identifiant haché de cette maille. Une découverte déclenche un signal ; les événements ordinaires dépendent des niveaux locaux de tension, d'anomalie et d'activité des factions.
+- L'écran Terrain n'affiche un événement que lorsqu'il appartient à la maille actuellement sélectionnée. Les objectifs des missions donnent une consigne calculée depuis la mission active et la zone réellement visitée, sans adresse, bâtiment, lieu privé, destination fictive ou téléchargement de carte.
 - Seuls des identifiants hachés de cellules sont sauvegardés. Les coordonnées latitude/longitude brutes ne sont ni affichées ni écrites en NVS.
 - Les données d'exploration sont dans la NVS interne, sous deux emplacements expl0/expl1 avec CRC-32, vérification après écriture et conservation du précédent emplacement valide.
 - Le Wi-Fi n'est jamais activé par Hawkins. Le SX1262 n'est pas utilisé pour cette étape.
@@ -84,7 +87,7 @@ La suite native hawkinstest vérifie :
 - l'évolution déterministe et le rattrapage plafonné ;
 - la progression de journées sans horloge ;
 - la conversion de coordonnées en cellules et le rejet de coordonnées invalides ;
-- les visites, retours et découvertes ;
+- les visites, retours, mémoire circulaire de 128 secteurs, migration des sauvegardes v1, événements locaux rattachés à une maille GPS et objectifs dynamiques ;
 - la création, les limites du nom, les attributs, les gains d'XP, les niveaux, les récompenses idempotentes et les sauvegardes CRC du personnage ;
 - le déverrouillage séquentiel, les doublons de secteurs, les sauvegardes CRC et la restauration des missions ;
 - les objets consommables, le plafonnement des effets, les prérequis et la dépense des points de compétence, les conséquences à choix unique et la validation CRC de l'état d'aventure.

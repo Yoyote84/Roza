@@ -108,9 +108,22 @@ void drawExplorationPage(const hawkins::WorldState* world) {
            (unsigned long)exploration.discoveries);
   cv.setTextColor(ACCENT, TFT_BLACK);
   cv.drawString(line, 5, 98);
-  const uint32_t day = world ? world->simulatedDays : 0U;
-  snprintf(line, sizeof(line), "JOUR DU MONDE : %lu", (unsigned long)day);
-  cv.setTextColor(ICON_DIM, TFT_BLACK);
+  const bool eventHere = exploration.hasOrigin != 0U &&
+      exploration.lastEventCellKey == exploration.lastCellKey &&
+      exploration.areaEventCount > 0U;
+  if (eventHere) {
+    snprintf(line, sizeof(line), "ICI : %s  INT %u",
+             hawkins::eventTypeName(exploration.lastEventType),
+             unsigned(exploration.lastEventIntensity));
+    cv.setTextColor(ACCENT, TFT_BLACK);
+  } else if (exploration.hasOrigin != 0U) {
+    snprintf(line, sizeof(line), "ZONE %08lX : AUCUN SIGNAL",
+             static_cast<unsigned long>(exploration.lastCellKey));
+    cv.setTextColor(ICON_DIM, TFT_BLACK);
+  } else {
+    snprintf(line, sizeof(line), "ZONE EN ATTENTE DU POINT GPS");
+    cv.setTextColor(ICON_DIM, TFT_BLACK);
+  }
   cv.drawString(line, 5, 112);
   cv.setTextDatum(bottom_left);
   cv.drawString("P PERSO M MISS I OBJ K COMP Q SCN D SD", 5, SH - 2);
@@ -147,7 +160,7 @@ void drawWorldPage(const hawkins::WorldState* world) {
 
   cv.setTextDatum(top_left);
   cv.setTextColor(ICON_DIM, TFT_BLACK);
-  cv.drawString("DERNIER EVENEMENT", 5, 98);
+  cv.drawString("DERNIER EVENEMENT MONDE", 5, 98);
   cv.setTextColor(ACCENT, TFT_BLACK);
   cv.drawString(hawkins::eventTypeName(world->latestEvent.type), 5, 111);
   if (world->eventCount > 0U) {
@@ -166,6 +179,34 @@ void drawWorldPage(const hawkins::WorldState* world) {
   cv.setTextDatum(bottom_left);
   cv.setTextColor(ICON_DIM, TFT_BLACK);
   cv.drawString("P PERSO  E TERRAIN  M MISS.  S SAVE", 5, SH - 2);
+}
+
+const char* currentMovementObjective() {
+  if (!missionsReady) return "MISSIONS NON DISPONIBLES";
+  const bool eventHere = exploration.hasOrigin != 0U &&
+      exploration.lastEventCellKey == exploration.lastCellKey &&
+      exploration.areaEventCount > 0U;
+
+  if (hawkins::missionStatus(missions, hawkins::MissionId::FirstSignal) ==
+      hawkins::MissionStatus::Active) {
+    return "REPONDRE A LIA AVEC Q";
+  }
+  if (hawkins::missionStatus(missions, hawkins::MissionId::ThreeSectors) ==
+      hawkins::MissionStatus::Active) {
+    if (exploration.hasOrigin == 0U) return "OBTENIR LE POINT GPS DE DEPART";
+    if (eventHere) return "EVENEMENT LOCAL DANS CETTE ZONE";
+    return "BOUGER VERS UN SECTEUR INEDIT";
+  }
+  if (hawkins::missionStatus(missions, hawkins::MissionId::AnomalyTrail) ==
+      hawkins::MissionStatus::Active) {
+    if (eventHere &&
+        exploration.lastEventType == hawkins::EventType::StrangeSignal) {
+      return "SIGNAL DETECTE DANS LA ZONE ACTUELLE";
+    }
+    if (eventHere) return "POURSUIVRE LE TRAJET POUR UN SIGNAL";
+    return "CHERCHER UN SIGNAL EN EXPLORANT";
+  }
+  return "OBJECTIFS ACTUELS TERMINES";
 }
 
 void drawMissionPage() {
@@ -227,8 +268,12 @@ void drawMissionPage() {
     }
   }
 
-  cv.setTextDatum(bottom_left);
+  cv.setTextDatum(top_left);
+  cv.setTextColor(ACCENT, TFT_BLACK);
+  cv.drawString("OBJECTIF ACTUEL", 6, 108);
   cv.setTextColor(ICON_DIM, TFT_BLACK);
+  cv.drawString(currentMovementObjective(), 6, 119);
+  cv.setTextDatum(bottom_left);
   cv.drawString("M RET I OBJ K COMP Q SCN D SD", 5, SH - 2);
 }
 
@@ -845,24 +890,42 @@ void hawkinsAppUpdate() {
     setGpsStatus("POSITION NON VALIDEE");
     return;
   }
-  if (result == hawkins::ExplorationResult::SameCell ||
-      result == hawkins::ExplorationResult::Revisited) {
-    setGpsStatus("SECTEUR DEJA CONNU");
+  if (result == hawkins::ExplorationResult::SameCell) {
+    setGpsStatus("POSITION STABLE - SECTEUR CONNU");
+    dirty = true;
+    return;
+  }
+  if (result == hawkins::ExplorationResult::Revisited) {
+    if (!hawkins::explorationSaveCommit(exploration, &explorationSequence)) {
+      exploration = previousExploration;
+      explorerStorageError = true;
+      explorerReady = false;
+      setGpsStatus("ERREUR SAUVEGARDE DU RETOUR");
+      return;
+    }
+    setGpsStatus("SECTEUR DEJA VISITE - OBJECTIF ACTUALISE");
+    hawkins::sdBackupAutoSave();
     dirty = true;
     return;
   }
   if (result == hawkins::ExplorationResult::OriginSet) {
+    const bool localEvent = hawkins::generateLocalAreaEvent(
+        exploration, *world, candidateCellKey, false);
     if (!hawkins::explorationSaveCommit(exploration, &explorationSequence)) {
+      exploration = previousExploration;
       explorerStorageError = true;
       explorerReady = false;
       setGpsStatus("ERREUR SAUVEGARDE GPS");
       return;
     }
-    setGpsStatus("POINT DE DEPART ENREGISTRE");
+    setGpsStatus(localEvent ? "EVENEMENT LOCAL DANS LA ZONE"
+                            : "POINT DE DEPART ENREGISTRE");
     hawkins::sdBackupAutoSave();
   } else {
     const bool discovery =
         result == hawkins::ExplorationResult::NewDiscovery;
+    const bool localEvent = hawkins::generateLocalAreaEvent(
+        exploration, *world, candidateCellKey, discovery);
     if (!commitMissionProgress(candidateCellKey, discovery)) {
       exploration = previousExploration;
       candidateActive = false;
@@ -882,8 +945,11 @@ void hawkinsAppUpdate() {
     applyCompletedMissionRewards();
     hawkins::sdBackupAutoSave();
     if (discovery) {
-      setGpsStatus(daySaved ? "SIGNAL ANORMAL DECOUVERT"
-                            : "SIGNAL TROUVE - SAUVEGARDE MONDE");
+      setGpsStatus(daySaved ? "SIGNAL LOCAL DECOUVERT"
+                            : "SIGNAL LOCAL - SAUVEGARDE MONDE");
+    } else if (localEvent) {
+      setGpsStatus(daySaved ? "EVENEMENT LOCAL DETECTE"
+                            : "EVENEMENT LOCAL - SAUVEGARDE MONDE");
     } else {
       setGpsStatus(daySaved ? "NOUVEAU SECTEUR EXPLORE"
                             : "SECTEUR TROUVE - SAUVEGARDE MONDE");

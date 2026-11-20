@@ -52,7 +52,8 @@ bool readExploreSlot(Preferences& store, const char* key,
   const size_t length = store.getBytesLength(key);
   if (length == 0U) return true;
   slot.present = true;
-  if (length != kExplorationSaveEncodedSize) return true;
+  if (length != kExplorationSaveEncodedSize &&
+      length != kLegacyExplorationSaveEncodedSize) return true;
   uint8_t bytes[kExplorationSaveEncodedSize];
   if (store.getBytes(key, bytes, length) != length) return false;
   slot.valid = decodeExplorationSave(bytes, length, slot.state, slot.sequence);

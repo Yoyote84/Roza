@@ -21,7 +21,9 @@ constexpr uint16_t kArchiveVersion = 1U;
 constexpr uint16_t kHeaderSize = 20U;
 constexpr size_t kCrcOffset = 16U;
 constexpr uint8_t kRecordCount = 5U;
-constexpr size_t kArchiveCapacity = 384U;
+// Archive actuelle ~764 octets avec la mémoire de 128 secteurs ; 800 octets
+// laissent une petite marge tout en gardant les buffers bornés.
+constexpr size_t kArchiveCapacity = 800U;
 
 struct ArchiveView {
   uint32_t sequence;
@@ -67,7 +69,8 @@ bool sequenceNewer(uint32_t a, uint32_t b) {
 
 bool validateRecords(const ArchiveView& view) {
   if (view.length[0] != kWorldSaveEncodedSize ||
-      view.length[1] != kExplorationSaveEncodedSize ||
+      (view.length[1] != kExplorationSaveEncodedSize &&
+       view.length[1] != kLegacyExplorationSaveEncodedSize) ||
       view.length[2] != kCharacterSaveEncodedSize ||
       view.length[3] != kMissionSaveEncodedSize ||
       view.length[4] != kAdventureSaveEncodedSize) return false;
