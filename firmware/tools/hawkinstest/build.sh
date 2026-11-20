@@ -16,10 +16,15 @@ fi
 "$CXX" -std=c++17 -Wall -Wextra -Werror $SANFLAGS \
   -I ../../src missions_test.cpp ../../src/hawkins_missions.cpp \
   -o /tmp/roza-hawkins-missions-test
-
+/tmp/roza-hawkins-missions-test
 "$CXX" -std=c++17 -Wall -Wextra -Werror $SANFLAGS \
   -I ../../src adventure_test.cpp ../../src/hawkins_adventure.cpp \
   ../../src/hawkins_character.cpp ../../src/hawkins_missions.cpp \
   -o /tmp/roza-hawkins-adventure-test
 /tmp/roza-hawkins-adventure-test
-/tmp/roza-hawkins-missions-test
+"$CXX" -std=c++17 -Wall -Wextra -Werror $SANFLAGS \
+  -I ../../src narrative_memory_test.cpp \
+  ../../src/hawkins_narrative_memory.cpp \
+  ../../src/hawkins_narrative_memory_codec.cpp \
+  -o /tmp/roza-hawkins-narrative-test
+/tmp/roza-hawkins-narrative-test

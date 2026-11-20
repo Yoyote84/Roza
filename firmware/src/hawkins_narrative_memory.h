@@ -1,4 +1,5 @@
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
 
 namespace hawkins {
@@ -44,8 +45,11 @@ bool narrativeRecord(NarrativeMemory& memory, NarrativeRecordType type,
                      uint32_t cellKey, uint16_t detail, uint8_t intensity);
 bool narrativeSetPlot(NarrativeMemory& memory, uint8_t plotId, bool open);
 bool narrativeAdjustNpcRelationship(NarrativeMemory& memory, uint8_t npcId,
-                                   int8_t delta);
+                                     int8_t delta);
 const NarrativeRecord* narrativeLatest(const NarrativeMemory& memory);
 const NarrativeRecord* narrativeRecordAt(const NarrativeMemory& memory,
                                          uint8_t chronologicalIndex);
+// Produit un résumé compact et déterministe pour le futur contexte de l'IA.
+bool formatNarrativeMemorySummary(const NarrativeMemory& memory,
+                                  char* output, size_t capacity);
 }

@@ -6,6 +6,8 @@
 #include "hawkins_adventure_store.h"
 #include "hawkins_save_codec.h"
 #include "hawkins_adventure.h"
+#include "hawkins_narrative_store.h"
+#include "hawkins_narrative_memory_codec.h"
 
 #include <string.h>
 
@@ -17,15 +19,17 @@ constexpr char kSlot0Path[] = "/HAWKINS/SLOT0.HWS";
 constexpr char kSlot1Path[] = "/HAWKINS/SLOT1.HWS";
 constexpr char kTempPath[] = "/HAWKINS/WRITING.TMP";
 constexpr uint32_t kArchiveMagic = 0x44535748U;  // "HWSD"
-constexpr uint16_t kArchiveVersion = 1U;
+constexpr uint16_t kArchiveVersion = 2U;
+constexpr uint16_t kLegacyArchiveVersion = 1U;
 constexpr uint16_t kHeaderSize = 20U;
 constexpr size_t kCrcOffset = 16U;
-constexpr uint8_t kRecordCount = 5U;
-// Archive actuelle ~764 octets avec la mémoire de 128 secteurs ; 800 octets
-// laissent une petite marge tout en gardant les buffers bornés.
-constexpr size_t kArchiveCapacity = 800U;
+constexpr uint8_t kLegacyRecordCount = 5U;
+constexpr uint8_t kRecordCount = 6U;
+// La memoire narrative ajoute un sixieme bloc CRC. Les buffers restent bornes.
+constexpr size_t kArchiveCapacity = 1024U;
 
 struct ArchiveView {
+  uint16_t version;
   uint32_t sequence;
   uint16_t length[kRecordCount];
   const uint8_t* records[kRecordCount];
@@ -74,24 +78,40 @@ bool validateRecords(const ArchiveView& view) {
       view.length[2] != kCharacterSaveEncodedSize ||
       view.length[3] != kMissionSaveEncodedSize ||
       view.length[4] != kAdventureSaveEncodedSize) return false;
+  if (view.version == kArchiveVersion &&
+      view.length[5] != kNarrativeSaveEncodedSize) return false;
+  if (view.version != kArchiveVersion &&
+      view.version != kLegacyArchiveVersion) return false;
   WorldState world{};
   ExplorationState exploration{};
   CharacterState character{};
   MissionState missions{};
   AdventureState adventure{};
+  NarrativeMemory narrative{};
   uint32_t sequence = 0U;
-  return decodeWorldSave(view.records[0], view.length[0], world, sequence) &&
-         decodeExplorationSave(view.records[1], view.length[1], exploration, sequence) &&
-         decodeCharacterSave(view.records[2], view.length[2], character, sequence) &&
-         decodeMissionSave(view.records[3], view.length[3], missions, sequence) &&
-         decodeAdventureSave(view.records[4], view.length[4], adventure, sequence);
+  const bool baseValid =
+      decodeWorldSave(view.records[0], view.length[0], world, sequence) &&
+      decodeExplorationSave(view.records[1], view.length[1], exploration, sequence) &&
+      decodeCharacterSave(view.records[2], view.length[2], character, sequence) &&
+      decodeMissionSave(view.records[3], view.length[3], missions, sequence) &&
+      decodeAdventureSave(view.records[4], view.length[4], adventure, sequence);
+  if (!baseValid) return false;
+  return view.version == kLegacyArchiveVersion ||
+         decodeNarrativeMemorySave(view.records[5], view.length[5],
+                                   narrative, sequence);
 }
 
 bool parseArchive(const uint8_t* bytes, size_t length, ArchiveView& view) {
-  if (!bytes || length < kHeaderSize + kRecordCount * 2U || length > kArchiveCapacity ||
-      read32(bytes) != kArchiveMagic || read16(bytes + 4U) != kArchiveVersion ||
+  if (!bytes || length < kHeaderSize + kLegacyRecordCount * 2U ||
+      length > kArchiveCapacity || read32(bytes) != kArchiveMagic ||
       read16(bytes + 6U) != kHeaderSize || read32(bytes + 8U) == 0U ||
       read32(bytes + 12U) != length - kHeaderSize) return false;
+  const uint16_t version = read16(bytes + 4U);
+  const uint8_t recordCount = version == kLegacyArchiveVersion
+                                  ? kLegacyRecordCount
+                                  : version == kArchiveVersion ? kRecordCount : 0U;
+  if (recordCount == 0U ||
+      length < kHeaderSize + static_cast<size_t>(recordCount) * 2U) return false;
   uint8_t check[kArchiveCapacity];
   memcpy(check, bytes, length);
   const uint32_t storedCrc = read32(check + kCrcOffset);
@@ -99,9 +119,10 @@ bool parseArchive(const uint8_t* bytes, size_t length, ArchiveView& view) {
   if (crc32(check, length) != storedCrc) return false;
 
   view = ArchiveView{};
+  view.version = version;
   view.sequence = read32(bytes + 8U);
   size_t offset = kHeaderSize;
-  for (uint8_t i = 0U; i < kRecordCount; ++i) {
+  for (uint8_t i = 0U; i < recordCount; ++i) {
     if (offset + 2U > length) return false;
     view.length[i] = read16(bytes + offset);
     offset += 2U;
@@ -147,13 +168,16 @@ bool makeArchive(uint8_t* output, size_t& length, uint32_t sequence) {
   uint8_t characterBytes[kCharacterSaveEncodedSize];
   uint8_t missionBytes[kMissionSaveEncodedSize];
   uint8_t adventureBytes[kAdventureSaveEncodedSize];
+  uint8_t narrativeBytes[kNarrativeSaveEncodedSize];
   WorldState world{};
   ExplorationState exploration{};
   CharacterState character{};
   MissionState missions{};
   AdventureState adventure{};
+  NarrativeMemory narrative{};
   uint32_t worldSequence = 0U, explorationSequence = 0U;
   uint32_t characterSequence = 0U, missionSequence = 0U, adventureSequence = 0U;
+  uint32_t narrativeSequence = 0U;
 
   const WorldSaveLoadStatus worldStatus = worldSaveLoad(world, &worldSequence);
   const ExplorationSaveLoadStatus explorationStatus =
@@ -163,6 +187,8 @@ bool makeArchive(uint8_t* output, size_t& length, uint32_t sequence) {
   const MissionSaveLoadStatus missionStatus = missionSaveLoad(missions, &missionSequence);
   const AdventureSaveLoadStatus adventureStatus =
       adventureSaveLoad(adventure, &adventureSequence);
+  const NarrativeSaveLoadStatus narrativeStatus =
+      narrativeSaveLoad(narrative, &narrativeSequence);
 
   // Une copie n'est jamais créée à partir de données manquantes ou invalides.
   // Un profil joueur est obligatoire pour garantir une sauvegarde complète.
@@ -170,7 +196,8 @@ bool makeArchive(uint8_t* output, size_t& length, uint32_t sequence) {
       explorationStatus != ExplorationSaveLoadStatus::Loaded ||
       characterStatus != CharacterSaveLoadStatus::Loaded ||
       missionStatus != MissionSaveLoadStatus::Loaded ||
-      adventureStatus != AdventureSaveLoadStatus::Loaded) return false;
+      adventureStatus != AdventureSaveLoadStatus::Loaded ||
+      narrativeStatus != NarrativeSaveLoadStatus::Loaded) return false;
 
   if (!encodeWorldSave(world, worldSequence, worldBytes, sizeof(worldBytes)) ||
       !encodeExplorationSave(exploration, explorationSequence,
@@ -179,7 +206,9 @@ bool makeArchive(uint8_t* output, size_t& length, uint32_t sequence) {
                            characterBytes, sizeof(characterBytes)) ||
       !encodeMissionSave(missions, missionSequence, missionBytes, sizeof(missionBytes)) ||
       !encodeAdventureSave(adventure, adventureSequence,
-                           adventureBytes, sizeof(adventureBytes))) return false;
+                           adventureBytes, sizeof(adventureBytes)) ||
+      !encodeNarrativeMemorySave(narrative, narrativeSequence,
+                                 narrativeBytes, sizeof(narrativeBytes))) return false;
 
   memset(output, 0, kHeaderSize);
   write32(output, kArchiveMagic);
@@ -191,7 +220,8 @@ bool makeArchive(uint8_t* output, size_t& length, uint32_t sequence) {
       !appendRecord(output, offset, explorationBytes, sizeof(explorationBytes)) ||
       !appendRecord(output, offset, characterBytes, sizeof(characterBytes)) ||
       !appendRecord(output, offset, missionBytes, sizeof(missionBytes)) ||
-      !appendRecord(output, offset, adventureBytes, sizeof(adventureBytes))) return false;
+      !appendRecord(output, offset, adventureBytes, sizeof(adventureBytes)) ||
+      !appendRecord(output, offset, narrativeBytes, sizeof(narrativeBytes))) return false;
   length = offset;
   write32(output + 12U, static_cast<uint32_t>(length - kHeaderSize));
   write32(output + kCrcOffset, 0U);
@@ -366,21 +396,30 @@ bool sdBackupRestore() {
   CharacterState character{};
   MissionState missions{};
   AdventureState adventure{};
+  NarrativeMemory narrative{};
   uint32_t sequence = 0U;
   if (!decodeWorldSave(view.records[0], view.length[0], world, sequence) ||
       !decodeExplorationSave(view.records[1], view.length[1], exploration, sequence) ||
       !decodeCharacterSave(view.records[2], view.length[2], character, sequence) ||
       !decodeMissionSave(view.records[3], view.length[3], missions, sequence) ||
-      !decodeAdventureSave(view.records[4], view.length[4], adventure, sequence)) {
+      !decodeAdventureSave(view.records[4], view.length[4], adventure, sequence) ||
+      (view.version == kArchiveVersion &&
+       !decodeNarrativeMemorySave(view.records[5], view.length[5],
+                                  narrative, sequence))) {
     statusText = "FORMAT DE COPIE INVALIDE";
     return false;
   }
 
-  // Tous les cinq blocs sont décodés et leurs CRC contrôlés avant la première écriture.
+  // Tous les blocs sont décodés et leurs CRC contrôlés avant la première écriture.
+  // Les archives v1 ne contenaient pas de memoire narrative : on repart alors
+  // d'une memoire vide compatible, sans rejeter les anciennes sauvegardes.
+  if (view.version == kLegacyArchiveVersion) {
+    initializeNarrativeMemory(narrative);
+  }
   const bool restored = worldSaveCommit(world) &&
       explorationSaveCommit(exploration) &&
       characterSaveCommit(character) && missionSaveCommit(missions) &&
-      adventureSaveCommit(adventure);
+      adventureSaveCommit(adventure) && narrativeSaveCommit(narrative);
   if (!restored) {
     statusText = "RESTAURATION PARTIELLE - VERIFIER NVS";
     return false;

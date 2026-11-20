@@ -6,6 +6,7 @@
 #include "hawkins_missions.h"
 #include "hawkins_adventure.h"
 #include "hawkins_adventure_store.h"
+#include "hawkins_narrative_store.h"
 #include "hawkins_sd_backup.h"
 #include "sd_files.h"
 #include "gnss.h"
@@ -48,6 +49,11 @@ hawkins::AdventureState adventure{};
 uint32_t adventureSequence = 0U;
 bool adventureReady = false;
 bool adventureStorageError = false;
+
+hawkins::NarrativeMemory narrative{};
+uint32_t narrativeSequence = 0U;
+bool narrativeReady = false;
+bool narrativeStorageError = false;
 bool showInventory = false;
 bool showSkills = false;
 bool showFirstContact = false;
@@ -529,9 +535,13 @@ void drawStoragePage() {
   snprintf(line, sizeof(line), "COPIE NUMERO : %lu",
            static_cast<unsigned long>(hawkins::sdBackupSequence()));
   cv.drawString(line, 6, 69);
-  cv.setTextColor(adventureStorageError ? TFT_ORANGE : ICON_DIM, TFT_BLACK);
+  const bool narrativeSaveError = adventureStorageError ||
+                                   narrativeStorageError;
+  cv.setTextColor(narrativeSaveError ? TFT_ORANGE : ICON_DIM, TFT_BLACK);
   cv.drawString(adventureStorageError ? "ERREUR NVS AVENTURE"
-                                     : hawkins::sdBackupStatusText(), 6, 83);
+                  : narrativeStorageError ? "ERREUR NVS RECIT"
+                                           : hawkins::sdBackupStatusText(),
+                6, 83);
   cv.setTextColor(TFT_WHITE, TFT_BLACK);
   cv.drawString(gpsStatusText, 6, 96);
   if (restoreConfirmation) {
@@ -582,6 +592,73 @@ bool savePlayerState(const hawkins::CharacterState& candidate) {
   return true;
 }
 
+bool saveNarrativeMemory(const hawkins::NarrativeMemory& candidate,
+                         bool createSdBackup = true) {
+  uint32_t nextSequence = narrativeSequence;
+  if (!hawkins::narrativeSaveCommit(candidate, &nextSequence)) {
+    narrativeStorageError = true;
+    setGpsStatus("MEMOIRE NARRATIVE NON SAUVEE");
+    return false;
+  }
+  narrative = candidate;
+  narrativeSequence = nextSequence;
+  narrativeReady = true;
+  narrativeStorageError = false;
+  if (createSdBackup) hawkins::sdBackupAutoSave();
+  dirty = true;
+  return true;
+}
+
+bool addNarrativeRecord(hawkins::NarrativeRecordType type, uint32_t cellKey,
+                        uint16_t detail, uint8_t intensity) {
+  if (!narrativeReady) return false;
+  hawkins::NarrativeMemory updated = narrative;
+  if (!hawkins::narrativeRecord(updated, type, cellKey, detail, intensity)) {
+    narrativeStorageError = true;
+    return false;
+  }
+  return saveNarrativeMemory(updated);
+}
+
+void rememberFirstContact(uint8_t savedChoice) {
+  if (!narrativeReady || (narrative.plotFlags & 0x01U) != 0U) return;
+  hawkins::NarrativeMemory updated = narrative;
+  // firstContactChoice=0 signifie une ancienne sauvegarde sans branche connue.
+  const int8_t relationshipChange =
+      savedChoice == 1U ? 10 : savedChoice == 2U ? 5 :
+      savedChoice == 3U ? -10 : 0;
+  if (!hawkins::narrativeSetPlot(updated, 0U, true) ||
+      !hawkins::narrativeAdjustNpcRelationship(updated, 0U,
+                                               relationshipChange) ||
+      !hawkins::narrativeRecord(
+          updated, hawkins::NarrativeRecordType::FirstContact, 0U,
+          savedChoice,
+          updated.relationships[0])) {
+    narrativeStorageError = true;
+    return;
+  }
+  saveNarrativeMemory(updated);
+}
+
+void rememberMissionCompletion(hawkins::MissionId id) {
+  if (!narrativeReady) return;
+  const uint8_t missionIndex = static_cast<uint8_t>(id);
+  if (missionIndex >= hawkins::kMissionCount) return;
+  const uint8_t plotId = static_cast<uint8_t>(missionIndex + 1U);
+  const uint8_t mask = static_cast<uint8_t>(1U << plotId);
+  if ((narrative.plotFlags & mask) != 0U) return;
+  hawkins::NarrativeMemory updated = narrative;
+  if (!hawkins::narrativeSetPlot(updated, plotId, true) ||
+      !hawkins::narrativeRecord(
+          updated, hawkins::NarrativeRecordType::MissionComplete, 0U,
+          missionIndex, 100U)) {
+    narrativeStorageError = true;
+    return;
+  }
+  saveNarrativeMemory(updated, false);
+}
+
+
 void applyCompletedMissionRewards() {
   if (!missionsReady || !playerLoaded) return;
   for (uint8_t i = 0U; i < hawkins::kMissionCount; ++i) {
@@ -622,6 +699,7 @@ bool completeFirstSignalMission() {
   missions = updated;
   missionSequence = nextSequence;
   missionsStorageError = false;
+  rememberMissionCompletion(hawkins::MissionId::FirstSignal);
   applyCompletedMissionRewards();
   // La copie SD facultative suit la NVS et la recompense, jamais l'inverse.
   hawkins::sdBackupAutoSave();
@@ -646,6 +724,13 @@ bool commitMissionProgress(uint32_t cellKey, bool discovery) {
   }
   missions = updated;
   missionSequence = nextSequence;
+  for (uint8_t i = 0U; i < hawkins::kMissionCount; ++i) {
+    const hawkins::MissionId id = static_cast<hawkins::MissionId>(i);
+    if (hawkins::missionStatus(missions, id) ==
+        hawkins::MissionStatus::Complete) {
+      rememberMissionCompletion(id);
+    }
+  }
   applyCompletedMissionRewards();
   return true;
 }
@@ -781,7 +866,36 @@ void hawkinsAppEnter() {
   } else {
     adventureStorageError = true;
   }
+  const hawkins::NarrativeSaveLoadStatus narrativeLoad =
+      hawkins::narrativeSaveLoad(narrative, &narrativeSequence);
+  if (narrativeLoad == hawkins::NarrativeSaveLoadStatus::Loaded) {
+    narrativeReady = true;
+    narrativeStorageError = false;
+  } else if (narrativeLoad == hawkins::NarrativeSaveLoadStatus::Empty) {
+    hawkins::initializeNarrativeMemory(narrative);
+    narrativeReady = hawkins::narrativeSaveCommit(
+        narrative, &narrativeSequence);
+    narrativeStorageError = !narrativeReady;
+  } else {
+    narrativeReady = false;
+    narrativeStorageError = true;
+  }
+
   hawkins::sdBackupInit();
+  if (playerLoaded && adventureReady &&
+      (adventure.storyFlags & 0x01U) != 0U) {
+    // Reconstruit la trace narrative si une sauvegarde plus ancienne ne la contenait pas.
+    rememberFirstContact(adventure.firstContactChoice);
+  }
+  if (missionsReady) {
+    for (uint8_t i = 0U; i < hawkins::kMissionCount; ++i) {
+      const hawkins::MissionId id = static_cast<hawkins::MissionId>(i);
+      if (hawkins::missionStatus(missions, id) ==
+          hawkins::MissionStatus::Complete) {
+        rememberMissionCompletion(id);
+      }
+    }
+  }
   if (playerLoaded && adventureReady &&
       (adventure.storyFlags & 0x01U) != 0U) {
     // Reprise idempotente si l'appareil s'est eteint apres le choix de Lia
@@ -944,6 +1058,16 @@ void hawkinsAppUpdate() {
     }
 
     const bool daySaved = hawkins::hawkinsRuntimeAdvanceDays(1U);
+    const hawkins::NarrativeRecordType narrativeType =
+        localEvent &&
+        exploration.lastEventType == hawkins::EventType::StrangeSignal
+            ? hawkins::NarrativeRecordType::LocalSignal
+            : hawkins::NarrativeRecordType::SectorDiscovery;
+    const uint16_t narrativeDetail = localEvent
+        ? static_cast<uint16_t>(exploration.lastEventType)
+        : static_cast<uint16_t>(0U);
+    addNarrativeRecord(narrativeType, candidateCellKey, narrativeDetail,
+                       localEvent ? exploration.lastEventIntensity : 0U);
     const uint16_t reward = discovery ? 50U : 25U;
     awardExplorationExperience(reward);
     applyCompletedMissionRewards();
@@ -976,6 +1100,8 @@ void hawkinsAppKey(char key) {
           ? hawkins::AdventureItem::Medkit : hawkins::AdventureItem::CalmingTea;
       if (hawkins::adventureUseItem(nextAdventure, nextPlayer, item) &&
           saveAdventureAndCharacter(nextAdventure, nextPlayer)) {
+        addNarrativeRecord(hawkins::NarrativeRecordType::ItemUsed, 0U,
+                           static_cast<uint16_t>(item), 0U);
         setGpsStatus("OBJET UTILISE");
       } else {
         setGpsStatus("OBJET INDISPONIBLE / ECHEC SAUVEGARDE");
@@ -999,6 +1125,8 @@ void hawkinsAppKey(char key) {
           static_cast<hawkins::AdventureSkill>(key - '1');
       if (hawkins::adventureUnlockSkill(nextAdventure, nextPlayer, skill) &&
           saveAdventureAndCharacter(nextAdventure, nextPlayer)) {
+        addNarrativeRecord(hawkins::NarrativeRecordType::SkillUnlocked, 0U,
+                           static_cast<uint16_t>(skill), 0U);
         setGpsStatus("COMPETENCE DEBLOQUEE");
       } else {
         setGpsStatus("POINT OU CARACTERISTIQUE INSUFFISANT");
@@ -1023,6 +1151,7 @@ void hawkinsAppKey(char key) {
           static_cast<hawkins::FirstContactChoice>(key - '1');
       if (hawkins::adventureResolveFirstContact(nextAdventure, nextPlayer, choice) &&
           saveAdventureAndCharacter(nextAdventure, nextPlayer)) {
+        rememberFirstContact(nextAdventure.firstContactChoice);
         if (completeFirstSignalMission()) {
           const bool mappingAlreadyComplete =
               hawkins::missionStatus(missions, hawkins::MissionId::ThreeSectors) ==
