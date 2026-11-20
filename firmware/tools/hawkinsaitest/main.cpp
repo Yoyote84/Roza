@@ -39,11 +39,14 @@ static void testHelloHeartbeat() {
 
 static void testNarration() {
   const char line[] =
-      "HKA/1 {\"type\":\"narration\",\"id\":7,\"text\":\"La lumiere vacille.\"}";
+      "HKA/1 {\"type\":\"narration\",\"id\":7,\"text\":\"La lumiere vacille.\",\"choices\":[\"Repondre\",\"Se cacher\"]}";
   HawkinsAiMessage message{};
   assert(hawkins::parseHawkinsAiMessage(line, sizeof(line) - 1U, message));
   assert(message.kind == HawkinsAiMessageKind::Narration);
   assert(message.requestId == 7U);
+  assert(message.choiceCount == 2U);
+  assert(strcmp(message.choices[0], "Repondre") == 0);
+  assert(strcmp(message.choices[1], "Se cacher") == 0);
   assert(strcmp(message.text, "La lumiere vacille.") == 0);
 }
 
