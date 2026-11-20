@@ -73,6 +73,20 @@ uint8_t aiChoiceCount = 0U;
 char aiUserAction[hawkins::kHawkinsAiChoiceCapacity + 1U] = {};
 const char* aiStatusText = "IA LOCALE EN ATTENTE";
 
+void sendAiProtocolAck(uint32_t id, const char* type, const char* status) {
+  if (id == 0U || !type || !status) return;
+  char frame[192];
+  const int length = snprintf(
+      frame, sizeof(frame),
+      "HKA/1 {\"type\":\"%s\",\"id\":%lu,\"status\":\"%s\"}\n",
+      type, static_cast<unsigned long>(id), status);
+  if (length > 0 && static_cast<size_t>(length) < sizeof(frame)) {
+    Serial.write(reinterpret_cast<const uint8_t*>(frame),
+                 static_cast<size_t>(length));
+    Serial.flush();
+  }
+}
+
 void setGpsStatus(const char* text) {
   if (gpsStatusText != text) {
     gpsStatusText = text;
@@ -1035,16 +1049,41 @@ void hawkinsAppAiUpdate() {
 bool hawkinsAppHandleSerialLine(const char* line, size_t length) {
   if (!line || length < 6U || memcmp(line, "HKA/1 ", 6U) != 0) return false;
   hawkins::HawkinsAiMessage message{};
-  if (!hawkins::parseHawkinsAiMessage(line, length, message)) return true;
+  if (!hawkins::parseHawkinsAiMessage(line, length, message)) {
+    Serial.printf("[hawkins-ai] trame HKA invalide: len=%u pending=%u id=%lu\n",
+                  static_cast<unsigned>(length), aiPending ? 1U : 0U,
+                  static_cast<unsigned long>(aiRequestId));
+    aiPending = false;
+    aiChoiceCount = 0U;
+    aiNarration[0] = '\0';
+    aiStatusText = "REPONSE IA INVALIDE - VOIR USB";
+    sendAiProtocolAck(aiRequestId, "nack", "invalid_frame");
+    dirty = true;
+    return true;
+  }
   if (message.kind == hawkins::HawkinsAiMessageKind::Hello) {
     aiPhoneSeen = true;
     aiLastHeartbeatMs = millis();
     if (!aiPending && strcmp(aiStatusText, "TELEPHONE DECONNECTE") == 0) {
       aiStatusText = "TELEPHONE USB CONNECTE";
+      dirty = true;
     }
     return true;
   }
-  if (!aiPending || message.requestId != aiRequestId) return true;
+  if (!aiPending) {
+    Serial.printf("[hawkins-ai] reponse sans demande: id=%lu\n",
+                  static_cast<unsigned long>(message.requestId));
+    sendAiProtocolAck(message.requestId, "nack", "no_pending_request");
+    return true;
+  }
+  if (message.requestId != aiRequestId) {
+    Serial.printf("[hawkins-ai] mauvais id: recu=%lu attendu=%lu\n",
+                  static_cast<unsigned long>(message.requestId),
+                  static_cast<unsigned long>(aiRequestId));
+    sendAiProtocolAck(message.requestId, "nack", "request_id_mismatch");
+    return true;
+  }
+
   aiPending = false;
   if (message.kind == hawkins::HawkinsAiMessageKind::Narration) {
     snprintf(aiNarration, sizeof(aiNarration), "%s", message.text);
@@ -1055,12 +1094,21 @@ bool hawkinsAppHandleSerialLine(const char* line, size_t length) {
     aiStatusText = "SCENE GENEREE SUR LE TELEPHONE";
     addNarrativeRecord(hawkins::NarrativeRecordType::AiNarration, 0U,
                        static_cast<uint16_t>(aiChoiceCount), 0U);
+    Serial.printf("[hawkins-ai] narration acceptee id=%lu texte=%u choix=%u\n",
+                  static_cast<unsigned long>(message.requestId),
+                  static_cast<unsigned>(strlen(message.text)),
+                  static_cast<unsigned>(message.choiceCount));
   } else if (message.kind == hawkins::HawkinsAiMessageKind::Error) {
     snprintf(aiNarration, sizeof(aiNarration), "%s", message.text);
     aiChoiceCount = 0U;
     aiStatusText = "ERREUR DU NARRATEUR LOCAL";
+    Serial.printf("[hawkins-ai] erreur acceptee id=%lu\n",
+                  static_cast<unsigned long>(message.requestId));
   }
   dirty = true;
+  sendAiProtocolAck(message.requestId, "ack",
+                    message.kind == hawkins::HawkinsAiMessageKind::Narration
+                        ? "narration_accepted" : "error_accepted");
   return true;
 }
 

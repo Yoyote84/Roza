@@ -37,3 +37,21 @@ class HawkinsProtocolTest {
         assertEquals(null, HawkinsProtocol.parseFrame("[boot-diag] ready"))
     }
 }
+
+
+    @Test
+    fun cardputerAcknowledgementIsRecognized() {
+        val frame = """HKA/1 {"type":"ack","id":1,"status":"narration_accepted"}"""
+        val message = HawkinsProtocol.parseFrame(frame)
+        assertEquals("ack", message?.getString("type"))
+        assertEquals(1L, message?.getLong("id"))
+        assertEquals("narration_accepted", message?.getString("status"))
+    }
+
+    @Test
+    fun cardputerNegativeAcknowledgementIsRecognized() {
+        val frame = """HKA/1 {"type":"nack","id":1,"status":"invalid_frame"}"""
+        val message = HawkinsProtocol.parseFrame(frame)
+        assertEquals("nack", message?.getString("type"))
+        assertEquals("invalid_frame", message?.getString("status"))
+    }

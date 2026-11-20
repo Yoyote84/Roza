@@ -64,3 +64,8 @@ Le pont JNI vérifie que le backend CPU est enregistré et tente, en secours, le
 ## Génération de narration et délais
 
 Le binding Android limite maintenant la sortie au nombre de tokens demandé : la position courante inclut déjà le prompt utilisateur, donc la longueur de ce prompt ne doit pas être ajoutée une seconde fois à la limite de génération. L'application indique aussi la réception d'une requête du Cardputer et la progression du flux de tokens. En cas d'expiration des 240 secondes, elle renvoie une trame `error` au Cardputer au lieu de le laisser attendre jusqu'à son propre délai de sécurité.
+
+
+## Confirmation de reception USB HKA/1
+
+Les trames de narration et d'erreur sont maintenant ecrites de façon synchrone sur le port USB serie, au lieu d'etre seulement ajoutees a la file d'ecriture asynchrone. Le Cardputer renvoie ensuite une trame HKA/1 \`ack\` apres avoir decode et accepte la reponse, ou \`nack\` avec la cause si la trame est invalide, arrive sans requete ou porte un identifiant inattendu. L'ecran et le journal Android distinguent donc l'ecriture terminee de l'acceptation reelle par le Cardputer.

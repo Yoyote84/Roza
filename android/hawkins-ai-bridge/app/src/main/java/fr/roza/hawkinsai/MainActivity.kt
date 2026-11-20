@@ -90,6 +90,7 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
     @Volatile private var ioManager: SerialInputOutputManager? = null
     private val incomingLine = ByteArrayOutputStream()
     private val lineLock = Any()
+    private val serialWriteLock = Any()
     private var receiverRegistered = false
 
     private val usbPermissionReceiver = object : BroadcastReceiver() {
@@ -383,7 +384,10 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
         heartbeatJob?.cancel()
         heartbeatJob = appScope.launch(Dispatchers.IO) {
             while (isActive && ioManager != null) {
-                writeBytes(HawkinsProtocol.encodeHello())
+                runCatching { writeBytes(HawkinsProtocol.encodeHello()) }
+                    .onFailure { error ->
+                        runOnUiThread { appendLog("Heartbeat USB impossible : ${error.message}") }
+                    }
                 delay(5_000L)
             }
         }
@@ -411,9 +415,32 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
     }
 
     private fun handleProtocolLine(line: String) {
-        val message = HawkinsProtocol.parseFrame(line) ?: return
+        val message = HawkinsProtocol.parseFrame(line)
+        if (message == null) {
+            runOnUiThread { appendLog("Trame USB ignoree : prefixe HKA/1 mais JSON invalide.") }
+            return
+        }
         when (message.optString("type")) {
             "narrate" -> handleNarrationRequest(message)
+            "ack" -> {
+                val id = message.optLong("id", 0L)
+                val status = message.optString("status", "unknown")
+                runOnUiThread {
+                    setStatus("Cardputer : reponse #${id} acceptee.")
+                    appendLog("Accuse Cardputer #${id} : ${status}.")
+                }
+            }
+            "nack" -> {
+                val id = message.optLong("id", 0L)
+                val status = message.optString("status", "unknown")
+                runOnUiThread {
+                    setStatus("Cardputer : reponse #${id} rejetee (${status}).")
+                    appendLog("REJET Cardputer #${id} : ${status}.")
+                }
+            }
+            else -> runOnUiThread {
+                appendLog("Trame Cardputer inconnue : " + message.optString("type"))
+            }
         }
     }
 
@@ -422,18 +449,20 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
         if (id <= 0L) return
         val activeEngine = engine
         if (!modelReady || activeEngine == null) {
-            writeBytes(HawkinsProtocol.encodeError(
+            queueWrite(HawkinsProtocol.encodeError(
                 id, "Charge d'abord le modele GGUF dans Hawkins AI."
-            ))
+            ), "erreur modele absent #$id")
             return
         }
         if (generationJob?.isActive == true) {
-            writeBytes(HawkinsProtocol.encodeError(id, "Le narrateur traite deja une scene."))
+            queueWrite(HawkinsProtocol.encodeError(id, "Le narrateur traite deja une scene."),
+                "erreur generation deja active #$id")
             return
         }
         val context = request.optJSONObject("context")
         if (context == null) {
-            writeBytes(HawkinsProtocol.encodeError(id, "Contexte de partie invalide."))
+            queueWrite(HawkinsProtocol.encodeError(id, "Contexte de partie invalide."),
+                "erreur contexte invalide #$id")
             return
         }
 
@@ -474,15 +503,22 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
                     .map { HawkinsProtocol.fitUtf8(it, HawkinsProtocol.MAX_CHOICE_BYTES) }
                     .filter { it.isNotBlank() }
                 if (narration.isBlank()) error("Le modele a renvoye une narration vide.")
-                writeBytes(HawkinsProtocol.encodeNarration(id, narration, choices))
+                writeBytes(
+                    HawkinsProtocol.encodeNarration(id, narration, choices),
+                    "reponse narration #${id}"
+                )
                 runOnUiThread {
-                    setStatus("Scene generee et envoyee au Cardputer.")
-                    appendLog("Reponse #${id} envoyee : ${tokenCount} fragments, ${narration.length} caracteres.")
+                    setStatus("Reponse #${id} ecrite sur USB. Attente de l'accuse du Cardputer...")
+                    appendLog("Reponse #${id} ecrite : ${tokenCount} fragments, ${narration.length} caracteres.")
                 }
             } catch (timeout: TimeoutCancellationException) {
-                writeBytes(HawkinsProtocol.encodeError(
-                    id, "Generation trop longue apres 240 secondes. Relancer avec R."
-                ))
+                runCatching {
+                    writeBytes(HawkinsProtocol.encodeError(
+                        id, "Generation trop longue apres 240 secondes. Relancer avec R."
+                    ), "erreur delai #${id}")
+                }.onFailure { error ->
+                    runOnUiThread { appendLog("Ecriture USB de l'erreur impossible : ${error.message}") }
+                }
                 runOnUiThread {
                     setStatus("Delai IA depasse. Une erreur a ete renvoyee au Cardputer.")
                     appendLog("Demande #${id} interrompue apres 240 secondes.")
@@ -491,9 +527,13 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
                 throw cancelled
             } catch (error: Exception) {
                 val detail = error.message ?: error.javaClass.simpleName
-                writeBytes(HawkinsProtocol.encodeError(
-                    id, "Generation locale impossible : ${detail}"
-                ))
+                runCatching {
+                    writeBytes(HawkinsProtocol.encodeError(
+                        id, "Generation locale impossible : ${detail}"
+                    ), "erreur inference #${id}")
+                }.onFailure { writeError ->
+                    runOnUiThread { appendLog("Ecriture USB de l'erreur impossible : ${writeError.message}") }
+                }
                 runOnUiThread {
                     setStatus("Erreur d'inference : ${detail}")
                     appendLog("Erreur pour la demande #${id} : ${detail}")
@@ -518,11 +558,36 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
         return narration to choices
     }
 
-    private fun writeBytes(bytes: ByteArray) {
-        runCatching { ioManager?.writeAsync(bytes) }
-            .onFailure {
-                runOnUiThread { appendLog("Ecriture USB impossible : " + it.message) }
+    /**
+     * Ecrit directement sur le point de terminaison USB bulk OUT et attend la fin
+     * de l'ecriture. writeAsync() ne confirmait que la mise en file, pas l'envoi
+     * effectif; le statut "envoye" pouvait donc etre affiche trop tot.
+     */
+    private suspend fun writeBytes(bytes: ByteArray, label: String? = null) {
+        withContext(Dispatchers.IO) {
+            val port = serialPort ?: error("Port USB serie ferme.")
+            synchronized(serialWriteLock) {
+                check(serialPort === port) { "Connexion USB remplacee avant l'ecriture." }
+                port.write(bytes, 5_000)
             }
+        }
+        if (label != null) {
+            runOnUiThread {
+                appendLog("Ecriture USB terminee : ${label} (${bytes.size} octets).")
+            }
+        }
+    }
+
+    private fun queueWrite(bytes: ByteArray, label: String) {
+        appScope.launch(Dispatchers.IO) {
+            runCatching { writeBytes(bytes, label) }
+                .onFailure { error ->
+                    runOnUiThread {
+                        setStatus("Ecriture USB impossible : " + (error.message ?: "erreur"))
+                        appendLog("Echec USB TX (${label}) : ${error.message}")
+                    }
+                }
+        }
     }
 
     private fun closeUsb(message: String?) {
@@ -532,9 +597,11 @@ raisonnement interne. Ne propose jamais une modification directe de statistiques
         generationJob = null
         runCatching { ioManager?.stop() }
         ioManager = null
-        runCatching { serialPort?.close() }
-        serialPort = null
-        runCatching { usbConnection?.close() }
+        synchronized(serialWriteLock) {
+            runCatching { serialPort?.close() }
+            serialPort = null
+            runCatching { usbConnection?.close() }
+        }
         usbConnection = null
         synchronized(lineLock) { incomingLine.reset() }
         if (message != null) setStatus(message)

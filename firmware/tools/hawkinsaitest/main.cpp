@@ -50,6 +50,17 @@ static void testNarration() {
   assert(strcmp(message.text, "La lumiere vacille.") == 0);
 }
 
+static void testNarrationAcceptsFrenchUtf8() {
+  const char line[] =
+      "HKA/1 {\"type\":\"narration\",\"id\":1,\"text\":\"La lumiere vacille dans le couloir. Quelqu\u0027un frappe a la porte.\",\"choices\":[\"Repondre a la radio\",\"Se cacher\",\"Aller voir\"]}";
+  HawkinsAiMessage message{};
+  assert(hawkins::parseHawkinsAiMessage(line, sizeof(line) - 1U, message));
+  assert(message.kind == HawkinsAiMessageKind::Narration);
+  assert(message.requestId == 1U);
+  assert(message.choiceCount == 3U);
+  assert(strcmp(message.text, "La lumiere vacille dans le couloir. Quelqu'un frappe a la porte.") == 0);
+}
+
 static void testInvalidAndUnknownMessages() {
   HawkinsAiMessage message{};
   const char noPrefix[] = "{\"type\":\"hello\",\"version\":1}";
@@ -90,6 +101,7 @@ int main() {
   testRequestRejectsInvalidInputAndOverflow();
   testHelloHeartbeat();
   testNarration();
+  testNarrationAcceptsFrenchUtf8();
   testInvalidAndUnknownMessages();
   testRejectsEmptyAndOversizedNarration();
   testRejectsControlCharacters();
