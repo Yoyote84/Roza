@@ -39,7 +39,10 @@ struct AdventureState {
   uint8_t items[kAdventureItemCount];
   uint8_t unlockedSkills;
   uint8_t storyFlags;
-  uint8_t reserved[2];
+  // 0 = choix inconnu (compatibilite ancienne sauvegarde), 1 = aider,
+  // 2 = enqueter, 3 = se replier. Occupe un ancien octet reserve.
+  uint8_t firstContactChoice;
+  uint8_t reserved;
 };
 
 struct AdventureSkillDef {

@@ -391,28 +391,63 @@ void drawSkillsPage() {
 
 void drawFirstContactPage() {
   cv.fillScreen(TFT_BLACK);
-  drawPageHeader("HAWKINS / RADIO", "RENCONTRE", ACCENT);
+  const bool resolved = (adventure.storyFlags & 0x01U) != 0U;
+  drawPageHeader(resolved ? "HAWKINS / LIA" : "HAWKINS / RADIO",
+                 resolved ? "SUITE" : "DEBUT", ACCENT);
   cv.setFont(&fonts::Font0);
   cv.setTextSize(1);
   cv.setTextDatum(top_left);
-  cv.setTextColor(TFT_WHITE, TFT_BLACK);
-  cv.drawString("UN APPEL GRÉSILLE PRES DU LABO.", 5, 22);
-  cv.drawString("UNE VOIX DEMANDE DE L'AIDE.", 5, 35);
-  if ((adventure.storyFlags & 0x01U) != 0U) {
-    cv.setTextColor(ACCENT, TFT_BLACK);
-    cv.drawString("DECISION ENREGISTREE.", 5, 60);
-    cv.setTextColor(ICON_DIM, TFT_BLACK);
-    cv.drawString("Cette rencontre ne se rejoue pas.", 5, 76);
-  } else {
-    cv.setTextColor(ACCENT, TFT_BLACK);
-    cv.drawString("1 AIDER LA PERSONNE", 5, 59);
+
+  if (!resolved) {
     cv.setTextColor(TFT_WHITE, TFT_BLACK);
-    cv.drawString("2 ENQUETER SUR LE SIGNAL", 5, 76);
-    cv.drawString("3 SE REPLIER PRUDEMMENT", 5, 93);
+    cv.drawString("MINUIT. LA RADIO S'ALLUME SEULE.", 5, 20);
+    cv.drawString("UN GRESILLEMENT COUVRE LA FREQUENCE.", 5, 32);
+    cv.drawString("UNE VOIX CHUCHOTE :", 5, 44);
+    cv.drawString("\"AIDEZ-MOI... JE VOUS EN PRIE.\"", 5, 56);
+
+    cv.setTextColor(ACCENT, TFT_BLACK);
+    cv.drawString("1 REPONDRE ET AIDER", 5, 75);
+    cv.setTextColor(TFT_WHITE, TFT_BLACK);
+    cv.drawString("2 ENQUETER SUR LE SIGNAL", 5, 88);
+    cv.drawString("3 COUPER ET SE REPLIER", 5, 101);
+  } else {
+    const char* lines[4] = {};
+    switch (adventure.firstContactChoice) {
+      case 1U:
+        lines[0] = "TU AS CHOISI D'AIDER.";
+        lines[1] = "LIA : \"MERCI... TU M'ENTENDS ?\"";
+        lines[2] = "\"ILS SONT TOUT PRES. ECOUTE.\"";
+        lines[3] = "LE SIGNAL RESTE OUVERT.";
+        break;
+      case 2U:
+        lines[0] = "TU AS CHOISI D'ENQUETER.";
+        lines[1] = "LIA : \"TROIS IMPULSIONS...\"";
+        lines[2] = "\"CE SIGNAL N'EST PAS UNE VOIX.\"";
+        lines[3] = "UN SECOND SIGNAL APPARAIT.";
+        break;
+      case 3U:
+        lines[0] = "TU AS CHOISI DE TE REPLIER.";
+        lines[1] = "LIA : \"D'ACCORD. ELOIGNE-TOI.\"";
+        lines[2] = "\"JE TE RECONTACTERAI. PROMIS.\"";
+        lines[3] = "LA RADIO S'ETEINT LENTEMENT.";
+        break;
+      default:
+        // Anciennes sauvegardes v1 : le choix avait ete consomme mais pas stocke.
+        lines[0] = "TON ANCIEN CHOIX EST CONSERVE.";
+        lines[1] = "LIA : \"JE SUIS TOUJOURS LA.\"";
+        lines[2] = "LA SUITE NE MODIFIE PAS TON PROFIL.";
+        lines[3] = "TU PEUX REPRENDRE TON HISTOIRE.";
+        break;
+    }
+    for (uint8_t i = 0U; i < 4U; ++i) {
+      cv.setTextColor(i == 0U ? ACCENT : TFT_WHITE, TFT_BLACK);
+      cv.drawString(lines[i], 5, 25 + static_cast<int>(i) * 15);
+    }
   }
+
   cv.setTextDatum(bottom_left);
   cv.setTextColor(ICON_DIM, TFT_BLACK);
-  cv.drawString("1 AIDER  2 ENQUETER  3 FUIR  Q RETOUR", 3, SH - 2);
+  cv.drawString(resolved ? "Q RETOUR" : "1-3 CHOISIR  Q RETOUR", 3, SH - 2);
 }
 
 void drawStoragePage() {

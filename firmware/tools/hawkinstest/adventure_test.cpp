@@ -47,7 +47,60 @@ static void testDialogueChoicesAreOneShot() {
   assert(adventureResolveFirstContact(game, player, FirstContactChoice::Investigate));
   assert(player.xp >= oldXp);
   assert(game.items[static_cast<uint8_t>(AdventureItem::Evidence)] == 1U);
+  assert(game.firstContactChoice == 2U);
+  assert((game.storyFlags & 0x01U) != 0U);
   assert(!adventureResolveFirstContact(game, player, FirstContactChoice::Help));
+
+  uint8_t bytes[kAdventureSaveEncodedSize];
+  assert(encodeAdventureSave(game, 12U, bytes, sizeof(bytes)));
+  AdventureState restored{};
+  uint32_t sequence = 0U;
+  assert(decodeAdventureSave(bytes, sizeof(bytes), restored, sequence));
+  assert(sequence == 12U);
+  assert(restored.firstContactChoice == 2U);
+  assert((restored.storyFlags & 0x01U) != 0U);
+}
+
+static void testAllThreeDialogueBranchesPersist() {
+  const FirstContactChoice choices[3] = {
+      FirstContactChoice::Help,
+      FirstContactChoice::Investigate,
+      FirstContactChoice::Retreat};
+  const char* names[3] = {"MIKE", "DUSTIN", "LUCAS"};
+
+  for (uint8_t i = 0U; i < 3U; ++i) {
+    CharacterState player{};
+    AdventureState game{};
+    assert(createCharacter(player, i, names[i]));
+    initializeAdventure(game);
+    assert(adventureResolveFirstContact(game, player, choices[i]));
+    assert(game.firstContactChoice == static_cast<uint8_t>(i + 1U));
+
+    uint8_t bytes[kAdventureSaveEncodedSize];
+    assert(encodeAdventureSave(game, static_cast<uint32_t>(i + 1U),
+                               bytes, sizeof(bytes)));
+    AdventureState restored{};
+    uint32_t sequence = 0U;
+    assert(decodeAdventureSave(bytes, sizeof(bytes), restored, sequence));
+    assert(restored.firstContactChoice == static_cast<uint8_t>(i + 1U));
+    assert(isValidAdventureState(restored));
+  }
+}
+
+static void testLegacyResolvedEncounterRemainsReadable() {
+  AdventureState legacy{};
+  initializeAdventure(legacy);
+  // En v1, le premier contact pouvait etre resolu sans conserver le choix.
+  legacy.storyFlags = 0x01U;
+  assert(isValidAdventureState(legacy));
+
+  uint8_t bytes[kAdventureSaveEncodedSize];
+  assert(encodeAdventureSave(legacy, 5U, bytes, sizeof(bytes)));
+  AdventureState restored{};
+  uint32_t sequence = 0U;
+  assert(decodeAdventureSave(bytes, sizeof(bytes), restored, sequence));
+  assert(restored.storyFlags == 0x01U);
+  assert(restored.firstContactChoice == 0U);
 }
 
 static void testCodecAndValidation() {
@@ -74,6 +127,8 @@ int main() {
   testStartingInventoryAndItems();
   testSkills();
   testDialogueChoicesAreOneShot();
+  testAllThreeDialogueBranchesPersist();
+  testLegacyResolvedEncounterRemainsReadable();
   testCodecAndValidation();
   puts("HAWKINS ADVENTURE: inventaire, competences, choix et CRC OK.");
   return 0;

@@ -49,8 +49,8 @@ void encodePayload(const AdventureState& state, uint8_t* output) {
   for (size_t i = 0; i < kAdventureItemCount; ++i) output[4U + i] = state.items[i];
   output[8] = state.unlockedSkills;
   output[9] = state.storyFlags;
-  output[10] = state.reserved[0];
-  output[11] = state.reserved[1];
+  output[10] = state.firstContactChoice;
+  output[11] = state.reserved;
 }
 bool decodePayload(const uint8_t* input, AdventureState& state) {
   state = AdventureState{};
@@ -58,8 +58,8 @@ bool decodePayload(const uint8_t* input, AdventureState& state) {
   for (size_t i = 0; i < kAdventureItemCount; ++i) state.items[i] = input[4U + i];
   state.unlockedSkills = input[8];
   state.storyFlags = input[9];
-  state.reserved[0] = input[10];
-  state.reserved[1] = input[11];
+  state.firstContactChoice = input[10];
+  state.reserved = input[11];
   return isValidAdventureState(state);
 }
 uint8_t bounded(uint8_t value, uint8_t maximum) {
@@ -80,7 +80,9 @@ bool isValidAdventureState(const AdventureState& state) {
   if (state.schemaVersion != kAdventureSchemaVersion ||
       (state.unlockedSkills & 0xF0U) != 0U ||
       (state.storyFlags & static_cast<uint8_t>(~kFirstContactResolved)) != 0U ||
-      state.reserved[0] != 0U || state.reserved[1] != 0U) return false;
+      state.firstContactChoice > 3U || state.reserved != 0U ||
+      ((state.storyFlags & kFirstContactResolved) == 0U &&
+       state.firstContactChoice != 0U)) return false;
   for (size_t i = 0; i < kAdventureItemCount; ++i) {
     if (state.items[i] > 99U) return false;
   }
@@ -195,6 +197,9 @@ bool adventureResolveFirstContact(AdventureState& state,
       adventureAddItem(state, AdventureItem::SpareBattery, 1U);
       break;
   }
+  // Le choix est conserve dans l'ancien octet reserve du format v1.
+  // La valeur 0 reste reservee aux anciennes sauvegardes sans branche connue.
+  state.firstContactChoice = static_cast<uint8_t>(choice) + 1U;
   state.storyFlags = static_cast<uint8_t>(state.storyFlags | kFirstContactResolved);
   return isValidCharacter(character) && isValidAdventureState(state);
 }
