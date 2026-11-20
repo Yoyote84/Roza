@@ -320,7 +320,7 @@ static void testLocalAreaEventsStayAttachedToTheirGpsSector() {
   // déterministe (sans être une découverte narrative garantie).
   world.tension = 100U;
   world.anomalyLevel = 100U;
-  world.factionActivity = 100U;
+  world.factionActivity = 0U;
   ExplorationState state{};
   initializeExploration(state);
   assert(observeExplorationCell(state, 0x11111111U) ==
