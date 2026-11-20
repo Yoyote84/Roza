@@ -10,6 +10,27 @@
 
 using namespace hawkins;
 
+static void testWrite16(uint8_t* p, uint16_t value) {
+  p[0] = static_cast<uint8_t>(value);
+  p[1] = static_cast<uint8_t>(value >> 8U);
+}
+static void testWrite32(uint8_t* p, uint32_t value) {
+  for (unsigned i = 0U; i < 4U; ++i) {
+    p[i] = static_cast<uint8_t>(value >> (8U * i));
+  }
+}
+static uint32_t testCrc32(const uint8_t* data, size_t length) {
+  uint32_t crc = 0xFFFFFFFFU;
+  for (size_t i = 0U; i < length; ++i) {
+    crc ^= data[i];
+    for (unsigned bit = 0U; bit < 8U; ++bit) {
+      const uint32_t mask = 0U - (crc & 1U);
+      crc = (crc >> 1U) ^ (0xEDB88320U & mask);
+    }
+  }
+  return ~crc;
+}
+
 static void testInitialization() {
   WorldState world{};
   initializeWorld(world, 12345U, 1800000000ULL);
@@ -196,20 +217,130 @@ static void testExplorationSaveCodec() {
   observeExplorationCell(original, 100U);
   observeExplorationCell(original, 200U);
   observeExplorationCell(original, 300U);
-  observeExplorationCell(original, 400U);
+  assert(observeExplorationCell(original, 400U) ==
+         ExplorationResult::NewDiscovery);
+  WorldState world{};
+  initializeWorld(world, 0x12345678U, 1ULL);
+  assert(generateLocalAreaEvent(original, world, 400U, true));
+  assert(original.lastEventCellKey == 400U);
+  assert(original.lastEventType == EventType::StrangeSignal);
+  assert(original.lastEventIntensity >= 1U &&
+         original.lastEventIntensity <= 100U);
+
   uint8_t encoded[kExplorationSaveEncodedSize];
   assert(encodeExplorationSave(original, 9U, encoded, sizeof(encoded)));
   ExplorationState restored{};
   uint32_t sequence = 0U;
   assert(decodeExplorationSave(encoded, sizeof(encoded), restored, sequence));
   assert(sequence == 9U);
+  assert(restored.schemaVersion == kExplorationSchemaVersion);
   assert(restored.sectorsVisited == original.sectorsVisited);
   assert(restored.discoveries == original.discoveries);
   assert(restored.lastCellKey == original.lastCellKey);
   assert(restored.knownCount == original.knownCount);
+  assert(restored.areaEventCount == 1U);
+  assert(restored.lastEventCellKey == 400U);
+  assert(restored.lastEventType == EventType::StrangeSignal);
+  assert(restored.lastEventIntensity == original.lastEventIntensity);
   encoded[24] ^= 0x20U;
   assert(!decodeExplorationSave(encoded, sizeof(encoded), restored, sequence));
   assert(!decodeExplorationSave(encoded, sizeof(encoded) - 1U, restored, sequence));
+}
+
+static void testExplorationMemoryTracks128RecentSectors() {
+  static_assert(kTrackedCellCapacity == 128U, "La memoire doit couvrir 128 secteurs");
+  ExplorationState state{};
+  initializeExploration(state);
+  assert(observeExplorationCell(state, 1U) == ExplorationResult::OriginSet);
+
+  // 129 secteurs distincts font dépasser la fenêtre : les 128 plus récents
+  // restent connus, tandis que le premier secteur ancien sort de la mémoire.
+  for (uint32_t key = 2U; key <= 130U; ++key) {
+    const ExplorationResult result = observeExplorationCell(state, key);
+    assert(result == ExplorationResult::NewSector ||
+           result == ExplorationResult::NewDiscovery);
+  }
+  assert(state.knownCount == kTrackedCellCapacity);
+  assert(state.sectorsVisited == 129U);
+  assert(observeExplorationCell(state, 130U) == ExplorationResult::SameCell);
+  assert(observeExplorationCell(state, 2U) == ExplorationResult::NewSector);
+  assert(state.sectorsVisited == 130U);
+  assert(state.knownCount == kTrackedCellCapacity);
+  assert(isValidExplorationState(state));
+}
+
+static void testLegacyExplorationSaveMigratesWithoutLosingVisits() {
+  uint8_t legacy[kLegacyExplorationSaveEncodedSize] = {};
+  testWrite32(legacy + 0U, 0x45585748U);
+  testWrite16(legacy + 4U, kLegacyExplorationSaveFormatVersion);
+  testWrite16(legacy + 6U, kLegacyExplorationSavePayloadSize);
+  testWrite32(legacy + 8U, 44U);
+  uint8_t* payload = legacy + kExplorationSaveHeaderSize;
+  testWrite32(payload + 0U, kLegacyExplorationSchemaVersion);
+  testWrite32(payload + 4U, 17U);
+  testWrite32(payload + 8U, 5U);
+  testWrite32(payload + 12U, 202U);
+  testWrite32(payload + 16U, 101U);
+  testWrite32(payload + 20U, 202U);
+  payload[112] = 2U;
+  payload[113] = 0U;
+  payload[114] = 1U;
+  payload[115] = 0U;
+  testWrite32(legacy + 12U, testCrc32(legacy, sizeof(legacy)));
+
+  ExplorationState restored{};
+  uint32_t sequence = 0U;
+  assert(decodeExplorationSave(legacy, sizeof(legacy), restored, sequence));
+  assert(sequence == 44U);
+  assert(restored.schemaVersion == kExplorationSchemaVersion);
+  assert(restored.sectorsVisited == 17U);
+  assert(restored.discoveries == 5U);
+  assert(restored.lastCellKey == 202U);
+  assert(restored.knownCount == 2U);
+  assert(restored.knownCellKeys[0] == 101U);
+  assert(restored.knownCellKeys[1] == 202U);
+  assert(restored.areaEventCount == 0U);
+  assert(isValidExplorationState(restored));
+
+  uint8_t migrated[kExplorationSaveEncodedSize];
+  assert(encodeExplorationSave(restored, sequence + 1U,
+                               migrated, sizeof(migrated)));
+  ExplorationState reread{};
+  uint32_t migratedSequence = 0U;
+  assert(decodeExplorationSave(migrated, sizeof(migrated),
+                               reread, migratedSequence));
+  assert(migratedSequence == 45U);
+  assert(reread.sectorsVisited == 17U && reread.knownCount == 2U);
+}
+
+static void testLocalAreaEventsStayAttachedToTheirGpsSector() {
+  WorldState world{};
+  initializeWorld(world, 0xAABBCCDDU, 1ULL);
+  ExplorationState state{};
+  initializeExploration(state);
+  assert(observeExplorationCell(state, 0x11111111U) ==
+         ExplorationResult::OriginSet);
+  assert(observeExplorationCell(state, 0x22222222U) ==
+         ExplorationResult::NewSector);
+
+  const uint32_t eventCell = state.lastCellKey;
+  ExplorationState sameState = state;
+  assert(generateLocalAreaEvent(state, world, eventCell, true));
+  assert(generateLocalAreaEvent(sameState, world, eventCell, true));
+  assert(state.areaEventCount == 1U);
+  assert(state.lastEventCellKey == eventCell);
+  assert(state.lastEventCellKey == state.lastCellKey);
+  assert(state.lastEventType == EventType::StrangeSignal);
+  assert(state.lastEventIntensity == sameState.lastEventIntensity);
+  assert(!generateLocalAreaEvent(state, world, eventCell, true));
+  assert(state.areaEventCount == 1U);
+
+  assert(observeExplorationCell(state, 0x33333333U) ==
+         ExplorationResult::NewSector);
+  assert(state.lastCellKey == 0x33333333U);
+  assert(state.lastEventCellKey == eventCell);
+  assert(state.lastEventCellKey != state.lastCellKey);
+  assert(isValidExplorationState(state));
 }
 
 static void testCharacterCreationAndAttributes() {
@@ -305,6 +436,9 @@ int main() {
   testExplorationCellGrid();
   testExplorationVisitsAndDiscoveries();
   testExplorationSaveCodec();
+  testExplorationMemoryTracks128RecentSectors();
+  testLegacyExplorationSaveMigratesWithoutLosingVisits();
+  testLocalAreaEventsStayAttachedToTheirGpsSector();
   testCharacterCreationAndAttributes();
   testCharacterExperienceAndLevels();
   testCharacterMissionRewardIsIdempotent();
