@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "firmware/src/**"
+      - "docs/HAWKINS_INSTALLATION.md"
+      - ".github/workflows/hawkins-ai-android.yml"
       - "firmware/tools/hawkinstest/**"
       - "firmware/tools/hawkinsaitest/**"
       - "firmware/tools/uisim/**"
@@ -127,7 +129,7 @@ jobs:
           name: ROZA-Cardputer-ADV-Hawkins-${{ github.sha }}
           path: ${{ runner.temp }}/roza-firmware-package/
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
 
       - name: Run native Hawkins tests
         working-directory: firmware
@@ -161,6 +163,8 @@ jobs:
             "$GITHUB_WORKSPACE/site/downloads/ROZA-Cardputer-ADV-Hawkins-factory.bin"
           cp "$RUNNER_TEMP/roza-firmware-package/INSTALLATION.txt" \
             "$GITHUB_WORKSPACE/site/downloads/INSTALLATION.txt"
+          cp "$GITHUB_WORKSPACE/docs/HAWKINS_INSTALLATION.md" \
+            "$GITHUB_WORKSPACE/site/downloads/HAWKINS_INSTALLATION.md"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

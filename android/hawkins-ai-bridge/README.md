@@ -12,7 +12,7 @@ Application compagnon du jeu Hawkins sur M5Stack Cardputer ADV.
 
 ## Modèle
 
-Importer depuis le sélecteur Android un modèle GGUF compatible llama.cpp. Le candidat recommandé pour le Z Flip6 est **Qwen3.5-4B-Instruct Q4_K_M** (environ 2,7–2,8 Go selon le fichier). Le modèle n'est volontairement pas intégré à l'APK : il doit être obtenu séparément et copié dans le stockage privé de l'application. Le premier import demande donc un fichier déjà présent sur le téléphone ; ensuite l'inférence est hors ligne.
+Importer depuis le sélecteur Android un modèle GGUF compatible llama.cpp. Le modèle retenu pour la première livraison est [ggml-org/Qwen3.5-4B-GGUF](https://huggingface.co/ggml-org/Qwen3.5-4B-GGUF), fichier `Qwen3.5-4B-Q4_K_M.gguf` (environ 3,03 Go d'après sa fiche). Le modèle n'est volontairement pas intégré à l'APK : il doit être téléchargé ou transféré une première fois, puis copié dans le stockage privé de l'application. Après cet import, l'inférence est hors ligne.
 
 Une taille Q4 de plusieurs gigaoctets nécessite de conserver assez d'espace libre pour la copie et le chargement en mémoire. La fluidité, la température et la consommation doivent être mesurées sur le téléphone réel à l'étape 5.
 

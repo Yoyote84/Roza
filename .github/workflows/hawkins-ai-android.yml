@@ -7,6 +7,10 @@ on:
       - "android/llama.cpp"
       - ".gitmodules"
       - ".github/workflows/hawkins-ai-android.yml"
+      - "firmware/src/hawkins_ai_protocol.*"
+      - "firmware/src/hawkins_app.*"
+      - "firmware/src/serial_cmd.cpp"
+      - "firmware/src/main.cpp"
   pull_request:
     paths:
       - "android/hawkins-ai-bridge/**"
@@ -54,10 +58,35 @@ jobs:
         working-directory: android/hawkins-ai-bridge
         run: gradle :app:testDebugUnitTest --no-daemon
 
-      - name: Publish debug APK
+      - name: Prepare offline APK package
+        working-directory: android/hawkins-ai-bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/Hawkins-AI-Companion.apk
+          cat > dist/INSTALLATION.txt <<'EOF'
+          HAWKINS AI — COMPAGNON ANDROID HORS LIGNE
+
+          1. Installez Hawkins-AI-Companion.apk sur un appareil Android 13 ou plus recent.
+          2. Importez un modele GGUF compatible llama.cpp depuis le stockage local.
+          3. Appuyez sur Charger le modele et attendez le statut "Inference locale prete".
+          4. Reliez le Cardputer ADV en USB-C OTG et autorisez l'acces USB.
+          5. Dans le jeu Hawkins, ouvrez le narrateur avec A puis choisissez 1, 2 ou 3.
+
+          Le modele GGUF n'est pas inclus dans l'APK. Il doit etre telecharge ou transfere
+          une seule fois, puis importe dans l'application. L'inference fonctionne ensuite
+          sans Wi-Fi, donnees mobiles, serveur ou service cloud.
+
+          Le modele est copie dans le stockage prive de l'application. Prevoyez au moins
+          3,3 Go d'espace supplementaire pour le fichier Q4_K_M d'environ 3 Go.
+          EOF
+          (cd dist && sha256sum Hawkins-AI-Companion.apk > SHA256SUMS.txt)
+
+      - name: Publish offline APK package
         uses: actions/upload-artifact@v4
         with:
-          name: hawkins-ai-bridge-debug
-          path: android/hawkins-ai-bridge/app/build/outputs/apk/debug/app-debug.apk
+          name: hawkins-ai-android-offline
+          path: android/hawkins-ai-bridge/dist/*
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90
