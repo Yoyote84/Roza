@@ -10,8 +10,8 @@ android {
         applicationId = "fr.roza.hawkinsai"
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
@@ -23,6 +23,14 @@ android {
         jvmToolchain(17)
         compileOptions {
             targetCompatibility = JavaVersion.VERSION_17
+        }
+    }
+    // llama.cpp loads CPU backends as dynamic plugins from nativeLibraryDir.
+    // Compressing JNI libraries forces Android to extract them to that directory
+    // at install time, where ggml_backend_load_all_from_path() can enumerate them.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
     testOptions { unitTests.isReturnDefaultValues = true }

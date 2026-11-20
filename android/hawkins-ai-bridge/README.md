@@ -52,3 +52,10 @@ python3 android/hawkins-ai-bridge/patch_llama_android.py
 cd android/hawkins-ai-bridge
 gradle :app:assembleDebug
 ```
+
+
+## Chargement du backend CPU Android
+
+Le moteur llama.cpp charge ses backends dynamiques depuis `ApplicationInfo.nativeLibraryDir`. L'application configure donc `jniLibs.useLegacyPackaging = true` pour qu'Android extraie les bibliothèques natives lors de l'installation. Sans extraction, le moteur peut trouver zéro plugin CPU dans ce répertoire même si les fichiers apparaissent dans l'archive APK.
+
+Le pont JNI vérifie que le backend CPU est enregistré et tente, en secours, le chargement explicite du plugin ARMv8.0 générique. La CI vérifie également que le plugin CPU ARM64 est présent et compressé dans l'APK pour garantir son extraction à l'installation.

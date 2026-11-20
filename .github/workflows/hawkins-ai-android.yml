@@ -57,6 +57,32 @@ jobs:
         working-directory: android/hawkins-ai-bridge
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
+      - name: Verify Android CPU backend is extractable from APK
+        working-directory: android/hawkins-ai-bridge
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+
+          apk = Path("app/build/outputs/apk/debug/app-debug.apk")
+          assert apk.is_file(), f"APK not found: {apk}"
+          with zipfile.ZipFile(apk) as archive:
+              entries = set(archive.namelist())
+              baseline = "lib/arm64-v8a/libggml-cpu-android_armv8.0_1.so"
+              assert baseline in entries, f"Missing baseline CPU backend: {baseline}"
+              info = archive.getinfo(baseline)
+              assert info.compress_type != zipfile.ZIP_STORED, (
+                  "CPU backend must be compressed/extracted at install time; "
+                  "JNI legacy packaging is not active."
+              )
+              plugins = sorted(
+                  name for name in entries
+                  if name.startswith("lib/arm64-v8a/libggml-cpu-") and name.endswith(".so")
+              )
+              assert plugins, "No arm64 CPU backend plugins found in APK"
+              print(f"Verified {len(plugins)} ARM64 CPU backend plugins; baseline is extractable.")
+          PY
+
       - name: Run Kotlin unit tests
         working-directory: android/hawkins-ai-bridge
         run: gradle :app:testDebugUnitTest --no-daemon
