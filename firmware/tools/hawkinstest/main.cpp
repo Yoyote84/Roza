@@ -316,6 +316,11 @@ static void testLegacyExplorationSaveMigratesWithoutLosingVisits() {
 static void testLocalAreaEventsStayAttachedToTheirGpsSector() {
   WorldState world{};
   initializeWorld(world, 0xAABBCCDDU, 1ULL);
+  // Pression élevée : ce secteur ordinaire déclenche un événement local
+  // déterministe (sans être une découverte narrative garantie).
+  world.tension = 100U;
+  world.anomalyLevel = 100U;
+  world.factionActivity = 100U;
   ExplorationState state{};
   initializeExploration(state);
   assert(observeExplorationCell(state, 0x11111111U) ==
@@ -325,14 +330,14 @@ static void testLocalAreaEventsStayAttachedToTheirGpsSector() {
 
   const uint32_t eventCell = state.lastCellKey;
   ExplorationState sameState = state;
-  assert(generateLocalAreaEvent(state, world, eventCell, true));
-  assert(generateLocalAreaEvent(sameState, world, eventCell, true));
+  assert(generateLocalAreaEvent(state, world, eventCell, false));
+  assert(generateLocalAreaEvent(sameState, world, eventCell, false));
   assert(state.areaEventCount == 1U);
   assert(state.lastEventCellKey == eventCell);
   assert(state.lastEventCellKey == state.lastCellKey);
-  assert(state.lastEventType == EventType::StrangeSignal);
+  assert(state.lastEventType == EventType::CreatureTrace);
   assert(state.lastEventIntensity == sameState.lastEventIntensity);
-  assert(!generateLocalAreaEvent(state, world, eventCell, true));
+  assert(!generateLocalAreaEvent(state, world, eventCell, false));
   assert(state.areaEventCount == 1U);
 
   assert(observeExplorationCell(state, 0x33333333U) ==

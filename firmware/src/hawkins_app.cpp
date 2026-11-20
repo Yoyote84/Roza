@@ -189,22 +189,22 @@ const char* currentMovementObjective() {
 
   if (hawkins::missionStatus(missions, hawkins::MissionId::FirstSignal) ==
       hawkins::MissionStatus::Active) {
-    return "REPONDRE A LIA AVEC Q";
+    return "REPONDRE A LIA (Q)";
   }
   if (hawkins::missionStatus(missions, hawkins::MissionId::ThreeSectors) ==
       hawkins::MissionStatus::Active) {
     if (exploration.hasOrigin == 0U) return "OBTENIR LE POINT GPS DE DEPART";
-    if (eventHere) return "EVENEMENT LOCAL DANS CETTE ZONE";
-    return "BOUGER VERS UN SECTEUR INEDIT";
+    if (eventHere) return "CONTINUER VERS UN SECTEUR INEDIT";
+    return "ALLER VERS UN SECTEUR INEDIT";
   }
   if (hawkins::missionStatus(missions, hawkins::MissionId::AnomalyTrail) ==
       hawkins::MissionStatus::Active) {
     if (eventHere &&
         exploration.lastEventType == hawkins::EventType::StrangeSignal) {
-      return "SIGNAL DETECTE DANS LA ZONE ACTUELLE";
+      return "SIGNAL DETECTE ICI - POURSUIVRE";
     }
     if (eventHere) return "POURSUIVRE LE TRAJET POUR UN SIGNAL";
-    return "CHERCHER UN SIGNAL EN EXPLORANT";
+    return "CHERCHER UN SIGNAL EN BOUGEANT";
   }
   return "OBJECTIFS ACTUELS TERMINES";
 }

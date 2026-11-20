@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "firmware/src/**"
+      - "firmware/tools/hawkinstest/**"
       - "firmware/tools/uisim/**"
       - "firmware/platformio.ini"
       - "firmware/partitions_8MB.csv"
