@@ -125,13 +125,15 @@ def main() -> None:
     tokenizer.pad_token = tokenizer.eos_token
 
     model = AutoModelForCausalLM.from_pretrained(snapshot).to(device)
-    if getattr(model.config, "model_type", "") != "gpt_neo":
+    base_architecture = getattr(model.config, "model_type", "")
+    if base_architecture not in ("gpt_neo", "llama"):
         raise RuntimeError(
-            f"Architecture de base inattendue: {getattr(model.config, 'model_type', None)}; GPT-Neo requis."
+            f"Architecture de base non prise en charge: {base_architecture}; "
+            "GPT-Neo ou LLaMA requis."
         )
     model.config.use_cache = False
     parameter_count = sum(parameter.numel() for parameter in model.parameters())
-    print(f"[+] architecture=gpt_neo params={parameter_count:,}", flush=True)
+    print(f"[+] architecture={base_architecture} params={parameter_count:,}", flush=True)
 
     data_dir = Path(args.data_dir)
     train_rows = read_jsonl(data_dir / "train.jsonl")
