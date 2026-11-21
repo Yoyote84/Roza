@@ -99,7 +99,7 @@ def verify_tokenizer(path: Path, expected_vocab: int):
             eos_length = length
         largest = max(largest, length)
         offset += length
-    replacement = b"\\xef\\xbf\\xbd"
+    replacement = b"\xef\xbf\xbd"
     fallback_id = None
     fallback_bytes = 0
     for byte_value, token_id in enumerate(byte_ids):
@@ -122,6 +122,8 @@ def verify_tokenizer(path: Path, expected_vocab: int):
     merge_inputs = {token for a, b, _ in triples for token in (a, b)}
     if eos in merge_ids or eos in merge_inputs:
         raise ValueError("CTK2 EOS special token must not participate in BPE merges")
+    if fallback_id is not None and (fallback_id in merge_ids or fallback_id in merge_inputs):
+        raise ValueError("CTK2 UNK fallback must not participate in BPE merges")
     if offset != len(data) or largest != max_len:
         raise ValueError("CTK2 length or trailing-data check failed")
     return {
