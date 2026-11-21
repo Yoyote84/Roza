@@ -82,6 +82,64 @@ def valid_answer(row: dict[str, Any]) -> bool:
     return True
 
 
+
+def load_alpaca_fr(max_pairs: int) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    from datasets import load_dataset
+
+    print("[+] Lecture de FreedomIntelligence/alpaca-gpt4-french", flush=True)
+    dataset = load_dataset("FreedomIntelligence/alpaca-gpt4-french", split="train")
+    pairs: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    for row in dataset:
+        turns = row.get("conversations") or []
+        if not isinstance(turns, list):
+            continue
+        for index in range(len(turns) - 1):
+            user = turns[index]
+            assistant = turns[index + 1]
+            if not isinstance(user, dict) or not isinstance(assistant, dict):
+                continue
+            if str(user.get("from", "")).lower() not in ("human", "user"):
+                continue
+            if str(assistant.get("from", "")).lower() not in ("gpt", "assistant"):
+                continue
+            prompt = clean_text(user.get("value"))
+            response = clean_text(assistant.get("value"))
+            if not (12 <= len(prompt) <= 240 and 12 <= len(response) <= 250):
+                continue
+            if len(prompt.split()) > 40 or len(response.split()) > 42:
+                continue
+            if chr(96) in prompt or chr(96) in response or "http://" in response or "https://" in response:
+                continue
+            if response.lower().startswith(("en tant qu'ia", "en tant que modèle de langage",
+                                            "je suis une intelligence artificielle")):
+                continue
+            key = (prompt.casefold(), response.casefold())
+            if key in seen:
+                continue
+            seen.add(key)
+            digest = hashlib.sha256(("alpaca-fr|" + prompt + "|" + response).encode("utf-8")).hexdigest()
+            pairs.append({
+                "id": digest,
+                "prompt": prompt,
+                "response": response,
+                "source": "FreedomIntelligence/alpaca-gpt4-french",
+            })
+
+    pairs.sort(key=lambda row: row["id"])
+    pairs = pairs[:max_pairs]
+    info = {
+        "dataset": "FreedomIntelligence/alpaca-gpt4-french",
+        "split": "train",
+        "license": "Apache-2.0",
+        "language_filter": "French dataset; human to gpt conversation pairs",
+        "accepted_pairs": len(pairs),
+        "max_pairs": max_pairs,
+    }
+    print(f"[+] Paires Alpaca françaises courtes retenues : {len(pairs)}", flush=True)
+    return pairs, info
+
 def load_seeds(path: Path) -> list[dict[str, str]]:
     rows = []
     for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -161,26 +219,37 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--output-dir", required=True)
     ap.add_argument("--max-oasst1", type=int, default=1200)
+    ap.add_argument("--max-alpaca", type=int, default=5000)
     ap.add_argument("--seed-repeat", type=int, default=4)
     ap.add_argument("--seed", type=int, default=1703)
     args = ap.parse_args()
-    if args.max_oasst1 < 100 or args.seed_repeat < 1:
-        raise SystemExit("--max-oasst1 doit être >= 100 et --seed-repeat >= 1")
+    if args.max_oasst1 < 100 or args.max_alpaca < 100 or args.seed_repeat < 1:
+        raise SystemExit("Les limites du corpus doivent être >= 100 et seed-repeat >= 1")
 
     root = Path(__file__).resolve().parent
     output = Path(args.output_dir)
     output.mkdir(parents=True, exist_ok=True)
 
     oasst, source_info = load_oasst(args.max_oasst1)
+    alpaca, alpaca_info = load_alpaca_fr(args.max_alpaca)
     seeds = load_seeds(root / "seed_fr.jsonl")
+    if len(alpaca) < 500:
+        raise SystemExit(f"Seulement {len(alpaca)} paires Alpaca françaises courtes ont été trouvées.")
     if len(oasst) < 80:
         raise SystemExit(
             f"Seulement {len(oasst)} paires OASST1 françaises de qualité ont été trouvées; "
             "arrêt pour éviter de fabriquer un modèle prétendument français avec trop peu de données."
         )
 
+    external, seen_pairs = [], set()
+    for row in oasst + alpaca:
+        key = (row["prompt"].casefold(), row["response"].casefold())
+        if key in seen_pairs:
+            continue
+        seen_pairs.add(key)
+        external.append(row)
     train_oasst, val_oasst = [], []
-    for row in oasst:
+    for row in external:
         (val_oasst if hash_bucket(row["id"]) == 0 else train_oasst).append(row)
 
     train_seeds, val_seeds = [], []
@@ -211,8 +280,9 @@ def main() -> None:
         "seed": args.seed,
         "base_model": "TheREZOR/TinyTalk",
         "base_model_license": "CC-BY-4.0",
-        "corpus_license": "Apache-2.0 for OASST1; project-authored Hawkins seeds",
+        "corpus_license": "Apache-2.0 for OASST1 and French Alpaca; project-authored Hawkins seeds",
         "oasst1": source_info,
+        "alpaca_gpt4_french": alpaca_info,
         "hawkins_seed_count": len(seeds),
         "hawkins_seed_repeat": args.seed_repeat,
         "train_examples_after_oversampling": len(train),
