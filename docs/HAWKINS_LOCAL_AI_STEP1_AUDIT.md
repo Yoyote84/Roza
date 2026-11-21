@@ -89,10 +89,12 @@ Le travail de l'étape 3 devra :
 
 - préparer un corpus français original de narration et de dialogues courts Hawkins ;
 - choisir des textes et jeux de données dont les licences permettent l'usage et la redistribution envisagés ;
-- adapter le modèle et son vocabulaire/tokenizer si nécessaire ;
-- produire le fichier quantifié attendu par le moteur ;
-- mesurer la taille, la mémoire, la qualité de génération et le contexte utile ;
-- tester des prompts français représentatifs du jeu.
+- adapter le modèle français et son vocabulaire/tokenizer ;
+- produire les poids quantifiés et le tokenizer binaires attendus par le moteur ;
+- vérifier la structure des exports, leur provenance, leurs licences et le budget Flash préliminaire ;
+- livrer un paquet versionné des poids et du tokenizer pour l'étape 4.
+
+La qualité des réponses, la mémoire réellement disponible pendant l'inférence, la vitesse et la stabilité sont vérifiées après l'étape 5, lorsque le firmware complet est installé.
 
 Le corpus doit apprendre au modèle à décrire une scène courte, respecter un ton et proposer des possibilités. Il ne doit pas lui confier la vérité de l'état du jeu.
 
@@ -152,11 +154,11 @@ Le modèle ne modifiera jamais directement les statistiques, les objets, les mis
 |---|---|---|
 | **1/5 — Audit et décision** | Étude du matériel, du moteur REZOR, des licences, du stockage, de la Flash et de la chaîne ROZA. | Architecture choisie et contraintes écrites. |
 | **2/5 — Port du moteur** | Porter le moteur LLM et le noyau ESP32-S3 dans la chaîne ROZA ; mesurer RAM, Flash et débit sur un test isolé. | Moteur embarqué compilé et démontré sans régression du firmware. |
-| **3/5 — Modèle français** | Construire/adapter le petit modèle français, le tokenizer et les poids quantifiés ; tests de narration et de qualité. | Modèle français adapté au format du moteur et au budget matériel. |
+| **3/5 — Modèle français final** | Préparer le corpus, fine-tuner LeCarnet-3M, exporter les poids quantifiés et le tokenizer, contrôler la structure et le budget préliminaire, livrer le paquet final. | Poids du modèle français et tokenizer binaires prêts à être embarqués à l'étape 4. Les contrôles de qualité des réponses sont réservés à l'après-étape 5. |
 | **4/5 — Intégration Hawkins** | Connecter le narrateur au monde, au personnage, aux PNJ, aux missions et aux choix ; préserver les règles ROZA. | Le jeu utilise le narrateur embarqué sans téléphone ni réseau. |
 | **5/5 — Firmware final et essais** | Compilation complète, tests automatisés, vérifications de mémoire/Flash, essais sur Cardputer ADV, corrections et génération du paquet Factory final. | Firmware Hawkins autonome final, BIN Factory, contrôles SHA-256 et instructions d'installation. |
 
-Le paquet final est livré dans l'étape 5 : il n'y aura pas une sixième phase de développement séparée. Le test physique final doit être réalisé sur le vrai Cardputer ADV ; une compilation CI ne sera jamais présentée comme un essai matériel réussi.
+Le paquet du modèle français (poids + tokenizer) est livré à la fin de l'étape 3 pour être intégré à l'étape 4. Le paquet firmware installable est livré à l'étape 5 : il n'y aura pas une sixième phase de développement séparée. Les contrôles qualitatifs et le test physique final doivent être réalisés sur le firmware complet et le vrai Cardputer ADV ; une compilation CI ne sera jamais présentée comme un essai matériel réussi.
 
 ## 8. Critères de fin
 
