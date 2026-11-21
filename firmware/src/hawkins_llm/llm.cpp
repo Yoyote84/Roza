@@ -332,9 +332,14 @@ static float* forward_llama(Transformer* T, int token, int pos) {
 
   // ---- token embedding (dequant one row of the embedding matrix into x) ----
   {
-    size_t row_bytes = ((size_t)(dim / BLOCK_SIZE)) * BYTES_PER_BLK;
-    const uint8_t* row = T->token_embed_q4 + (size_t)token * row_bytes;
-    dequant_q4_row(s->x, row, dim);
+    if (g_fmt == VERSION_NEO_V3) {
+      const uint8_t* row = T->token_embed_q4 + (size_t)token * v3_row_stride(dim);
+      dequant_q4_row_v3(s->x, row, dim);
+    } else {
+      size_t row_bytes = ((size_t)(dim / BLOCK_SIZE)) * BYTES_PER_BLK;
+      const uint8_t* row = T->token_embed_q4 + (size_t)token * row_bytes;
+      dequant_q4_row(s->x, row, dim);
+    }
   }
 
   for (int l = 0; l < p->n_layers; l++) {
@@ -648,12 +653,12 @@ bool llm_init_embedded(Transformer* T, const uint8_t* model_bytes, size_t model_
   };
   size_t off = 64;
 
-  if (p->arch == ARCH_GPTNEO) {
-    // v3: per-layer stride = rows x row-planar row stride (cols).
+  if (p->arch == ARCH_GPTNEO || g_fmt == VERSION_NEO_V3) {
+    // v3 row-planar Q4 works for both GPT-Neo and LLaMA compute graphs.
     T->stride_wq    = (size_t)p->dim        * v3_row_stride(p->dim);
-    T->stride_wk    = T->stride_wq;
-    T->stride_wv    = T->stride_wq;
-    T->stride_wo    = T->stride_wq;
+    T->stride_wk    = (size_t)kv_dim        * v3_row_stride(p->dim);
+    T->stride_wv    = (size_t)kv_dim        * v3_row_stride(p->dim);
+    T->stride_wo    = (size_t)p->dim        * v3_row_stride(p->dim);
     T->stride_w1w3  = (size_t)p->hidden_dim * v3_row_stride(p->dim);
     T->stride_w2    = (size_t)p->dim        * v3_row_stride(p->hidden_dim);
   } else {
@@ -697,6 +702,33 @@ bool llm_init_embedded(Transformer* T, const uint8_t* model_bytes, size_t model_
     T->w3_q4   = NULL;
     T->wcls_q4 = T->token_embed_q4;
     // PIE loads fault on unaligned addresses; catch a bad blob at boot.
+    if (((uintptr_t)T->token_embed_q4 & 15) || ((uintptr_t)T->wq_q4 & 15) ||
+        ((uintptr_t)T->w1_q4 & 15) || ((uintptr_t)T->w2_q4 & 15)) return false;
+  } else if (g_fmt == VERSION_NEO_V3) {
+    // CRDP v3 LLaMA: same RMSNorm/RoPE/SwiGLU graph as v1, but row-planar
+    // Q4 weights so the ESP32-S3 Q8 x Q4 SIMD kernel can be used. CTK2 is
+    // intentionally independent of the compute architecture: GPT-2 BPE
+    // tokenization can be paired with this LLaMA model.
+    size_t Ld = (size_t)p->n_layers * p->dim;
+    T->rms_att   = (const float*)(model_bytes + off); off += Ld * sizeof(float);
+    T->rms_ffn   = (const float*)(model_bytes + off); off += Ld * sizeof(float);
+    T->rms_final = (const float*)(model_bytes + off); off += (size_t)p->dim * sizeof(float);
+    off += (0 - off) & 15;
+    T->token_embed_q4 = model_bytes + off;
+    off += (size_t)p->vocab_size * v3_row_stride(p->dim);
+    T->wq_q4 = model_bytes + off; off += T->stride_wq * p->n_layers;
+    T->wk_q4 = model_bytes + off; off += T->stride_wk * p->n_layers;
+    T->wv_q4 = model_bytes + off; off += T->stride_wv * p->n_layers;
+    T->wo_q4 = model_bytes + off; off += T->stride_wo * p->n_layers;
+    T->w1_q4 = model_bytes + off; off += T->stride_w1w3 * p->n_layers;
+    T->w2_q4 = model_bytes + off; off += T->stride_w2 * p->n_layers;
+    T->w3_q4 = model_bytes + off; off += T->stride_w1w3 * p->n_layers;
+    if (shared) {
+      T->wcls_q4 = T->token_embed_q4;
+    } else {
+      T->wcls_q4 = model_bytes + off;
+      off += (size_t)p->vocab_size * v3_row_stride(p->dim);
+    }
     if (((uintptr_t)T->token_embed_q4 & 15) || ((uintptr_t)T->wq_q4 & 15) ||
         ((uintptr_t)T->w1_q4 & 15) || ((uintptr_t)T->w2_q4 & 15)) return false;
   } else {
