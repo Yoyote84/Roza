@@ -30,7 +30,10 @@ def encode_pair(row: dict[str, str], tokenizer, max_length: int) -> dict[str, li
     reply = tokenizer.encode(" " + row["response"], add_special_tokens=False)
     eos = tokenizer.eos_token_id
     if eos is None:
-        raise RuntimeError("Le tokenizer TinyTalk n'a pas de token EOS.")
+        raise RuntimeError("Le tokenizer de base n'a pas de token EOS.")
+    bos = tokenizer.bos_token_id
+    if bos is not None:
+        prefix = [bos] + prefix
     max_prefix = max(8, max_length - 10)
     if len(prefix) > max_prefix:
         prefix = prefix[-max_prefix:]
@@ -81,8 +84,12 @@ def evaluate(model, loader, device) -> float:
 @torch.no_grad()
 def generate_sample(model, tokenizer, prompt: str, device: str) -> str:
     model.eval()
-    ids = tokenizer(f"User: {prompt}\nBot:", return_tensors="pt",
-                    add_special_tokens=False).input_ids.to(device)
+    encoded = tokenizer(f"User: {prompt}\nBot:", return_tensors="pt",
+                         add_special_tokens=False).input_ids
+    if tokenizer.bos_token_id is not None:
+        bos = torch.tensor([[tokenizer.bos_token_id]], dtype=torch.long)
+        encoded = torch.cat((bos, encoded), dim=1)
+    ids = encoded.to(device)
     out = model.generate(
         ids, max_new_tokens=28, do_sample=False,
         eos_token_id=tokenizer.eos_token_id,
