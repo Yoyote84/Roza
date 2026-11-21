@@ -52,7 +52,8 @@ jobs:
           python firmware/tools/hawkinsllm/prepare_fr_dataset.py \
             --output-dir "$RUNNER_TEMP/hawkins-fr-data" \
             --max-oasst1 1200 \
-            --seed-repeat 4
+            --max-alpaca 5000 \
+            --seed-repeat 6
 
       - name: Fine-tune TinyTalk on French dialogues
         run: |
@@ -61,10 +62,10 @@ jobs:
             --out-dir "$RUNNER_TEMP/hawkins-fr-checkpoint" \
             --base TheREZOR/TinyTalk \
             --base-revision main \
-            --epochs 3 \
-            --batch-size 8 \
+            --epochs 5 \
+            --batch-size 16 \
             --max-length 80 \
-            --learning-rate 0.00005
+            --learning-rate 0.00008
 
       - name: Checkout audited REZOR converter
         run: |
