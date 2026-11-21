@@ -9,38 +9,31 @@ Ce dossier contient le moteur d'inférence C++ issu de [therezor/cardputer-ai](h
 - Fichiers importés : `llm.cpp`, `llm.h`, `dot_q4_pie.S`
 - Licence du code moteur : MIT, voir `LICENSE`.
 - Attribution et provenance du moteur : REZOR, 2026.
-- Les poids du modèle et les données d'entraînement ne sont pas importés à l'étape 2. Leurs licences doivent être vérifiées séparément avant distribution.
 
 ## Portage
 
-Le moteur utilise seulement des API déjà fournies par l'environnement ROZA :
+Le moteur utilise les API fournies par l'environnement ROZA :
 - `esp_heap_caps.h` pour l'allocation SRAM interne ;
 - FreeRTOS pour le worker de calcul sur le second cœur ;
-- les instructions PIE SIMD du processeur ESP32-S3, via `dot_q4_pie.S`.
+- les instructions PIE SIMD de l'ESP32-S3, via `dot_q4_pie.S`.
 
 La version ROZA reste PlatformIO + Arduino-ESP32 2.0.17 / ESP-IDF 4.4.7. Aucune migration globale vers l'ESP-IDF amont 5.5.4 n'est effectuée.
 
-## Format de modèle attendu
+## Modèle final de l'étape 3
 
-Le moteur sait lire :
-- CRDP v1 (LLaMA) ;
-- CRDP v3 (GPT-Neo/TinyTalk, Q4_0 en lignes planaires) ;
-- tokenizer SentencePiece ou CTK2 GPT-2 BPE.
+Le modèle français LeCarnet-3M a été fine-tuné et exporté. Les deux fichiers définitifs destinés à l'intégration de l'étape 4 sont :
 
-Aucun fichier de poids ou tokenizer n'est embarqué dans ce commit. La préparation du modèle français, la conversion et le budget final sont réservés à l'étape 3.
+- `model_lecarnet_q4.bin` : poids CRDP v3 LLaMA Q4_0 row-planar ;
+- `tokenizer_lecarnet_ctk2.bin` : tokenizer CTK2 GPT-2 byte-level BPE.
 
-## Limites de cette étape
+Ils sont livrés dans l'artefact `HAWKINS-ETAPE3-MODELE-FR-FINAL.zip`, avec manifeste, métriques, provenance et SHA-256. Les fichiers ne doivent pas être copiés sur la microSD pour l'inférence : l'étape 4 les embarquera dans l'image applicative et les lira depuis la Flash mappée.
 
-Cette étape porte et compile le moteur. Elle ne signifie pas encore que le modèle français a été entraîné, qu'une inférence a été exécutée sur l'appareil, ni que le narrateur est raccordé aux règles Hawkins. Ces validations arrivent dans les étapes suivantes.
+## Liaison au jeu
 
+`hawkins_app.cpp` expose déjà le contexte du monde, du personnage, des missions, des objets et de la mémoire narrative. L'étape 4 doit remplacer le chemin de narration compagnon USB par le moteur local embarqué.
 
-## Liaison au jeu Hawkins
+Le modèle ne doit jamais écrire directement dans les sauvegardes ni modifier les règles. Le moteur déterministe ROZA garde l'autorité sur les PV, l'inventaire, les missions, les compétences et la progression.
 
-`hawkins_app.cpp` récupère la table `HawkinsLlmApi` à l'entrée de l'application. Cette référence garde les fonctions réelles du moteur dans le firmware final au lieu de les laisser éliminer par le ramasse-miettes du linker. Elle ne charge pas de poids et ne réserve pas le cache de contexte ; l'initialisation du modèle et la génération restent pour les étapes 3 et 4.
+## Limites de validation
 
-Le journal série indique explicitement que le moteur est lié, mais que le modèle n'est pas encore embarqué.
-
-
-## Robustesse du port — étape 2
-
-Les tests hôte couvrent également les pointeurs nuls, en-têtes trop courts, longueur de tokenizer invalide, et métadonnées CTK2 avec compteur de merges négatif ou hors blob. Ces tests visent les erreurs de format avant de charger un tokenizer en mémoire.
+L'export de l'étape 3 est présent et son manifeste structurel a passé les contrôles CRDP/CTK2 et le budget préliminaire. Cela ne constitue pas une validation qualitative des réponses et ne constitue pas un essai sur la carte. Les contrôles de qualité, de mémoire libre, de vitesse, de stabilité et le fonctionnement physique sont reportés après l'étape 5, sur le firmware complet.
