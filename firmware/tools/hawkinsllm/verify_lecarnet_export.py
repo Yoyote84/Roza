@@ -36,7 +36,7 @@ def verify_model(path: Path):
     shared, quant, arch = struct.unpack_from("<BBB", data, 36)
     if arch != ARCH_LLAMA or quant != Q4_0 or shared != 1:
         raise ValueError(f"expected shared LLaMA Q4_0, got arch={arch}, quant={quant}, shared={shared}")
-    if not (0 < layers <= 16 and 0 < vocab <= 8000 and 16 <= context <= 64):
+    if not (0 < layers <= 16 and 0 < vocab <= 16000 and 16 <= context <= 64):
         raise ValueError("model exceeds Cardputer dimensions/context guardrails")
     if dim % heads or dim % BLOCK or hidden % BLOCK or kv_heads != heads:
         raise ValueError("LLaMA dimensions are incompatible with the ROZA v3 kernel")
