@@ -72,12 +72,23 @@ def quantize_q4_v3(matrix: np.ndarray, cols: int) -> bytes:
 
 def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
               min_count: int, max_vocab: int):
-    from tokenizers import ByteLevelBPETokenizer
-
-    vocab = json.loads((snapshot / "vocab.json").read_text(encoding="utf-8"))
-    id_to_piece = {int(v): k for k, v in vocab.items()}
-    if len(id_to_piece) != len(vocab) or eos_id not in id_to_piece:
-        raise ValueError(f"invalid GPT-2 vocabulary or EOS id {eos_id} not present")
+    # LeCarnet inherits PAGnol's GPT-2 vocabulary. Its first six special-token
+    # ids all have the empty spelling, so preserve duplicate JSON keys.
+    pairs = json.loads(
+        (snapshot / "vocab.json").read_text(encoding="utf-8"),
+        object_pairs_hook=lambda items: items,
+    )
+    vocab = {}
+    id_to_piece = {}
+    for piece, raw_id in pairs:
+        old_id = int(raw_id)
+        id_to_piece[old_id] = piece
+        if piece:
+            if piece in vocab:
+                raise ValueError(f"duplicate non-empty BPE token {piece!r}")
+            vocab[piece] = old_id
+    if eos_id not in id_to_piece or id_to_piece[eos_id] != "":
+        raise ValueError(f"LeCarnet special EOS id {eos_id} is not present")
     b2u = bytes_to_unicode()
     u2b = {v: k for k, v in b2u.items()}
 
@@ -94,9 +105,8 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
     if len(byte_old) != 256:
         raise ValueError(f"GPT-2 tokenizer must have all 256 byte tokens; found {len(byte_old)}")
 
-    tokenizer = ByteLevelBPETokenizer(
-        str(snapshot / "vocab.json"), str(snapshot / "merges.txt")
-    )
+    from transformers import AutoTokenizer
+    tokenizer = AutoTokenizer.from_pretrained(snapshot, use_fast=True)
     counts = collections.Counter()
     for path in corpus_files:
         if not path.exists():
@@ -104,7 +114,7 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
         text = path.read_text(encoding="utf-8")
         chunk_size = 500_000
         for start in range(0, len(text), chunk_size):
-            counts.update(tokenizer.encode(text[start:start + chunk_size]).ids)
+            counts.update(tokenizer.encode(text[start:start + chunk_size], add_special_tokens=False))
 
     lines = (snapshot / "merges.txt").read_text(encoding="utf-8").splitlines()
     if lines and lines[0].startswith("#"):
