@@ -102,7 +102,8 @@ typedef struct {
   int vocab_size;
   int max_token_length;
   int style;                  // ARCH_LLAMA (sentencepiece) or ARCH_GPTNEO (bpe)
-  int eos_id;                 // gptneo: <|endoftext|> id in the pruned vocab
+  int eos_id;                 // gptneo: EOS id in the pruned vocabulary
+  int unk_id;                 // CTK2: learned UNK id used for missing source bytes, or -1
   int n_merges;               // gptneo
   const uint16_t* byte_ids;   // gptneo: byte -> token id [256]
   const uint16_t* merges;     // gptneo: (a,b,c) triples sorted by (a,b)
