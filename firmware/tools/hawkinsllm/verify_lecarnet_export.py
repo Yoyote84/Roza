@@ -111,6 +111,20 @@ def main():
     firmware_bytes = Path(args.firmware_bin).stat().st_size
     total = firmware_bytes + model["bytes"] + tokenizer["bytes"]
     allowed = args.partition_bytes - args.margin_bytes
+
+    # Approximate dynamic heap requested by llm_init_embedded for the current
+    # LLaMA runtime: six dim vectors, two MLP vectors, Q/K/V, attention,
+    # logits, BF16 K/V cache and v3 Q8 activation buffers.
+    dim = model["dim"]
+    hidden = model["hidden"]
+    layers = model["layers"]
+    heads = model["heads"]
+    context = model["context"]
+    kv_dim = dim  # This profile requires full multi-head attention.
+    float_state = (6 * dim + 2 * hidden + heads * context + model["vocabulary"]) * 4
+    kv_cache = 2 * layers * context * kv_dim * 2  # K and V, BF16
+    q8_scratch = max(dim, hidden) + (max(dim, hidden) // 32) * 4
+    estimated_llm_heap = float_state + kv_cache + q8_scratch
     if total > allowed:
         raise SystemExit(
             f"Flash budget exceeded: {total:,} bytes > {allowed:,} bytes "
@@ -125,6 +139,9 @@ def main():
         "application_partition_bytes": args.partition_bytes,
         "safety_margin_bytes": args.margin_bytes,
         "remaining_after_margin_bytes": allowed - total,
+        "estimated_llm_dynamic_heap_bytes": estimated_llm_heap,
+        "estimated_llm_dynamic_heap_kib": round(estimated_llm_heap / 1024, 2),
+        "runtime_heap_note": "Arithmetic estimate from llm_init_embedded allocations; not a measurement of free heap on the physical Cardputer. Stage 5 must log heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) before/after init.",
         "note": "Estimation before stage-4 embedding; final binary size and runtime heap must be remeasured.",
     }
     Path(args.output).write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
