@@ -1,4 +1,4 @@
-#include "llm.h"
+#include "port.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -26,10 +26,24 @@ static void testRejectsUnsupportedModelVersion() {
   assert(!llm_init_embedded(&transformer, model, sizeof(model), 8));
 }
 
+static void testAllEngineEntrypointsAreLinked() {
+  const HawkinsLlmApi& api = hawkinsLlmGetApi();
+  assert(api.initEmbedded != nullptr);
+  assert(api.tokenizerFromMemory != nullptr);
+  assert(api.buildSampler != nullptr);
+  assert(api.forward != nullptr);
+  assert(api.forwardAt != nullptr);
+  assert(api.slideContext != nullptr);
+  assert(api.sample != nullptr);
+  assert(api.encode != nullptr);
+  assert(api.decode != nullptr);
+}
+
 int main() {
   testRejectsShortModelBeforeReadingPointer();
   testRejectsWrongMagic();
   testRejectsUnsupportedModelVersion();
+  testAllEngineEntrypointsAreLinked();
   puts("HAWKINS LLM : moteur compilé, garde-fous d'en-tête validés.");
   return 0;
 }

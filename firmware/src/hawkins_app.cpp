@@ -8,6 +8,7 @@
 #include "hawkins_adventure.h"
 #include "hawkins_adventure_store.h"
 #include "hawkins_narrative_store.h"
+#include "hawkins_llm/port.h"
 #include "hawkins_sd_backup.h"
 #include "sd_files.h"
 #include "gnss.h"
@@ -1113,6 +1114,13 @@ bool hawkinsAppHandleSerialLine(const char* line, size_t length) {
 }
 
 void hawkinsAppEnter() {
+  const HawkinsLlmApi& llm = hawkinsLlmGetApi();
+  const bool engineLinked = llm.initEmbedded && llm.tokenizerFromMemory &&
+      llm.buildSampler && llm.forward && llm.forwardAt && llm.slideContext &&
+      llm.sample && llm.encode && llm.decode;
+  Serial.printf("[hawkins-llm] moteur %s; modele %s (etape 3)\n",
+                engineLinked ? "lie au firmware" : "incomplet",
+                "non embarque");
   showAiNarration = false;
   candidateActive = false;
   lastSampleMs = 0U;
