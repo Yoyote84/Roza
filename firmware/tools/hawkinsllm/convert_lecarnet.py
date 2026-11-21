@@ -170,7 +170,7 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
     merges.sort(key=lambda item: (item[0], item[1]))
     if len(merges) > 65535:
         raise ValueError("CTK2 merge count exceeds uint16 token index capacity")
-    return pieces, merges, old_to_new[eos_id], len(ordered)
+    return pieces, merges, old_to_new[eos_id], old_to_new, ordered
 
 
 def write_ctk2(path: Path, pieces: list[bytes], merges: list[tuple[int, int, int]], eos_id: int):
@@ -252,13 +252,12 @@ def export_model(model_dir: Path, output: Path, tokenizer_output: Path,
 
     # Use the saved tokenizer files in the fine-tuned checkpoint. The 3M model
     # uses GPT-2 byte-level BPE; CTK2 stores the exact reduced vocabulary.
-    pieces, merges, eos_new, pruned_vocab = prune_bpe(
+    pieces, merges, eos_new, old_to_new, ordered = prune_bpe(
         model_dir, corpus_files, eos_old, min_count, max_vocab
     )
-    if len(pieces) != pruned_vocab:
+    pruned_vocab = len(pieces)
+    if len(ordered) != pruned_vocab or set(old_to_new.values()) != set(range(pruned_vocab)):
         raise ValueError("tokenizer pruning produced inconsistent vocabulary")
-    if pruned_vocab != len(set(range(pruned_vocab))):
-        raise ValueError("non-contiguous pruned tokenizer ids")
 
     def layer(l: int, name: str):
         key = f"model.layers.{l}.{name}"
@@ -283,13 +282,37 @@ def export_model(model_dir: Path, output: Path, tokenizer_output: Path,
             out.write(np.ascontiguousarray(tensor, dtype=np.float32).tobytes())
 
         out.write(b"\x00" * ((-out.tell()) % 16))
-        index = np.asarray(list(range(vocab_size)), dtype=np.int64)
-        # Reorder embeddings to match the compact CTK2 vocabulary. The old
-        # token ids are recoverable from the same pruning function.
-        # Save mapping alongside the vocabulary in prune_bpe() in the next step.
-        raise RuntimeError("internal: converter must return old-token mapping before weight export")
+        new_to_old = np.asarray(ordered, dtype=np.int64)
+        out.write(quantize_q4_v3(embed[new_to_old], dim))
+
+        projections = [
+            ("self_attn.q_proj.weight", dim),
+            ("self_attn.k_proj.weight", dim),
+            ("self_attn.v_proj.weight", dim),
+            ("self_attn.o_proj.weight", dim),
+            ("mlp.gate_proj.weight", dim),
+            ("mlp.down_proj.weight", hidden),
+            ("mlp.up_proj.weight", dim),
+        ]
+        for suffix, width in projections:
+            stacked = np.stack([layer(i, suffix) for i in range(layers)])
+            expected_rows = hidden if suffix in ("mlp.gate_proj.weight", "mlp.up_proj.weight") else dim
+            if stacked.shape != (layers, expected_rows, width):
+                raise ValueError(
+                    f"{suffix} shape mismatch: {stacked.shape}; "
+                    f"expected {(layers, expected_rows, width)}"
+                )
+            out.write(quantize_q4_v3(stacked, width))
+
+        # Tied embeddings: classifier is an alias of the compact token table.
+        final_size = out.tell()
+        model_size = final_size
+        if model_size > 0x7E0000:
+            raise ValueError(f"model alone exceeds app partition: {model_size} bytes")
 
     write_ctk2(tokenizer_output, pieces, merges, eos_new)
+    print(f"[+] LLaMA CRDP v3: {model_size:,} bytes; vocabulary={pruned_vocab}")
+    print(f"[+] CTK2: {tokenizer_output.stat().st_size:,} bytes; eos_id={eos_new}")
 
 
 def main():
