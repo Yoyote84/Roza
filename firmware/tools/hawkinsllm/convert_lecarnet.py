@@ -167,8 +167,31 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
             if raw[0] in byte_old:
                 raise ValueError(f"duplicate byte-level base token for byte {raw[0]}")
             byte_old[raw[0]] = old_id
-    if len(byte_old) != 256:
-        raise ValueError(f"GPT-2 tokenizer must have all 256 byte tokens; found {len(byte_old)}")
+    # This French-trained ByteLevel BPE has only the byte tokens seen during
+    # tokenizer training (210/256 in the pinned snapshot). Never invent token
+    # IDs or embeddings: map genuinely absent byte values to its real learned
+    # <UNK> embedding. Common French UTF-8 bytes remain represented directly.
+    if not byte_old:
+        raise ValueError("tokenizer has no usable byte-level base tokens")
+    unk_meta = tokenizer_config.get("unk_token")
+    if isinstance(unk_meta, dict):
+        unk_content = unk_meta.get("content")
+    else:
+        unk_content = unk_meta
+    if not isinstance(unk_content, str) or not unk_content:
+        raise ValueError("tokenizer_config.json does not declare a usable UNK token")
+    unk_candidates = [
+        token_id for token_id, content in special_by_id.items()
+        if content == unk_content
+    ]
+    if len(unk_candidates) != 1:
+        raise ValueError(
+            f"expected exactly one declared UNK token {unk_content!r}, "
+            f"found {len(unk_candidates)}"
+        )
+    unk_id = unk_candidates[0]
+    if unk_id == eos_id:
+        raise ValueError("UNK and EOS must be different tokenizer IDs")
 
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(snapshot, use_fast=True)
@@ -205,7 +228,7 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
         rank_by_id[rid] = rank
 
     keep = set(byte_old.values())
-    keep.add(eos_id)
+    keep.update((unk_id, eos_id))
     keep.update(tid for tid, count in counts.items() if count >= min_count)
     stack = list(keep)
     while stack:
@@ -220,7 +243,7 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
     # Put all byte fallback tokens first, then merge results in exact BPE rank
     # order, then special/non-merge tokens. This preserves the runtime's rule
     # that the lowest output id corresponds to the earliest applicable merge.
-    ordered = [byte_old[b] for b in range(256)]
+    ordered = [byte_old[b] for b in sorted(byte_old)]
     byte_set = set(ordered)
     merge_order = [
         tid for tid, _ in sorted(rank_by_id.items(), key=lambda item: item[1])
@@ -228,9 +251,14 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
     ]
     ordered.extend(merge_order)
     ordered_set = set(ordered)
-    extras = sorted(tid for tid in keep if tid not in ordered_set and tid != eos_id)
-    ordered += extras
-    if eos_id not in set(ordered):
+    extras = sorted(
+        tid for tid in keep
+        if tid not in ordered_set and tid not in (unk_id, eos_id)
+    )
+    ordered.extend(extras)
+    if unk_id not in ordered:
+        ordered.append(unk_id)
+    if eos_id not in ordered:
         ordered.append(eos_id)
     if len(ordered) > max_vocab:
         raise ValueError(
@@ -242,9 +270,17 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
     for old in ordered:
         if old == eos_id:
             pieces.append(b"")
+        elif old == unk_id:
+            # The existing learned UNK embedding decodes as a visible
+            # replacement character when an unsupported byte is encountered.
+            pieces.append(b"\\xef\\xbf\\xbd")
         else:
             pieces.append(piece_to_bytes(id_to_piece[old], u2b))
 
+    byte_ids = [
+        old_to_new[byte_old.get(byte_value, unk_id)]
+        for byte_value in range(256)
+    ]
     merges = []
     for old_result, (old_a, old_b) in created_by.items():
         if old_result in old_to_new and old_a in old_to_new and old_b in old_to_new:
@@ -252,14 +288,24 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
     merges.sort(key=lambda item: (item[0], item[1]))
     if len(merges) > 65535:
         raise ValueError("CTK2 merge count exceeds uint16 token index capacity")
-    return pieces, merges, old_to_new[eos_id], old_to_new, ordered
+    return (
+        pieces, merges, old_to_new[eos_id], byte_ids,
+        old_to_new[unk_id], old_to_new, ordered,
+    )
 
 
-def write_ctk2(path: Path, pieces: list[bytes], merges: list[tuple[int, int, int]], eos_id: int):
+def write_ctk2(
+    path: Path, pieces: list[bytes], merges: list[tuple[int, int, int]],
+    eos_id: int, byte_ids: list[int],
+):
     max_len = max((len(piece) for piece in pieces), default=0)
+    if len(byte_ids) != 256 or any(token_id < 0 or token_id >= len(pieces) for token_id in byte_ids):
+        raise ValueError("CTK2 byte fallback table must contain 256 valid token IDs")
+    if len(pieces) > 65535 or any(token_id > 65535 for token_id in byte_ids):
+        raise ValueError("CTK2 uint16 token ID capacity exceeded")
     with path.open("wb") as out:
         out.write(struct.pack("<Iiiii", TOK_MAGIC, len(pieces), max_len, eos_id, len(merges)))
-        out.write(struct.pack("<256H", *range(256)))
+        out.write(struct.pack("<256H", *byte_ids))
         for a, b, c in merges:
             out.write(struct.pack("<HHH", a, b, c))
         for piece in pieces:
@@ -334,7 +380,7 @@ def export_model(model_dir: Path, output: Path, tokenizer_output: Path,
 
     # Use the saved tokenizer files in the fine-tuned checkpoint. The 3M model
     # uses GPT-2 byte-level BPE; CTK2 stores the exact reduced vocabulary.
-    pieces, merges, eos_new, old_to_new, ordered = prune_bpe(
+    pieces, merges, eos_new, byte_ids, unk_new, old_to_new, ordered = prune_bpe(
         model_dir, corpus_files, eos_old, min_count, max_vocab
     )
     pruned_vocab = len(pieces)
@@ -392,9 +438,13 @@ def export_model(model_dir: Path, output: Path, tokenizer_output: Path,
         if model_size > 0x7E0000:
             raise ValueError(f"model alone exceeds app partition: {model_size} bytes")
 
-    write_ctk2(tokenizer_output, pieces, merges, eos_new)
+    write_ctk2(tokenizer_output, pieces, merges, eos_new, byte_ids)
+    fallback_bytes = 256 - len(byte_old) if "byte_old" in locals() else 0
     print(f"[+] LLaMA CRDP v3: {model_size:,} bytes; vocabulary={pruned_vocab}")
-    print(f"[+] CTK2: {tokenizer_output.stat().st_size:,} bytes; eos_id={eos_new}")
+    print(
+        f"[+] CTK2: {tokenizer_output.stat().st_size:,} bytes; "
+        f"eos_id={eos_new}, unk_id={unk_new}, missing byte values={fallback_bytes}"
+    )
 
 
 def main():
