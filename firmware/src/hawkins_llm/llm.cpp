@@ -859,9 +859,22 @@ bool llm_tokenizer_from_memory(Tokenizer* tk, const uint8_t* data, size_t size,
     tk->style            = ARCH_GPTNEO;
     tk->max_token_length = mtl;
     tk->eos_id           = eos;
+    tk->unk_id           = -1;
     tk->n_merges         = nm;
     tk->byte_ids         = (const uint16_t*)(data + 20);
     tk->merges           = (const uint16_t*)(data + 20 + 512);
+    // Validate all byte mappings and detect the one intentional duplicate
+    // target used by the converter for unsupported source bytes.
+    for (int i = 0; i < 256; i++) {
+      if (tk->byte_ids[i] >= v) return false;
+      for (int j = 0; j < i; j++) {
+        if (tk->byte_ids[i] == tk->byte_ids[j]) {
+          if (tk->unk_id < 0) tk->unk_id = tk->byte_ids[i];
+          else if (tk->unk_id != tk->byte_ids[i]) return false;
+        }
+      }
+    }
+    if (tk->unk_id == eos) return false;
     tk->pieces           = data + 20 + 512 + (size_t)nm * 6;
   } else {
     if (first == 0 || first > 512) return false;
@@ -871,6 +884,7 @@ bool llm_tokenizer_from_memory(Tokenizer* tk, const uint8_t* data, size_t size,
     tk->style            = ARCH_LLAMA;
     tk->max_token_length = (int)first;
     tk->eos_id           = 2;
+    tk->unk_id           = -1;
     tk->n_merges         = 0;
     tk->byte_ids         = NULL;
     tk->merges           = NULL;
@@ -920,8 +934,42 @@ static bool ctk2_piece(const Tokenizer* tk, int id, const char** str, int* len) 
 // rank order). No BOS/EOS, no dummy space.
 static void ctk2_encode(Tokenizer* tk, const char* text, int* tokens, int* n_tokens) {
   int n = 0;
-  for (const unsigned char* c = (const unsigned char*)text; *c; c++)
-    tokens[n++] = tk->byte_ids[*c];
+  const unsigned char* c = (const unsigned char*)text;
+  while (*c) {
+    // If any byte of one UTF-8 code point is absent from the source byte
+    // vocabulary, replace the whole code point with one learned UNK token.
+    // This keeps the prompt valid UTF-8 instead of mixing U+FFFD with stray
+    // continuation bytes. Valid French UTF-8 bytes use their original IDs.
+    int char_len = 1;
+    if (c[0] >= 0xC2 && c[0] <= 0xDF) char_len = 2;
+    else if (c[0] >= 0xE0 && c[0] <= 0xEF) char_len = 3;
+    else if (c[0] >= 0xF0 && c[0] <= 0xF4) char_len = 4;
+    bool valid = true;
+    for (int i = 1; i < char_len; i++) {
+      if (c[i] == 0 || (c[i] & 0xC0) != 0x80) valid = false;
+    }
+    if (valid && char_len == 3 &&
+        ((c[0] == 0xE0 && c[1] < 0xA0) ||
+         (c[0] == 0xED && c[1] >= 0xA0))) valid = false;
+    if (valid && char_len == 4 &&
+        ((c[0] == 0xF0 && c[1] < 0x90) ||
+         (c[0] == 0xF4 && c[1] > 0x8F))) valid = false;
+    if (!valid) char_len = 1;
+
+    bool missing = false;
+    if (tk->unk_id >= 0) {
+      for (int i = 0; i < char_len; i++) {
+        if (tk->byte_ids[c[i]] == tk->unk_id) { missing = true; break; }
+      }
+    }
+    if (missing) {
+      tokens[n++] = tk->unk_id;
+    } else {
+      for (int i = 0; i < char_len; i++)
+        tokens[n++] = tk->byte_ids[c[i]];
+    }
+    c += char_len;
+  }
 
   while (n > 1) {
     int best_c = -1, best_idx = -1;
