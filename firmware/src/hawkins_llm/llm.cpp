@@ -807,30 +807,35 @@ bool llm_init_embedded(Transformer* T, const uint8_t* model_bytes, size_t model_
 // ============================================================================
 bool llm_tokenizer_from_memory(Tokenizer* tk, const uint8_t* data, size_t size,
                                int vocab_size) {
-  if (!data || size < 4) return false;
-  tk->base       = data;
-  tk->size       = size;
-  tk->vocab_size = vocab_size;
-
+  // Reject invalid caller inputs and malformed CTK2 metadata before assigning
+  // pointers into the model blob. This function is also used by host fuzz tests.
+  if (!tk || !data || size < 4 || vocab_size <= 0) return false;
   uint32_t first; memcpy(&first, data, 4);
   if (first == TOK_MAGIC) {
-    // CTK2 (GPT-2 byte-level BPE). vocab_size comes from the blob itself.
     if (size < 20 + 512) return false;
     int32_t v, mtl, eos, nm;
     memcpy(&v,   data + 4,  4);
-    memcpy(&mtl, data + 8,  4);
-    memcpy(&eos, data + 12, 4);
+    memcpy(&mtl,  data + 8,  4);
+    memcpy(&eos,  data + 12, 4);
     memcpy(&nm,  data + 16, 4);
+    if (v <= 0 || v > 32768 || mtl <= 0 || mtl > 512 ||
+        eos < 0 || eos >= v || nm < 0 ||
+        (size_t)nm > (size - 20 - 512) / 6) return false;
+    tk->base       = data;
+    tk->size       = size;
+    tk->vocab_size = v;
     tk->style            = ARCH_GPTNEO;
-    tk->vocab_size       = v;
     tk->max_token_length = mtl;
     tk->eos_id           = eos;
     tk->n_merges         = nm;
     tk->byte_ids         = (const uint16_t*)(data + 20);
     tk->merges           = (const uint16_t*)(data + 20 + 512);
     tk->pieces           = data + 20 + 512 + (size_t)nm * 6;
-    if (tk->pieces > data + size) return false;
   } else {
+    if (first == 0 || first > 512) return false;
+    tk->base       = data;
+    tk->size       = size;
+    tk->vocab_size = vocab_size;
     tk->style            = ARCH_LLAMA;
     tk->max_token_length = (int)first;
     tk->eos_id           = 2;

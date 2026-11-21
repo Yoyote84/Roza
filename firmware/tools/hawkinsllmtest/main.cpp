@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <vector>
 
 static void testRejectsShortModelBeforeReadingPointer() {
   Transformer transformer{};
@@ -44,6 +45,7 @@ int main() {
   testRejectsWrongMagic();
   testRejectsUnsupportedModelVersion();
   testAllEngineEntrypointsAreLinked();
+  testTokenizerRejectsInvalidInputsAndMetadata();
   puts("HAWKINS LLM : moteur compilé, garde-fous d'en-tête validés.");
   return 0;
 }

@@ -39,3 +39,8 @@ Cette étape porte et compile le moteur. Elle ne signifie pas encore que le mod�
 `hawkins_app.cpp` récupère la table `HawkinsLlmApi` à l'entrée de l'application. Cette référence garde les fonctions réelles du moteur dans le firmware final au lieu de les laisser éliminer par le ramasse-miettes du linker. Elle ne charge pas de poids et ne réserve pas le cache de contexte ; l'initialisation du modèle et la génération restent pour les étapes 3 et 4.
 
 Le journal série indique explicitement que le moteur est lié, mais que le modèle n'est pas encore embarqué.
+
+
+## Robustesse du port — étape 2
+
+Les tests hôte couvrent également les pointeurs nuls, en-têtes trop courts, longueur de tokenizer invalide, et métadonnées CTK2 avec compteur de merges négatif ou hors blob. Ces tests visent les erreurs de format avant de charger un tokenizer en mémoire.
