@@ -94,7 +94,8 @@ typedef struct {
 //   - llama2.c style (SentencePiece): [u32 max_len] then [f32 score][i32 len][bytes]*
 //   - CTK2 (GPT-2 byte-level BPE, pruned): [u32 magic][i32 vocab][i32 max_len]
 //     [i32 eos][i32 n_merges][u16 byte_ids[256]][(u16 a,u16 b,u16 c) sorted by
-//     (a,b)]* then [i32 len][bytes]* — exact BPE via the merge pair table.
+//     (a,b)]* then [i32 len][bytes]* — missing byte values may point to the learned
+//     UNK piece when a partially trained byte vocabulary has no direct token.
 typedef struct {
   const uint8_t* base;        // start of tokenizer blob (in flash)
   size_t size;
