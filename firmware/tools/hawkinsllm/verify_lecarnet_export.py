@@ -63,7 +63,7 @@ def verify_tokenizer(path: Path, expected_vocab: int):
     magic, vocab, max_len, eos, merges = struct.unpack_from("<Iiiii", data, 0)
     if magic != TOK_MAGIC or vocab != expected_vocab:
         raise ValueError("CTK2 header or vocabulary mismatch")
-    if not (256 <= vocab <= 8000 and 0 <= eos < vocab and 1 <= max_len <= 512 and merges >= 0):
+    if not (256 <= vocab <= 16000 and 0 <= eos < vocab and 1 <= max_len <= 512 and merges >= 0):
         raise ValueError("invalid CTK2 dimensions")
     offset = 20
     byte_ids = struct.unpack_from("<256H", data, offset)
