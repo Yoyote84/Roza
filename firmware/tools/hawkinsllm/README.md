@@ -1,37 +1,55 @@
 # Hawkins — modèle français embarqué (étape 3/5)
 
-Ce dossier fabrique un petit modèle de dialogue en français pour le moteur local porté de REZOR. Il ne télécharge aucun poids vers le Cardputer pendant le jeu : les fichiers créés ici sont des artefacts de développement destinés à être intégrés dans la Flash à l'étape 4.
+Ce dossier prépare un modèle français compact pour le moteur local de ROZA. Aucun modèle ni firmware intermédiaire n'est destiné à être flashé sur le Cardputer : le modèle sera intégré à l'application à l'étape 4 et le seul firmware installable sera livré à l'étape 5.
 
-## Base choisie
+## Modèle candidat retenu
 
-- Modèle de départ : \`TheREZOR/TinyTalk\` (GPT-Neo, 8,3 M paramètres publiés, 8 couches, dimension 128).
-- Licence du modèle de départ : CC BY 4.0. Conserver les attributions indiquées dans sa fiche et son NOTICE.
-- Données de conversation : \`OpenAssistant/oasst1\`, filtrées sur \`lang=fr\`, licence Apache-2.0.
-- Corpus Hawkins additionnel : dialogues originaux écrits pour ce projet, stockés dans \`seed_fr.jsonl\`.
-- Export : Q4_0 GPT-Neo CRDP v3 + tokenizer CTK2 byte-level BPE, format attendu par \`firmware/src/hawkins_llm/llm.cpp\`.
+- Base : \`MaxLSB/LeCarnet-3M\`, révision \`0bf134cfceb1b00c7c56a0ebbc1560ec634c3502\`.
+- Architecture : LLaMA, 3 742 144 paramètres, 8 couches, dimension 64, dimension MLP 256, 16 têtes.
+- Licence du modèle : MIT.
+- Jeu de pré-entraînement : \`MaxLSB/LeCarnet\`, licence ODC-BY.
+- Fine-tuning : OpenAssistant/OASST1 (Apache-2.0), FreedomIntelligence/alpaca-gpt4-french (Apache-2.0), plus 40 dialogues Hawkins originaux.
+- Export cible : CRDP v3 LLaMA Q4_0 row-planar + CTK2 byte-level BPE, contexte de 32 tokens.
 
-Le tokenizer GPT-2 est byte-level : il peut représenter les caractères UTF-8 français. Le convertisseur amont réduit le vocabulaire et conserve les 256 tokens octet de base. Le script de vérification impose la limite CTK2 de 32 768 tokens et vérifie que le vocabulaire du modèle correspond à celui du tokenizer.
+TinyTalk (anglais) a été testé comme première base, mais sa génération française sur le vrai moteur ROZA était incohérente. Il est conservé uniquement comme essai de comparaison et n'est pas le modèle candidat final.
 
-## Limites honnêtes
+## Pipeline
 
-TinyTalk reste un modèle extrêmement petit, conçu pour du small talk anglais, pas pour le raisonnement complexe. Le fine-tuning en français est une adaptation expérimentale ; un passage de CI ou une génération sur ordinateur ne garantit pas une conversation française parfaite sur ESP32-S3. La qualité devra être évaluée à partir des sorties d'essai sauvegardées dans l'artefact.
+1. \`prepare_fr_dataset.py\` prépare des dialogues courts, filtrés et distincts pour entraînement/validation.
+2. \`finetune_fr.py\` adapte LeCarnet-3M aux réponses conversationnelles françaises et aux scènes Hawkins.
+3. \`convert_lecarnet.py\` réduit le vocabulaire BPE à partir du corpus, réordonne les poids d'embedding, quantifie les matrices LLaMA en Q4_0 row-planar et écrit le format CRDP v3 + CTK2.
+4. \`verify_lecarnet_export.py\` contrôle les dimensions, en-têtes, tables BPE, tailles et budget Flash avec 256 Kio de marge.
+5. Le workflow compile le véritable \`firmware/src/hawkins_llm/llm.cpp\` dans le host harness REZOR et tente une réponse française courte.
 
-Le jeu ROZA reste l'autorité : le modèle ne doit jamais modifier les PV, l'inventaire, les missions, les compétences ou les sauvegardes. Il propose uniquement une narration courte et des formulations de choix.
+Le convertisseur conserve les 256 tokens d'octet de base du GPT-2 byte-BPE. Le vocabulaire est compacté pour rester raisonnable sur la Flash. Le token BOS/EOS de LeCarnet est l'id 1 ; le wrapper CTK2 de ROZA insère ce token quand le moteur demande un BOS.
 
-## Reproduire
+## Limites et critères de validation
 
-Depuis la racine du dépôt, avec Python 3.11 :
+LeCarnet-3M est un petit modèle francophone entraîné principalement sur des récits, pas un grand modèle de raisonnement. Le fine-tuning peut améliorer les dialogues courts, mais la qualité doit être jugée sur les réponses réellement produites par \`llm.cpp\`, pas uniquement sur la perte d'entraînement ou les exemples de Transformers.
 
-1. Installer PyTorch CPU, Transformers, Datasets et les dépendances du convertisseur.
-2. Exécuter \`prepare_fr_dataset.py\` pour produire train/validation/corpus.
-3. Exécuter \`finetune_fr.py\` à partir de \`TheREZOR/TinyTalk\`.
-4. Cloner \`therezor/cardputer-ai\` à la révision auditée dans le workflow et lancer \`tools/convert_tinystories_instruct.py\` avec le checkpoint et le corpus français.
-5. Lancer \`verify_export.py\`, compiler le firmware de base puis exécuter le host harness avec le vrai \`llm.cpp\` de ROZA.
+Étape 3 n'est validée que si :
+- entraînement et validation se terminent avec des pertes finies ;
+- export CRDP v3 et CTK2 passe les contrôles ;
+- taille modèle + tokenizer + firmware respecte la partition avec marge ;
+- le host harness ouvre le modèle et produit un texte français compréhensible ;
+- les métriques, sorties et manifeste de provenance sont conservés dans l'artefact.
 
-Le workflow GitHub Actions réalise ces opérations et publie les deux fichiers binaires, les métriques, l'échantillon généré et le manifeste comme artefact temporaire. Aucun firmware flashable final n'est livré à cette étape.
+Le test sur le véritable Cardputer ADV n'est pas fait à l'étape 3. La mémoire libre, la vitesse réelle, la stabilité et la qualité finale seront vérifiées avec le firmware complet à l'étape 5. Le modèle ne modifie jamais les PV, l'inventaire, les missions, les compétences ou les sauvegardes : ces règles restent dans le moteur déterministe de ROZA.
 
-## Attribution
+## Fichiers
 
-- TinyTalk : TheREZOR, basé sur TinyStories-Instruct-3M (Ronen Eldan et Yuanzhi Li), dialogues SODA (Kim et al.), tokenizer GPT-2/OpenAI. Voir la fiche du modèle et son NOTICE : https://huggingface.co/TheREZOR/TinyTalk
-- OpenAssistant OASST1 : OpenAssistant contributors, licence Apache-2.0 : https://huggingface.co/datasets/OpenAssistant/oasst1
-- Moteur et convertisseur Cardputer AI : https://github.com/therezor/cardputer-ai
+- \`seed_fr.jsonl\`
+- \`prepare_fr_dataset.py\`
+- \`finetune_fr.py\`
+- \`convert_lecarnet.py\`
+- \`verify_lecarnet_export.py\`
+- \`.github/workflows/hawkins-lecarnet-model.yml\`
+
+## Sources et licences
+
+- LeCarnet-3M : https://huggingface.co/MaxLSB/LeCarnet-3M
+- Corpus LeCarnet : https://huggingface.co/datasets/MaxLSB/LeCarnet
+- OpenAssistant/OASST1 : https://huggingface.co/datasets/OpenAssistant/oasst1
+- Alpaca GPT-4 French : https://huggingface.co/datasets/FreedomIntelligence/alpaca-gpt4-french
+- Moteur REZOR : https://github.com/therezor/cardputer-ai
+- Cardputer ADV : https://docs.m5stack.com/en/core/Cardputer-Adv
