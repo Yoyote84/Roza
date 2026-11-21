@@ -1054,7 +1054,8 @@ void llm_encode(Tokenizer* tk, const char* text, int8_t bos, int8_t eos,
 const char* llm_decode(Tokenizer* tk, int prev, int token, char* scratch, size_t scratch_size) {
   if (tk->style == ARCH_GPTNEO) {
     if (token == tk->eos_id) return "";
-    const char* str; int len;
+    const char* str = nullptr;
+    int len = 0;
     if (!ctk2_piece(tk, token, &str, &len)) return "";
     if (scratch_size == 0) return "";
     size_t cp = (size_t)len < scratch_size - 1 ? (size_t)len : scratch_size - 1;
