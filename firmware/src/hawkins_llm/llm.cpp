@@ -850,7 +850,7 @@ bool llm_tokenizer_from_memory(Tokenizer* tk, const uint8_t* data, size_t size,
     memcpy(&mtl,  data + 8,  4);
     memcpy(&eos,  data + 12, 4);
     memcpy(&nm,  data + 16, 4);
-    if (v <= 0 || v > 32768 || mtl <= 0 || mtl > 512 ||
+    if (v <= 0 || v != vocab_size || v > 32768 || mtl <= 0 || mtl > 512 ||
         eos < 0 || eos >= v || nm < 0 ||
         (size_t)nm > (size - 20 - 512) / 6) return false;
     tk->base       = data;
@@ -946,7 +946,10 @@ static void ctk2_encode(Tokenizer* tk, const char* text, int* tokens, int* n_tok
     else if (c[0] >= 0xF0 && c[0] <= 0xF4) char_len = 4;
     bool valid = true;
     for (int i = 1; i < char_len; i++) {
-      if (c[i] == 0 || (c[i] & 0xC0) != 0x80) valid = false;
+      if (c[i] == 0 || (c[i] & 0xC0) != 0x80) {
+        valid = false;
+        break;
+      }
     }
     if (valid && char_len == 3 &&
         ((c[0] == 0xE0 && c[1] < 0xA0) ||
