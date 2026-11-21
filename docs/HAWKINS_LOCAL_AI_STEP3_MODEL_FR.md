@@ -11,7 +11,7 @@ Préparer un petit modèle GPT-Neo qui peut produire de courtes réponses en fra
 
 - Modèle : TheREZOR/TinyTalk, GPT-Neo, 8 couches, dimension 128, environ 8,3 millions de paramètres publiés.
 - Licence du modèle : CC BY 4.0. Les attributions TinyTalk, TinyStories-Instruct-3M, SODA et GPT-2 doivent être conservées.
-- Données françaises : OpenAssistant/oasst1, licence Apache-2.0 ; seuls les couples promeneur/assistant marqués français et filtrés sont utilisés.
+- Données françaises : OpenAssistant/oasst1 (messages français validés, licence Apache-2.0) et FreedomIntelligence/alpaca-gpt4-french (dialogues human→gpt courts, licence Apache-2.0).
 - Corpus Hawkins : exemples originaux versionnés dans firmware/tools/hawkinsllm/seed_fr.jsonl.
 - Convertisseur : therezor/cardputer-ai épinglé au commit 78c5128672b750977619dc0a6c3b8baed91168ed.
 
@@ -19,7 +19,7 @@ Le modèle TinyTalk d'origine est anglophone. Le simple fait de lui envoyer un p
 
 ## Pipeline créé
 
-1. prepare_fr_dataset.py construit des paires françaises. Il exclut les messages supprimés, les réponses non validées, les réponses synthétiques, les doublons et les exemples portant des indicateurs de données personnelles ou de contenu à risque. Les URLs, adresses e-mail et numéros de téléphone sont retirés.
+1. prepare_fr_dataset.py combine des messages OpenAssistant évalués et un corpus d'instructions/dialogues français court issu de FreedomIntelligence/alpaca-gpt4-french. Il filtre les messages OpenAssistant supprimés, synthétiques, non validés ou signalés ; les exemples trop longs, les réponses de refus génériques et les réponses de type code/listes sont exclus. Les URLs, adresses e-mail et numéros de téléphone sont retirés.
 2. Les exemples originaux Hawkins sont sur-échantillonnés modérément pour donner une tonalité de narration au petit modèle.
 3. finetune_fr.py affine TheREZOR/TinyTalk avec la séquence User: ... / Bot: ..., masque la perte sur le prompt utilisateur et limite les séquences d'entraînement à 80 tokens.
 4. Le convertisseur amont produit model_neo_q4.bin (CRDP v3, GPT-Neo, Q4_0) et tok_neo.bin (CTK2 byte-level BPE). La réduction du vocabulaire conserve les 256 tokens octet, ce qui permet de représenter les caractères accentués UTF-8.
@@ -50,5 +50,6 @@ Cela ne prouve pas encore l'exécution physique sur l'ESP32-S3. Le firmware ne d
 
 - TheREZOR/TinyTalk : https://huggingface.co/TheREZOR/TinyTalk
 - OpenAssistant/oasst1 : https://huggingface.co/datasets/OpenAssistant/oasst1
+- FreedomIntelligence/alpaca-gpt4-french : https://huggingface.co/datasets/FreedomIntelligence/alpaca-gpt4-french
 - Cardputer AI / moteur et convertisseur : https://github.com/therezor/cardputer-ai
 - Cardputer ADV officiel : https://docs.m5stack.com/en/core/Cardputer-Adv
