@@ -21,7 +21,7 @@ TinyTalk (anglais) a été testé comme première base, mais sa génération fra
 4. \`verify_lecarnet_export.py\` contrôle les dimensions, en-têtes, tables BPE, tailles et budget Flash avec 256 Kio de marge.
 5. Le workflow compile le véritable \`firmware/src/hawkins_llm/llm.cpp\` dans le host harness REZOR et tente une réponse française courte.
 
-Le convertisseur conserve les 256 tokens d'octet de base du GPT-2 byte-BPE. Le vocabulaire est compacté pour rester raisonnable sur la Flash. Le token BOS/EOS de LeCarnet est l'id 1 ; le wrapper CTK2 de ROZA insère ce token quand le moteur demande un BOS.
+Le convertisseur conserve les 256 tokens d'octet de base du GPT-2 byte-BPE. Le vocabulaire est compacté pour rester raisonnable sur la Flash. Les six tokens de contrôle LeCarnet sont déclarés dans `tokenizer_config.json` (`added_tokens_decoder`), pas dans les merges BPE ordinaires. L'exporteur récupère leurs IDs depuis ces métadonnées ; l'EOS/BOS d'id 1 est ajouté comme token spécial CTK2 sans octets de texte. Le wrapper CTK2 de ROZA l'insère quand le moteur demande un BOS et arrête la génération à cet EOS.
 
 ## Limites et critères de validation
 
