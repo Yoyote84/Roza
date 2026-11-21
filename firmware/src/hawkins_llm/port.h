@@ -3,8 +3,9 @@
 #include "llm.h"
 
 // Table de fonctions du moteur embarqué REZOR.
-// Les poids et le tokenizer seront fournis par l'étape 3 ; cette table expose
-// le vrai moteur à Hawkins sans charger de modèle ni réserver sa mémoire.
+// Les poids et le tokenizer finaux sont livrés à la fin de l'étape 3.
+// L'étape 4 les embarque et utilise cette table pour initialiser le moteur
+// local ; obtenir l'API ne charge pas le modèle ni ne réserve sa mémoire.
 struct HawkinsLlmApi {
   decltype(&llm_init_embedded) initEmbedded;
   decltype(&llm_tokenizer_from_memory) tokenizerFromMemory;
