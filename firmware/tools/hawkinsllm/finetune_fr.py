@@ -6,6 +6,7 @@ import argparse
 import json
 import math
 import random
+import shutil
 import time
 from pathlib import Path
 
@@ -203,6 +204,23 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(out_dir, safe_serialization=False)
     tokenizer.save_pretrained(out_dir)
+
+    # LeCarnet's GPT-2 vocab.json deliberately contains six distinct special
+    # token ids with the same empty spelling. Slow-tokenizer serialization can
+    # collapse duplicate JSON keys. Restore the exact source tokenizer files so
+    # CTK2 export preserves BOS/EOS id 1 and the original byte-BPE vocabulary.
+    tokenizer_files = (
+        "vocab.json",
+        "merges.txt",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "special_tokens_map.json",
+        "added_tokens.json",
+    )
+    for filename in tokenizer_files:
+        source_file = Path(snapshot) / filename
+        if source_file.is_file():
+            shutil.copy2(source_file, out_dir / filename)
 
     sample_prompts = [
         "La radio grésille dans le sous-sol. Que remarques-tu ?",
