@@ -1,0 +1,167 @@
+name: Hawkins LeCarnet French model (step 3)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "firmware/src/hawkins_llm/llm.cpp"
+      - "firmware/tools/hawkinsllm/**"
+      - ".github/workflows/hawkins-lecarnet-model.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hawkins-lecarnet-model-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-fr-model:
+    name: Fine-tune LeCarnet-3M, export and test ROZA inference
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      PYTHONUNBUFFERED: "1"
+      TOKENIZERS_PARALLELISM: "false"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    steps:
+      - name: Checkout ROZA
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CPU model and data dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install \
+            transformers==4.51.3 \
+            datasets==3.5.0 \
+            pyarrow==17.0.0 \
+            huggingface_hub==0.30.2 \
+            tokenizers==0.21.1 \
+            safetensors==0.5.3 \
+            numpy==1.26.4 \
+            accelerate==1.5.2
+
+      - name: Prepare French dialogue data
+        run: |
+          python firmware/tools/hawkinsllm/prepare_fr_dataset.py \
+            --output-dir "$RUNNER_TEMP/hawkins-fr-data" \
+            --max-oasst1 1200 \
+            --max-alpaca 5000 \
+            --seed-repeat 6
+
+      - name: Fine-tune French-native LeCarnet-3M
+        run: |
+          python firmware/tools/hawkinsllm/finetune_fr.py \
+            --data-dir "$RUNNER_TEMP/hawkins-fr-data" \
+            --out-dir "$RUNNER_TEMP/lecarnet-hawkins-fr" \
+            --base MaxLSB/LeCarnet-3M \
+            --base-revision 0bf134c \
+            --epochs 3 \
+            --batch-size 16 \
+            --max-length 80 \
+            --learning-rate 0.00005
+
+      - name: Compile ROZA baseline firmware
+        run: |
+          python -m pip install platformio==6.1.6
+          cd firmware
+          platformio run -e cardputer-adv
+          test -s .pio/build/cardputer-adv/firmware.bin
+
+      - name: Export LeCarnet LLaMA Q4_0 row-planar model and CTK2 tokenizer
+        run: |
+          python firmware/tools/hawkinsllm/convert_lecarnet.py \
+            --model-dir "$RUNNER_TEMP/lecarnet-hawkins-fr" \
+            --corpus "$RUNNER_TEMP/hawkins-fr-data/corpus.txt" \
+            --output-model "$RUNNER_TEMP/model_lecarnet_q4.bin" \
+            --output-tokenizer "$RUNNER_TEMP/tokenizer_lecarnet_ctk2.bin" \
+            --context 32 \
+            --min-count 2 \
+            --max-vocab 8000
+
+      - name: Verify model, BPE tokenizer and Flash budget
+        run: |
+          python firmware/tools/hawkinsllm/verify_lecarnet_export.py \
+            --model "$RUNNER_TEMP/model_lecarnet_q4.bin" \
+            --tokenizer "$RUNNER_TEMP/tokenizer_lecarnet_ctk2.bin" \
+            --firmware-bin firmware/.pio/build/cardputer-adv/firmware.bin \
+            --output "$RUNNER_TEMP/lecarnet-export-manifest.json"
+
+      - name: Checkout host harness from audited REZOR source
+        run: |
+          git clone https://github.com/therezor/cardputer-ai.git "$RUNNER_TEMP/cardputer-ai"
+          git -C "$RUNNER_TEMP/cardputer-ai" checkout 78c5128672b750977619dc0a6c3b8baed91168ed
+          cp firmware/src/hawkins_llm/llm.h "$RUNNER_TEMP/cardputer-ai/main/llm.h"
+
+      - name: Compile the actual ROZA LLaMA and CTK2 inference engine
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -pthread \
+            -I "$GITHUB_WORKSPACE/firmware/tools/hawkinsllmtest/host" \
+            -I "$RUNNER_TEMP/cardputer-ai/tools/host" \
+            -I "$RUNNER_TEMP/cardputer-ai/main" \
+            "$RUNNER_TEMP/cardputer-ai/tools/host/host_test.cpp" \
+            firmware/src/hawkins_llm/llm.cpp \
+            -o "$RUNNER_TEMP/roza-lecarnet-host"
+
+      - name: Generate a French Hawkins answer with ROZA engine
+        run: |
+          timeout 180 "$RUNNER_TEMP/roza-lecarnet-host" \
+            "$RUNNER_TEMP/model_lecarnet_q4.bin" \
+            "$RUNNER_TEMP/tokenizer_lecarnet_ctk2.bin" \
+            'User: La radio grésille dans le sous-sol. Que remarques-tu ?\nBot:' \
+            --max 18 --temp 0 --top-p 1 --seed 42 --kv 32 \
+            > "$RUNNER_TEMP/lecarnet-host-answer.txt" \
+            2> "$RUNNER_TEMP/lecarnet-host-diagnostics.txt"
+          test -s "$RUNNER_TEMP/lecarnet-host-answer.txt"
+          cat "$RUNNER_TEMP/lecarnet-host-answer.txt"
+          cat "$RUNNER_TEMP/lecarnet-host-diagnostics.txt"
+
+      - name: Assemble model, tokenizer, memory and inference report
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"])
+          data = json.loads((root / "hawkins-fr-data/dataset_manifest.json").read_text())
+          train = json.loads((root / "lecarnet-hawkins-fr/metrics.json").read_text())
+          export = json.loads((root / "lecarnet-export-manifest.json").read_text())
+          report = {
+              "stage": "3/5",
+              "base_model": "MaxLSB/LeCarnet-3M",
+              "base_model_revision": "0bf134c",
+              "base_model_license": "MIT",
+              "source_dataset_license": "MIT",
+              "fine_tuning_corpora": data,
+              "training_metrics": train,
+              "export": export,
+              "host_inference_sample": (root / "lecarnet-host-answer.txt").read_text(),
+              "host_inference_diagnostics": (root / "lecarnet-host-diagnostics.txt").read_text(),
+              "physical_cardputer_test": "not performed; reserved for stage 5 final firmware test"
+          }
+          (root / "lecarnet-model-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+          print((root / "lecarnet-model-report.json").read_text())
+          PY
+
+      - name: Upload model, tokenizer and validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: hawkins-lecarnet3m-step3-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/model_lecarnet_q4.bin
+            ${{ runner.temp }}/tokenizer_lecarnet_ctk2.bin
+            ${{ runner.temp }}/hawkins-fr-data/dataset_manifest.json
+            ${{ runner.temp }}/lecarnet-hawkins-fr/metrics.json
+            ${{ runner.temp }}/lecarnet-hawkins-fr/samples_fr.jsonl
+            ${{ runner.temp }}/lecarnet-export-manifest.json
+            ${{ runner.temp }}/lecarnet-host-answer.txt
+            ${{ runner.temp }}/lecarnet-host-diagnostics.txt
+            ${{ runner.temp }}/lecarnet-model-report.json
+          if-no-files-found: error
+          retention-days: 30
