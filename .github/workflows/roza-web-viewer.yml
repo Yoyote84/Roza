@@ -9,6 +9,7 @@ on:
       - ".github/workflows/hawkins-ai-android.yml"
       - "firmware/tools/hawkinstest/**"
       - "firmware/tools/hawkinsaitest/**"
+      - "firmware/tools/hawkinsllmtest/**"
       - "firmware/tools/uisim/**"
       - "firmware/platformio.ini"
       - "firmware/partitions_8MB.csv"
@@ -138,6 +139,10 @@ jobs:
       - name: Run native Hawkins AI USB protocol tests
         working-directory: firmware
         run: bash tools/hawkinsaitest/build.sh
+
+      - name: Run native Hawkins LLM engine tests
+        working-directory: firmware
+        run: bash tools/hawkinsllmtest/build.sh
 
       - name: Prepare optional simulator-only credentials
         working-directory: firmware

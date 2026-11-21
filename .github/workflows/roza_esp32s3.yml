@@ -59,7 +59,7 @@ jobs:
       - name: Exécuter les tests logiciels hors matériel
         run: |
           set -euo pipefail
-          for suite in irtest loratest odidtest gnsstest jsontest oventest powertest ramtest astrotest calctest clocktest hawkinstest hawkinsaitest; do
+          for suite in irtest loratest odidtest gnsstest jsontest oventest powertest ramtest astrotest calctest clocktest hawkinstest hawkinsaitest hawkinsllmtest; do
             echo "::group::Suite $suite"
             bash "tools/$suite/build.sh"
             echo "::endgroup::"
