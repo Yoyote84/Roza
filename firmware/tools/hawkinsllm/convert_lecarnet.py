@@ -83,18 +83,76 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
     id_to_piece = {}
     for piece, raw_id in pairs:
         old_id = int(raw_id)
+        if old_id in id_to_piece and id_to_piece[old_id] != piece:
+            raise ValueError(f"two ordinary BPE pieces use token id {old_id}")
         id_to_piece[old_id] = piece
         if piece:
             if piece in vocab:
                 raise ValueError(f"duplicate non-empty BPE token {piece!r}")
             vocab[piece] = old_id
-    if eos_id not in id_to_piece:
-        raise ValueError(f"LeCarnet special EOS id {eos_id} is not present in vocab.json")
+
+    # GPT2Tokenizer keeps its six control tokens outside vocab.json. Their
+    # numeric ids and spellings live in tokenizer_config.json under
+    # added_tokens_decoder (0=<UNK>, 1=<EOS>, 2=<PAD>, ...). Add those IDs to
+    # the id table, but never to the ordinary BPE merge vocabulary.
+    tokenizer_config_path = snapshot / "tokenizer_config.json"
+    if not tokenizer_config_path.is_file():
+        raise FileNotFoundError(f"missing tokenizer metadata: {tokenizer_config_path}")
+    tokenizer_config = json.loads(tokenizer_config_path.read_text(encoding="utf-8"))
+    special_by_id = {}
+    decoder = tokenizer_config.get("added_tokens_decoder", {})
+    if isinstance(decoder, dict):
+        for raw_id, token_info in decoder.items():
+            if not isinstance(token_info, dict) or not isinstance(token_info.get("content"), str):
+                raise ValueError(f"invalid added token metadata for id {raw_id}")
+            token_id = int(raw_id)
+            content = token_info["content"]
+            if token_id in special_by_id and special_by_id[token_id] != content:
+                raise ValueError(f"conflicting special token metadata for id {token_id}")
+            special_by_id[token_id] = content
+
+    # tokenizer.json is a second source of truth for added-token ids. Use it
+    # only as a fallback for checkpoints whose tokenizer_config omits them.
+    if not special_by_id:
+        tokenizer_json_path = snapshot / "tokenizer.json"
+        if tokenizer_json_path.is_file():
+            tokenizer_json = json.loads(tokenizer_json_path.read_text(encoding="utf-8"))
+            for item in tokenizer_json.get("added_tokens", []):
+                if item.get("special"):
+                    special_by_id[int(item["id"])] = str(item["content"])
+
+    for token_id, content in special_by_id.items():
+        existing = id_to_piece.get(token_id)
+        if existing not in (None, "", content):
+            raise ValueError(
+                f"special token id {token_id} conflicts with vocab.json piece {existing!r}"
+            )
+        if existing and vocab.get(existing) == token_id:
+            del vocab[existing]
+        id_to_piece[token_id] = content
+
+    eos_meta = tokenizer_config.get("eos_token")
+    if isinstance(eos_meta, dict):
+        eos_content = eos_meta.get("content")
+    else:
+        eos_content = eos_meta
+    if eos_id not in special_by_id:
+        raise ValueError(
+            f"EOS id {eos_id} is missing from tokenizer_config.json added_tokens_decoder"
+        )
+    if eos_content and special_by_id[eos_id] != eos_content:
+        raise ValueError(
+            f"EOS metadata mismatch: config says {eos_content!r}, "
+            f"added_tokens_decoder says {special_by_id[eos_id]!r}"
+        )
+
     b2u = bytes_to_unicode()
     u2b = {v: k for k, v in b2u.items()}
 
     byte_old = {}
     for old_id, piece in id_to_piece.items():
+        if old_id in special_by_id:
+            continue
         try:
             raw = piece_to_bytes(piece, u2b)
         except KeyError:
@@ -115,7 +173,8 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
         text = path.read_text(encoding="utf-8")
         chunk_size = 500_000
         for start in range(0, len(text), chunk_size):
-            counts.update(tokenizer.encode(text[start:start + chunk_size], add_special_tokens=False))
+            encoded = tokenizer.encode(text[start:start + chunk_size], add_special_tokens=False)
+        counts.update(token_id for token_id in encoded if token_id not in special_by_id)
 
     lines = (snapshot / "merges.txt").read_text(encoding="utf-8").splitlines()
     if lines and lines[0].startswith("#"):
@@ -130,6 +189,8 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
         rid = vocab.get(a + b)
         if rid is None:
             raise ValueError(f"merge rank {rank} result {a+b!r} missing from vocab.json")
+        if a not in vocab or b not in vocab:
+            raise ValueError(f"merge rank {rank} references missing parent token: {a!r}, {b!r}")
         rid = int(rid)
         aid, bid = int(vocab[a]), int(vocab[b])
         if rid in created_by:
