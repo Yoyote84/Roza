@@ -63,13 +63,13 @@ def verify_tokenizer(path: Path, expected_vocab: int):
     magic, vocab, max_len, eos, merges = struct.unpack_from("<Iiiii", data, 0)
     if magic != TOK_MAGIC or vocab != expected_vocab:
         raise ValueError("CTK2 header or vocabulary mismatch")
-    if not (256 <= vocab <= 8000 and 256 <= eos < vocab and 1 <= max_len <= 512 and merges >= 0):
-        raise ValueError("invalid CTK2 dimensions (EOS must be a non-byte special token)")
+    if not (256 <= vocab <= 8000 and 0 <= eos < vocab and 1 <= max_len <= 512 and merges >= 0):
+        raise ValueError("invalid CTK2 dimensions")
     offset = 20
     byte_ids = struct.unpack_from("<256H", data, offset)
     offset += 512
-    if tuple(byte_ids) != tuple(range(256)):
-        raise ValueError("CTK2 byte fallback ids must map to ids 0..255")
+    if any(token_id >= vocab for token_id in byte_ids):
+        raise ValueError("CTK2 byte fallback table references an invalid token ID")
     if offset + merges * 6 > len(data):
         raise ValueError("truncated CTK2 merge table")
     triples = [struct.unpack_from("<HHH", data, offset + i * 6) for i in range(merges)]
@@ -77,13 +77,15 @@ def verify_tokenizer(path: Path, expected_vocab: int):
         raise ValueError("CTK2 merge table is not sorted by pair")
     if any(a >= vocab or b >= vocab or c >= vocab for a, b, c in triples):
         raise ValueError("CTK2 merge references an invalid token")
-    if any(c < 256 or a >= c or b >= c for a, b, c in triples):
+    byte_token_ids = set(byte_ids)
+    if any(c in byte_token_ids or a >= c or b >= c for a, b, c in triples):
         raise ValueError("CTK2 merge ids do not preserve byte-BPE rank order")
     if len({c for _, _, c in triples}) != len(triples):
         raise ValueError("CTK2 contains duplicate merge-result ids")
     offset += merges * 6
     largest = 0
     eos_length = None
+    token_pieces = []
     for token_id in range(vocab):
         if offset + 4 > len(data):
             raise ValueError(f"truncated token {token_id}")
@@ -91,13 +93,29 @@ def verify_tokenizer(path: Path, expected_vocab: int):
         offset += 4
         if length < 0 or length > max_len or offset + length > len(data):
             raise ValueError(f"invalid token length for token {token_id}")
-        if token_id < 256:
-            if length != 1 or data[offset] != token_id:
-                raise ValueError(f"CTK2 byte fallback token {token_id} is not its exact byte")
+        piece = data[offset:offset + length]
+        token_pieces.append(piece)
         if token_id == eos:
             eos_length = length
         largest = max(largest, length)
         offset += length
+    replacement = b"\\xef\\xbf\\xbd"
+    fallback_id = None
+    fallback_bytes = 0
+    for byte_value, token_id in enumerate(byte_ids):
+        piece = token_pieces[token_id]
+        if piece == replacement:
+            if fallback_id is None:
+                fallback_id = token_id
+            elif fallback_id != token_id:
+                raise ValueError("CTK2 uses more than one unknown-byte fallback token")
+            fallback_bytes += 1
+        elif piece != bytes((byte_value,)):
+            raise ValueError(
+                f"CTK2 byte {byte_value} maps to token {token_id} with an invalid piece"
+            )
+    if fallback_id is not None and fallback_id == eos:
+        raise ValueError("CTK2 unknown-byte fallback must not be EOS")
     if eos_length != 0:
         raise ValueError("CTK2 EOS must be a non-text special token with an empty byte piece")
     merge_ids = {c for _, _, c in triples}
@@ -110,6 +128,9 @@ def verify_tokenizer(path: Path, expected_vocab: int):
         "bytes": len(data), "format": "CTK2 byte-level BPE",
         "vocabulary": vocab, "eos_id": eos, "merges": merges,
         "max_token_bytes": max_len,
+        "distinct_byte_token_ids": len(set(byte_ids)),
+        "unknown_fallback_id": fallback_id,
+        "bytes_using_unknown_fallback": fallback_bytes,
     }
 
 
