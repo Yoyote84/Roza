@@ -1,0 +1,171 @@
+name: Hawkins French embedded model (step 3)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "firmware/tools/hawkinsllm/**"
+      - ".github/workflows/hawkins-fr-model.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hawkins-fr-model-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-french-model:
+    name: Fine-tune, export and test French TinyTalk
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      PYTHONUNBUFFERED: "1"
+      TOKENIZERS_PARALLELISM: "false"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    steps:
+      - name: Checkout ROZA
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install CPU training and conversion dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install \
+            transformers==4.46.3 \
+            datasets==3.1.0 \
+            huggingface_hub==0.26.2 \
+            tokenizers==0.20.3 \
+            safetensors==0.4.5 \
+            numpy==1.26.4 \
+            accelerate==1.1.1
+
+      - name: Prepare filtered French training corpus
+        run: |
+          python firmware/tools/hawkinsllm/prepare_fr_dataset.py \
+            --output-dir "$RUNNER_TEMP/hawkins-fr-data" \
+            --max-oasst1 1200 \
+            --seed-repeat 4
+
+      - name: Fine-tune TinyTalk on French dialogues
+        run: |
+          python firmware/tools/hawkinsllm/finetune_fr.py \
+            --data-dir "$RUNNER_TEMP/hawkins-fr-data" \
+            --out-dir "$RUNNER_TEMP/hawkins-fr-checkpoint" \
+            --base TheREZOR/TinyTalk \
+            --base-revision main \
+            --epochs 3 \
+            --batch-size 8 \
+            --max-length 80 \
+            --learning-rate 0.00005
+
+      - name: Checkout audited REZOR converter
+        run: |
+          git clone https://github.com/therezor/cardputer-ai.git "$RUNNER_TEMP/cardputer-ai"
+          git -C "$RUNNER_TEMP/cardputer-ai" checkout 78c5128672b750977619dc0a6c3b8baed91168ed
+          test -s "$RUNNER_TEMP/cardputer-ai/tools/convert_tinystories_instruct.py"
+          echo "REZOR_REF=$(git -C "$RUNNER_TEMP/cardputer-ai" rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Convert to firmware CRDP v3 and CTK2 Q4_0 blobs
+        run: |
+          python "$RUNNER_TEMP/cardputer-ai/tools/convert_tinystories_instruct.py" \
+            --model-dir "$RUNNER_TEMP/hawkins-fr-checkpoint" \
+            --corpus "$RUNNER_TEMP/hawkins-fr-data/corpus.txt" \
+            --min-count 2 \
+            --max-vocab 15500 \
+            --max-pos 80 \
+            --out-dir "$RUNNER_TEMP/cardputer-ai" \
+            --cache "$RUNNER_TEMP/hf-cache" \
+            --keep-bin \
+            --no-cpp
+
+      - name: Compile ROZA baseline firmware and measure Flash budget
+        run: |
+          python -m pip install platformio==6.1.6
+          cd firmware
+          platformio run -e cardputer-adv
+          test -s .pio/build/cardputer-adv/firmware.bin
+
+      - name: Verify exported model and tokenizer against ROZA parser
+        run: |
+          python firmware/tools/hawkinsllm/verify_export.py \
+            --model "$RUNNER_TEMP/cardputer-ai/embed/model_neo_q4.bin" \
+            --tokenizer "$RUNNER_TEMP/cardputer-ai/embed/tok_neo.bin" \
+            --firmware-bin firmware/.pio/build/cardputer-adv/firmware.bin \
+            --output "$RUNNER_TEMP/hawkins-fr-checkpoint/export_manifest.json"
+
+      - name: Compile the actual ROZA inference engine for host smoke test
+        run: |
+          cp firmware/src/hawkins_llm/llm.h "$RUNNER_TEMP/cardputer-ai/main/llm.h"
+          cp firmware/src/hawkins_llm/llm.cpp "$RUNNER_TEMP/cardputer-ai/main/llm.cpp"
+          g++ -std=c++17 -O2 -Wall -Wextra -pthread \
+            -I "$GITHUB_WORKSPACE/firmware/tools/hawkinsllmtest/host" \
+            -I "$RUNNER_TEMP/cardputer-ai/tools/host" \
+            -I "$RUNNER_TEMP/cardputer-ai/main" \
+            "$RUNNER_TEMP/cardputer-ai/tools/host/host_test.cpp" \
+            "$RUNNER_TEMP/cardputer-ai/main/llm.cpp" \
+            -o "$RUNNER_TEMP/hawkins-fr-host"
+
+      - name: Generate a French Hawkins sample through the ROZA engine
+        run: |
+          PROMPT='User: La radio grésille dans le sous-sol. Que remarques-tu ?\nBot:'
+          timeout 180 "$RUNNER_TEMP/hawkins-fr-host" \
+            "$RUNNER_TEMP/cardputer-ai/embed/model_neo_q4.bin" \
+            "$RUNNER_TEMP/cardputer-ai/embed/tok_neo.bin" \
+            "$PROMPT" \
+            --max 24 --temp 0 --top-p 1 --seed 42 --kv 80 \
+            > "$RUNNER_TEMP/hawkins-fr-host-answer.txt" \
+            2> "$RUNNER_TEMP/hawkins-fr-host-diagnostics.txt"
+          test -s "$RUNNER_TEMP/hawkins-fr-host-answer.txt"
+          cat "$RUNNER_TEMP/hawkins-fr-host-answer.txt"
+          cat "$RUNNER_TEMP/hawkins-fr-host-diagnostics.txt"
+
+      - name: Assemble model provenance manifest
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          base = Path(os.environ["RUNNER_TEMP"])
+          data = json.loads((base / "hawkins-fr-data/dataset_manifest.json").read_text())
+          train = json.loads((base / "hawkins-fr-checkpoint/metrics.json").read_text())
+          export = json.loads((base / "hawkins-fr-checkpoint/export_manifest.json").read_text())
+          manifest = {
+              "stage": "3/5",
+              "base_model": "TheREZOR/TinyTalk",
+              "base_model_license": "CC-BY-4.0",
+              "oasst1_license": "Apache-2.0",
+              "upstream_converter": "therezor/cardputer-ai",
+              "upstream_converter_commit": os.environ["REZOR_REF"],
+              "training_data": data,
+              "training_metrics": train,
+              "export": export,
+              "runtime_test": "ROZA llm.cpp host inference completed with non-empty French prompt response",
+              "note": "This is a host smoke test, not yet a physical ESP32-S3 test. Stage 4 embeds the blobs; stage 5 validates the final firmware on Cardputer ADV."
+          }
+          out = base / "hawkins-fr-checkpoint/model-manifest.json"
+          out.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+          print(out.read_text())
+          PY
+
+      - name: Upload model, tokenizer, metrics and smoke-test output
+        uses: actions/upload-artifact@v4
+        with:
+          name: hawkins-fr-model-step3-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/cardputer-ai/embed/model_neo_q4.bin
+            ${{ runner.temp }}/cardputer-ai/embed/tok_neo.bin
+            ${{ runner.temp }}/hawkins-fr-data/dataset_manifest.json
+            ${{ runner.temp }}/hawkins-fr-checkpoint/metrics.json
+            ${{ runner.temp }}/hawkins-fr-checkpoint/samples_fr.jsonl
+            ${{ runner.temp }}/hawkins-fr-checkpoint/model-manifest.json
+            ${{ runner.temp }}/hawkins-fr-host-answer.txt
+            ${{ runner.temp }}/hawkins-fr-host-diagnostics.txt
+          if-no-files-found: error
+          retention-days: 30
