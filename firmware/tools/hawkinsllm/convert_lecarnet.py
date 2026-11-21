@@ -57,10 +57,16 @@ def quantize_q4_v3(matrix: np.ndarray, cols: int) -> bytes:
     gidx = np.arange(groups)[None, :]
     peak = blocks[ridx, gidx, imax]
     scale = peak / -8.0
-    inv = np.where(scale != 0, 1.0 / np.where(scale != 0, scale, 1.0), 0.0)
-    q = np.clip(np.floor(blocks * inv[:, :, None] + 8.5), 0, 15).astype(np.uint8)
     f32 = scale.astype(np.float32).view(np.uint32)
     bf16 = ((f32 + 0x7FFF + ((f32 >> 16) & 1)) >> 16).astype("<u2")
+    # Quantize against the exact BF16 scale that the runtime will decode.
+    rounded_scale = (bf16.astype(np.uint32) << 16).view(np.float32)
+    inv = np.divide(
+        1.0, rounded_scale,
+        out=np.zeros_like(rounded_scale, dtype=np.float32),
+        where=rounded_scale != 0,
+    )
+    q = np.clip(np.floor(blocks * inv[:, :, None] + 8.5), 0, 15).astype(np.uint8)
     packed = (q[:, :, :16] & 0x0F) | ((q[:, :, 16:] & 0x0F) << 4)
     sbytes = 2 * groups
     pad = (-sbytes) % 16
