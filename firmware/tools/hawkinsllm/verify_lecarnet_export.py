@@ -63,8 +63,8 @@ def verify_tokenizer(path: Path, expected_vocab: int):
     magic, vocab, max_len, eos, merges = struct.unpack_from("<Iiiii", data, 0)
     if magic != TOK_MAGIC or vocab != expected_vocab:
         raise ValueError("CTK2 header or vocabulary mismatch")
-    if not (256 <= vocab <= 8000 and 0 <= eos < vocab and 1 <= max_len <= 512 and merges >= 0):
-        raise ValueError("invalid CTK2 dimensions")
+    if not (256 <= vocab <= 8000 and 256 <= eos < vocab and 1 <= max_len <= 512 and merges >= 0):
+        raise ValueError("invalid CTK2 dimensions (EOS must be a non-byte special token)")
     offset = 20
     byte_ids = struct.unpack_from("<256H", data, offset)
     offset += 512
@@ -77,8 +77,13 @@ def verify_tokenizer(path: Path, expected_vocab: int):
         raise ValueError("CTK2 merge table is not sorted by pair")
     if any(a >= vocab or b >= vocab or c >= vocab for a, b, c in triples):
         raise ValueError("CTK2 merge references an invalid token")
+    if any(c < 256 or a >= c or b >= c for a, b, c in triples):
+        raise ValueError("CTK2 merge ids do not preserve byte-BPE rank order")
+    if len({c for _, _, c in triples}) != len(triples):
+        raise ValueError("CTK2 contains duplicate merge-result ids")
     offset += merges * 6
     largest = 0
+    eos_length = None
     for token_id in range(vocab):
         if offset + 4 > len(data):
             raise ValueError(f"truncated token {token_id}")
@@ -86,8 +91,12 @@ def verify_tokenizer(path: Path, expected_vocab: int):
         offset += 4
         if length < 0 or length > max_len or offset + length > len(data):
             raise ValueError(f"invalid token length for token {token_id}")
+        if token_id == eos:
+            eos_length = length
         largest = max(largest, length)
         offset += length
+    if eos_length != 0:
+        raise ValueError("CTK2 EOS must be a non-text special token with an empty byte piece")
     if offset != len(data) or largest != max_len:
         raise ValueError("CTK2 length or trailing-data check failed")
     return {
