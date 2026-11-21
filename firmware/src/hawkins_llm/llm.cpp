@@ -1012,7 +1012,14 @@ static bool merge_scan_cb(void* c, int id, float score, const char* str, int len
 void llm_encode(Tokenizer* tk, const char* text, int8_t bos, int8_t eos,
                 int* tokens, int* n_tokens) {
   if (tk->style == ARCH_GPTNEO) {
-    ctk2_encode(tk, text, tokens, n_tokens);   // bos/eos ignored (GPT-2 has none)
+    // CTK2 is byte-level BPE and may be paired with either GPT-Neo or LLaMA.
+    // GPT-2 style checkpoints can use the same token id for BOS and EOS.
+    *n_tokens = 0;
+    if (bos) tokens[(*n_tokens)++] = tk->eos_id;
+    int encoded = 0;
+    ctk2_encode(tk, text, tokens + *n_tokens, &encoded);
+    *n_tokens += encoded;
+    if (eos) tokens[(*n_tokens)++] = tk->eos_id;
     return;
   }
 
