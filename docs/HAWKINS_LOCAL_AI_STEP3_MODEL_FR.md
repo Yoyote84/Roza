@@ -37,8 +37,9 @@ Les réponses longues, les exemples code/liste, les URLs, adresses e-mail et num
 Le convertisseur \`convert_lecarnet.py\` produit :
 - un modèle CRDP version 3, architecture LLaMA, quantification Q4_0 row-planar ;
 - un tokenizer CTK2 byte-level BPE, réduit à partir des tokens présents dans le corpus et de leurs dépendances BPE.
+- une table couvrant les 256 valeurs d'octet : les 210 tokens de base réellement présents sont conservés, et les 46 valeurs absentes pointent vers l'embedding <UNK> appris. Aucun token ni poids artificiel n'est créé ; les valeurs rares sont rendues par le caractère de remplacement UTF-8.
 
-Le moteur \`firmware/src/hawkins_llm/llm.cpp\` a reçu une branche de lecture CRDP v3 pour LLaMA, tout en conservant le calcul LLaMA existant (RMSNorm, RoPE, SwiGLU) et les chemins GPT-Neo existants. Les six tokens de contrôle du tokenizer LeCarnet sont portés par `tokenizer_config.json` (`added_tokens_decoder`), séparément de `vocab.json` et `merges.txt`. Le convertisseur remappe le BOS/EOS d'origine (id 1) dans le vocabulaire réduit CTK2 et le conserve comme token spécial sans octets de texte ; le moteur insère ce nouvel ID et l'arrête à la génération. Les poids du modèle restent en Flash ; le cache KV et les buffers de calcul utilisent la SRAM interne.
+Le moteur `firmware/src/hawkins_llm/llm.cpp` sélectionne désormais le layout CRDP v3 selon l'architecture déclarée : LLaMA utilise son agencement RMSNorm/RoPE/SwiGLU, tandis que GPT-Neo garde son layout et son cache distincts. Les six tokens de contrôle du tokenizer LeCarnet sont portés par `tokenizer_config.json` (`added_tokens_decoder`), séparément de `vocab.json` et `merges.txt`. Le convertisseur remappe le BOS/EOS d'origine (id 1) dans le vocabulaire réduit CTK2 et le conserve comme token spécial sans octets de texte ; le moteur insère ce nouvel ID et l'arrête à la génération. Les poids du modèle restent en Flash ; le cache KV et les buffers de calcul utilisent la SRAM interne.
 
 ## Validation nécessaire
 
