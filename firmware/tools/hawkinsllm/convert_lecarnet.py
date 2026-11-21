@@ -273,7 +273,7 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
         elif old == unk_id:
             # The existing learned UNK embedding decodes as a visible
             # replacement character when an unsupported byte is encountered.
-            pieces.append(b"\\xef\\xbf\\xbd")
+            pieces.append(b"\xef\xbf\xbd")
         else:
             pieces.append(piece_to_bytes(id_to_piece[old], u2b))
 
@@ -439,7 +439,7 @@ def export_model(model_dir: Path, output: Path, tokenizer_output: Path,
             raise ValueError(f"model alone exceeds app partition: {model_size} bytes")
 
     write_ctk2(tokenizer_output, pieces, merges, eos_new, byte_ids)
-    fallback_bytes = 256 - len(byte_old) if "byte_old" in locals() else 0
+    fallback_bytes = sum(1 for token_id in byte_ids if token_id == unk_new)
     print(f"[+] LLaMA CRDP v3: {model_size:,} bytes; vocabulary={pruned_vocab}")
     print(
         f"[+] CTK2: {tokenizer_output.stat().st_size:,} bytes; "
