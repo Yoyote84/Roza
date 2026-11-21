@@ -10,6 +10,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <esp_heap_caps.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -630,7 +631,8 @@ bool llm_init_embedded(Transformer* T, const uint8_t* model_bytes, size_t model_
   uint8_t quant  = model_bytes[37];
   T->config.shared_classifier = shared;
   T->config.quant_type        = quant;
-  T->config.arch = (version == VERSION_NEO_V3) ? model_bytes[38] : ARCH_LLAMA;
+  T->config.arch = (version == VERSION_NEO_V3)
+      ? static_cast<int>(model_bytes[38]) : static_cast<int>(ARCH_LLAMA);
   if (quant != 4) return false;
   if (T->config.arch != ARCH_LLAMA && T->config.arch != ARCH_GPTNEO) return false;
 
