@@ -215,10 +215,10 @@ def main() -> None:
     model.save_pretrained(out_dir, safe_serialization=False)
     tokenizer.save_pretrained(out_dir)
 
-    # LeCarnet's GPT-2 vocab.json deliberately contains six distinct special
-    # token ids with the same empty spelling. Slow-tokenizer serialization can
-    # collapse duplicate JSON keys. Restore the exact source tokenizer files so
-    # CTK2 export preserves BOS/EOS id 1 and the original byte-BPE vocabulary.
+    # LeCarnet stores its six control-token ids in tokenizer_config.json's
+    # added_tokens_decoder rather than in the ordinary GPT-2 vocab/merge table.
+    # Restore the pinned source tokenizer metadata after save_pretrained so the
+    # exporter can preserve the exact BOS/EOS/PAD/UNK/CLS/MASK/SEP id mapping.
     tokenizer_files = (
         "vocab.json",
         "merges.txt",
