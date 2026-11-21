@@ -153,8 +153,12 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
     # order, then special/non-merge tokens. This preserves the runtime's rule
     # that the lowest output id corresponds to the earliest applicable merge.
     ordered = [byte_old[b] for b in range(256)]
-    ordered += [tid for tid, _ in sorted(rank_by_id.items(), key=lambda item: item[1])
-                if tid in keep and tid not in set(ordered)]
+    byte_set = set(ordered)
+    merge_order = [
+        tid for tid, _ in sorted(rank_by_id.items(), key=lambda item: item[1])
+        if tid in keep and tid not in byte_set
+    ]
+    ordered.extend(merge_order)
     ordered_set = set(ordered)
     extras = sorted(tid for tid in keep if tid not in ordered_set and tid != eos_id)
     ordered += extras
