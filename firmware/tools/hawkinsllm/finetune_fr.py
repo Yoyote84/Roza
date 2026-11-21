@@ -93,8 +93,11 @@ def generate_sample(model, tokenizer, prompt: str, device: str) -> str:
         bos = torch.tensor([[tokenizer.bos_token_id]], dtype=torch.long)
         encoded = torch.cat((bos, encoded), dim=1)
     ids = encoded.to(device)
+    # EOS is also used as PAD for this compact tokenizer, so generation must
+    # receive an explicit mask rather than trying to infer it from token IDs.
+    attention_mask = torch.ones_like(ids)
     out = model.generate(
-        ids, max_new_tokens=28, do_sample=False,
+        ids, attention_mask=attention_mask, max_new_tokens=28, do_sample=False,
         eos_token_id=tokenizer.eos_token_id,
         pad_token_id=tokenizer.eos_token_id,
         use_cache=True,
