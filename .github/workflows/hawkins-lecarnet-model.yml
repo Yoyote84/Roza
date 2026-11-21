@@ -62,10 +62,10 @@ jobs:
             --data-dir "$RUNNER_TEMP/hawkins-fr-data" \
             --out-dir "$RUNNER_TEMP/lecarnet-hawkins-fr" \
             --base MaxLSB/LeCarnet-3M \
-            --base-revision 0bf134c \
+            --base-revision 0bf134cfceb1b00c7c56a0ebbc1560ec634c3502 \
             --epochs 3 \
             --batch-size 16 \
-            --max-length 80 \
+            --max-length 32 \
             --learning-rate 0.00005
 
       - name: Compile ROZA baseline firmware
@@ -137,7 +137,8 @@ jobs:
               "base_model": "MaxLSB/LeCarnet-3M",
               "base_model_revision": "0bf134c",
               "base_model_license": "MIT",
-              "source_dataset_license": "MIT",
+              "pretraining_dataset": "MaxLSB/LeCarnet",
+              "pretraining_dataset_license": "ODC-BY",
               "fine_tuning_corpora": data,
               "training_metrics": train,
               "export": export,
