@@ -180,7 +180,7 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
         chunk_size = 500_000
         for start in range(0, len(text), chunk_size):
             encoded = tokenizer.encode(text[start:start + chunk_size], add_special_tokens=False)
-        counts.update(token_id for token_id in encoded if token_id not in special_by_id)
+            counts.update(token_id for token_id in encoded if token_id not in special_by_id)
 
     lines = (snapshot / "merges.txt").read_text(encoding="utf-8").splitlines()
     if lines and lines[0].startswith("#"):
