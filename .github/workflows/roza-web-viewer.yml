@@ -56,6 +56,19 @@ jobs:
         working-directory: firmware
         run: pio run -e cardputer-adv
 
+      - name: Verify LLM engine and SIMD kernel are linked
+        working-directory: firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          ELF=".pio/build/cardputer-adv/firmware.elf"
+          NM="$(find "$HOME/.platformio/packages" -type f -name 'xtensa-esp32s3-elf-nm' -print -quit)"
+          test -s "$ELF"
+          test -n "$NM"
+          "$NM" -C "$ELF" | grep -F "llm_init_embedded("
+          "$NM" -C "$ELF" | grep -F "hawkinsLlmGetApi"
+          "$NM" "$ELF" | grep -F "dot_q4q8_pie"
+
       - name: Assemble flashable Cardputer ADV images
         working-directory: firmware
         shell: bash
