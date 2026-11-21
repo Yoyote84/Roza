@@ -72,8 +72,9 @@ def quantize_q4_v3(matrix: np.ndarray, cols: int) -> bytes:
 
 def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
               min_count: int, max_vocab: int):
-    # LeCarnet inherits PAGnol's GPT-2 vocabulary. Its first six special-token
-    # ids all have the empty spelling, so preserve duplicate JSON keys.
+    # LeCarnet uses GPT-2 byte-level BPE, but its first six IDs are named
+    # special tokens (<UNK>, <EOS>, <PAD>, <CLS>, <MASK>, <SEP>). Preserve
+    # the exact ID mapping; special tokens are not emitted as ordinary bytes.
     pairs = json.loads(
         (snapshot / "vocab.json").read_text(encoding="utf-8"),
         object_pairs_hook=lambda items: items,
@@ -87,8 +88,8 @@ def prune_bpe(snapshot: Path, corpus_files: list[Path], eos_id: int,
             if piece in vocab:
                 raise ValueError(f"duplicate non-empty BPE token {piece!r}")
             vocab[piece] = old_id
-    if eos_id not in id_to_piece or id_to_piece[eos_id] != "":
-        raise ValueError(f"LeCarnet special EOS id {eos_id} is not present")
+    if eos_id not in id_to_piece:
+        raise ValueError(f"LeCarnet special EOS id {eos_id} is not present in vocab.json")
     b2u = bytes_to_unicode()
     u2b = {v: k for k, v in b2u.items()}
 
