@@ -653,7 +653,7 @@ bool llm_init_embedded(Transformer* T, const uint8_t* model_bytes, size_t model_
   };
   size_t off = 64;
 
-  if (p->arch == ARCH_GPTNEO || g_fmt == VERSION_NEO_V3) {
+  if (p->arch == ARCH_GPTNEO) {
     // v3 row-planar Q4 works for both GPT-Neo and LLaMA compute graphs.
     T->stride_wq    = (size_t)p->dim        * v3_row_stride(p->dim);
     T->stride_wk    = (size_t)kv_dim        * v3_row_stride(p->dim);
