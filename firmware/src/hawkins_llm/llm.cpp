@@ -1,7 +1,7 @@
 // Port ROZA du moteur d'inférence Cardputer AI de REZOR.
 // Source amont : https://github.com/therezor/cardputer-ai
 // Révision auditée : 78c5128672b750977619dc0a6c3b8baed91168ed
-// Modèle absent à cette étape : les poids seront adaptés et ajoutés à l'étape 3.
+// Les poids LeCarnet sont exportés et validés à l'étape 3, puis intégrés au firmware final à l'étape 4.
 // Weights are Q4_0-quantized and embedded into the firmware .bin via .incbin —
 // the MMU maps the app partition into the data space, so reads are zero-copy
 // from flash. Matmul rows are split between core 0 and core 1.
@@ -22,7 +22,7 @@
 static const uint8_t  MAGIC[4]      = { 'C', 'R', 'D', 'P' };
 static const uint32_t VERSION_LLAMA  = 1;   // TinyLLama-v0 (RMSNorm/RoPE/SwiGLU)
 static const uint32_t VERSION_NEO_V2 = 2;   // old interleaved Q4 (rejected: stale)
-static const uint32_t VERSION_NEO_V3 = 3;   // TinyStories (LN/wpe/GELU), row-planar Q4
+static const uint32_t VERSION_NEO_V3 = 3;   // row-planar Q4 (GPT-Neo or LLaMA, selected by arch)
 static const uint32_t TOK_MAGIC      = 0x324B5443; // "CTK2"
 static const int      BLOCK_SIZE    = 32;   // weights per Q4_0 block
 static const size_t   BYTES_PER_BLK = 18;   // v1: 2B bf16 scale + 16B nibbles
