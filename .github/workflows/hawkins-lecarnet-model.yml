@@ -84,7 +84,7 @@ jobs:
             --output-tokenizer "$RUNNER_TEMP/tokenizer_lecarnet_ctk2.bin" \
             --context 32 \
             --min-count 2 \
-            --max-vocab 8000
+            --max-vocab 16000
 
       - name: Verify model, BPE tokenizer and Flash budget
         run: |
