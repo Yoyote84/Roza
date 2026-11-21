@@ -36,7 +36,10 @@ def encode_pair(row: dict[str, str], tokenizer, max_length: int) -> dict[str, li
         prefix = [bos] + prefix
     max_prefix = max(8, max_length - 10)
     if len(prefix) > max_prefix:
-        prefix = prefix[-max_prefix:]
+        if bos is not None:
+            prefix = [prefix[0]] + prefix[-(max_prefix - 1):]
+        else:
+            prefix = prefix[-max_prefix:]
     available = max_length - len(prefix)
     if available < 2:
         raise RuntimeError("Le préfixe consomme toute la fenêtre de contexte.")
