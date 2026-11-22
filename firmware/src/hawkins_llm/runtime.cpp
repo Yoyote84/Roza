@@ -2,6 +2,7 @@
 
 #include "llm.h"
 
+#include <Arduino.h>
 #include <esp_system.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -35,9 +36,16 @@ size_t safeUtf8Length(const char* text, size_t length) {
          (static_cast<unsigned char>(text[start - 1U]) & 0xC0U) == 0x80U) {
     --start;
   }
-  if (start == length) return length;
 
+  if (start == length) {
+    const unsigned char last = static_cast<unsigned char>(text[length - 1U]);
+    if ((last & 0xE0U) == 0xC0U) return length - 1U;
+    if ((last & 0xF0U) == 0xE0U) return length - 1U;
+    if ((last & 0xF8U) == 0xF0U) return length - 1U;
+    return length;
+  }
   if (start == 0U) return 0U;
+
   const unsigned char lead = static_cast<unsigned char>(text[start - 1U]);
   size_t expected = 1U;
   if ((lead & 0xE0U) == 0xC0U) expected = 2U;
