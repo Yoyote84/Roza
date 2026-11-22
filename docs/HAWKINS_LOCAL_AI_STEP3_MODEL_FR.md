@@ -1,6 +1,6 @@
 # Hawkins — étape 3/5 : modèle français final
 
-<badge>Étape 3 terminée — passage à l'étape 4</badge>
+**État : étape 3 terminée — passage à l'étape 4.**
 
 ## Livrable de l'étape 3
 
