@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: hawkins-lecarnet-model-${{ github.ref }}
@@ -124,6 +124,27 @@ jobs:
           )
           print((root / "lecarnet-model-report.json").read_text())
           PY
+
+      - name: Publish the stage-3 model binaries into the firmware source tree
+        run: |
+          mkdir -p firmware/src/hawkins_llm/assets
+          cp "$RUNNER_TEMP/model_lecarnet_q4.bin" firmware/src/hawkins_llm/assets/model_lecarnet_q4.bin
+          cp "$RUNNER_TEMP/tokenizer_lecarnet_ctk2.bin" firmware/src/hawkins_llm/assets/tokenizer_lecarnet_ctk2.bin
+          cp "$RUNNER_TEMP/lecarnet-export-manifest.json" firmware/src/hawkins_llm/assets/model_manifest.json
+          (
+            cd firmware/src/hawkins_llm/assets
+            sha256sum model_lecarnet_q4.bin tokenizer_lecarnet_ctk2.bin > SHA256SUMS.txt
+          )
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add firmware/src/hawkins_llm/assets/model_lecarnet_q4.bin \
+                  firmware/src/hawkins_llm/assets/tokenizer_lecarnet_ctk2.bin \
+                  firmware/src/hawkins_llm/assets/model_manifest.json \
+                  firmware/src/hawkins_llm/assets/SHA256SUMS.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Add final Hawkins French model assets"
+            git push origin HEAD:main
+          fi
 
       - name: Upload final model, tokenizer and handoff report
         uses: actions/upload-artifact@v4
