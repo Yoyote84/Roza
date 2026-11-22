@@ -300,7 +300,7 @@ void hawkinsAiNarrationTask(void*) {
 
   char generated[hawkins::kHawkinsAiTextCapacity + 1U] = {};
   const bool ok = hawkins::hawkinsLlmRuntimeGenerate(
-      prompt, generated, sizeof(generated), 9U);
+      prompt, generated, sizeof(generated), 10U);
 
   portENTER_CRITICAL(&aiWorkerMux);
   snprintf(aiWorkerOutput, sizeof(aiWorkerOutput), "%s", generated);
@@ -325,6 +325,7 @@ bool requestAiNarration() {
   const hawkins::WorldState* world = hawkins::hawkinsRuntimeWorld();
   const char* playerName = playerLoaded ? player.name : "Joueur";
   const char* className = compactAiClassName(playerLoaded ? player.classId : 255U);
+  const uint8_t level = playerLoaded ? player.level : 0U;
   const uint8_t hp = playerLoaded ? player.hitPoints : 0U;
   const uint8_t stress = playerLoaded ? player.stress : 0U;
   const uint32_t day = world ? world->simulatedDays : 0U;
@@ -338,32 +339,38 @@ bool requestAiNarration() {
 
   char fullName[hawkins::kCharacterNameCapacity + 1U] = {};
   char shortName[6] = {};
+  char tinyName[4] = {};
   compactAiName(fullName, sizeof(fullName), playerName,
                 hawkins::kCharacterNameCapacity);
   compactAiName(shortName, sizeof(shortName), playerName, 5U);
+  compactAiName(tinyName, sizeof(tinyName), playerName, 3U);
   if (fullName[0] == '\0') snprintf(fullName, sizeof(fullName), "joueur");
-  if (shortName[0] == '\0') snprintf(shortName, sizeof(shortName), "joueur");
+  if (shortName[0] == '\0') snprintf(shortName, sizeof(shortName), "joueu");
+  if (tinyName[0] == '\0') snprintf(tinyName, sizeof(tinyName), "jou");
 
   // Le moteur ne tronque plus le début du prompt. On essaie d'abord un
-  // contexte riche, puis des variantes compactes dont le budget CTK2 est
-  // vérifié avec le vrai tokenizer avant de lancer l'inférence.
+  // contexte riche avec le niveau et les jauges, puis des variantes compactes.
+  // Chaque forme est mesurée avec le vrai tokenizer CTK2 avant l'inférence.
   char prompt[sizeof(aiWorkerPrompt)] = {};
   int promptLength = snprintf(
       prompt, sizeof(prompt),
-      "User: %s %s PV%u S%u J%lu %s %s %s %s Bot:",
-      fullName, className, unsigned(hp), unsigned(stress),
+      "User: %s %s N%u PV%u S%u J%lu %s %s %s %s Bot:",
+      fullName, className, unsigned(level), unsigned(hp), unsigned(stress),
       static_cast<unsigned long>(day), mood, event, objective, action);
   bool promptFits = promptLength > 0 &&
       static_cast<size_t>(promptLength) < sizeof(prompt) &&
-      hawkins::hawkinsLlmRuntimePromptFits(prompt, 9U);
+      hawkins::hawkinsLlmRuntimePromptFits(prompt, 10U);
 
   if (!promptFits) {
+    // Conserve les éléments de progression les plus importants lorsque le
+    // contexte complet ne tient pas dans les 22 tokens disponibles.
     promptLength = snprintf(prompt, sizeof(prompt),
-        "User: %s %s PV%u %s %s %s %s Bot:",
-        fullName, className, unsigned(hp), mood, event, objective, action);
+        "User: %s %s N%u PV%u %s %s %s Bot:",
+        fullName, className, unsigned(level), unsigned(hp),
+        event, objective, action);
     promptFits = promptLength > 0 &&
         static_cast<size_t>(promptLength) < sizeof(prompt) &&
-        hawkins::hawkinsLlmRuntimePromptFits(prompt, 9U);
+        hawkins::hawkinsLlmRuntimePromptFits(prompt, 10U);
   }
 
   if (!promptFits) {
@@ -372,16 +379,19 @@ bool requestAiNarration() {
         shortName, className, mood, event, objective, action);
     promptFits = promptLength > 0 &&
         static_cast<size_t>(promptLength) < sizeof(prompt) &&
-        hawkins::hawkinsLlmRuntimePromptFits(prompt, 9U);
+        hawkins::hawkinsLlmRuntimePromptFits(prompt, 10U);
   }
 
   if (!promptFits) {
+    // Noms contenant tirets/underscores peuvent coûter plus de sous-tokens.
+    // Trois caractères gardent le nom identifiable tout en préservant le
+    // contexte narratif complet même pour les noms autorisés les plus coûteux.
     promptLength = snprintf(prompt, sizeof(prompt),
-        "User: %s %s %s %s %s Bot:",
-        shortName, event, objective, action, mood);
+        "User: %s %s %s %s %s %s Bot:",
+        tinyName, className, mood, event, objective, action);
     promptFits = promptLength > 0 &&
         static_cast<size_t>(promptLength) < sizeof(prompt) &&
-        hawkins::hawkinsLlmRuntimePromptFits(prompt, 9U);
+        hawkins::hawkinsLlmRuntimePromptFits(prompt, 10U);
   }
 
   if (!promptFits) {

@@ -8,7 +8,7 @@ Ce dossier contient le moteur d'inférence C++ issu de [therezor/cardputer-ai](h
 - Modèle : `MaxLSB/LeCarnet-3M`, révision `0bf134cfceb1b00c7c56a0ebbc1560ec634c3502`, licence MIT.
 - Poids : CRDP v3, LLaMA, Q4_0 row-planar.
 - Tokenizer : CTK2 GPT-2 byte-level BPE.
-- Profil : contexte de 32 tokens ; génération plafonnée à 9 nouveaux tokens, conforme à la fenêtre d'entraînement exportée.
+- Profil : contexte de 32 tokens ; jusqu'à 9 tokens de texte par réponse, avec un pas supplémentaire réservé au token EOS (10 pas de génération maximum).
 
 ## Embarquement Flash
 

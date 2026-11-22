@@ -14,7 +14,7 @@
 ## Raccordement du firmware
 
 - `firmware/src/hawkins_llm/model_data.S` expose les limites des binaires embarqués.
-- `firmware/src/hawkins_llm/runtime.cpp` initialise le moteur, le tokenizer et le sampler, puis génère une narration courte.
+- `firmware/src/hawkins_llm/runtime.cpp` initialise le moteur, le tokenizer et le sampler, expose un contrôle de budget CTK2 et refuse les prompts trop longs sans les tronquer.
 - `firmware/src/hawkins_app.cpp` construit un prompt compact à partir de l'événement Hawkins, du personnage et du choix du joueur.
 - Une tâche FreeRTOS dédiée exécute la génération ; la boucle UI principale conserve la gestion des entrées et de l'écran.
 - Le protocole compagnon HKA/1 n'est plus utilisé par le jeu et a été retiré du lecteur de commandes série.
@@ -27,7 +27,7 @@ Si le chargement du modèle ou une génération échoue, le narrateur affiche un
 
 ## Limites matérielles
 
-Le premier profil utilise un contexte de 32 tokens et limite chaque génération à 16 nouveaux tokens. Il s'agit d'un profil très compact, destiné à une narration brève. La qualité des réponses, la vitesse, le heap réellement libre et la stabilité ne sont pas déclarés validés ici.
+Le profil utilise un contexte de 32 tokens et réserve 10 pas de génération au maximum : jusqu'à 9 tokens de texte, plus le token EOS, comme dans l'entraînement. Le runtime mesure les prompts avec CTK2 et n'efface jamais silencieusement le début du contexte. La qualité des réponses, la vitesse, le heap réellement libre et la stabilité ne sont pas déclarés validés ici.
 
 ## Validation
 

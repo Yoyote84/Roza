@@ -23,7 +23,7 @@ Le Cardputer reste l'autorité sur les règles du jeu et les sauvegardes.
 
 ### 2. Runtime local
 
-`runtime.cpp` initialise le transformeur LLaMA CRDP v3, le tokenizer CTK2 et le sampler. Le profil utilise un contexte de 32 tokens et une génération de 9 tokens maximum, conformément à la fenêtre d'entraînement du modèle. Le runtime compte les tokens CTK2 avant l'inférence : il refuse un contexte trop long au lieu de supprimer silencieusement les premières informations.
+`runtime.cpp` initialise le transformeur LLaMA CRDP v3, le tokenizer CTK2 et le sampler. Le profil utilise un contexte de 32 tokens et jusqu'à 9 tokens de texte, plus le token EOS (10 pas de génération maximum), conformément à la fenêtre d'entraînement. Le runtime compte les tokens CTK2 avant l'inférence : il refuse un contexte trop long au lieu de supprimer silencieusement les premières informations.
 
 Le moteur nettoie les allocations temporaires si l'initialisation échoue. Les échecs de chargement ou une génération vide désactivent seulement le narrateur : le jeu reste utilisable.
 
@@ -31,7 +31,7 @@ Le moteur nettoie les allocations temporaires si l'initialisation échoue. Les �
 
 `hawkins_app.cpp` demande au runtime une narration dans une tâche FreeRTOS séparée, afin de ne pas bloquer directement la boucle d'affichage. Le contexte transmis contient un instantané compact du joueur, du monde, de l'événement, de l'objectif actif et de l'action choisie.
 
-Le prompt compact transmet le nom et la classe du personnage, ses PV lorsque le budget le permet, le niveau de tension du monde, l'événement, l'objectif actif et l'action choisie. Plusieurs formes compactes sont essayées avec le véritable tokenizer ; le prompt retenu tient dans le contexte avant le démarrage de l'inférence.
+Le prompt compact transmet le nom, la classe, le niveau et les PV du personnage lorsque le budget le permet, le niveau de tension du monde, l'événement, l'objectif actif et l'action choisie. Plusieurs formes compactes sont essayées avec le véritable tokenizer ; le prompt retenu tient dans le contexte avant le démarrage de l'inférence.
 
 Le texte généré est affiché sur la page du narrateur et ajouté à la mémoire narrative. Les choix visibles de cette première intégration restent contrôlés par ROZA : Observer, Répondre, Se cacher. Leur sélection ne donne pas au modèle le droit d'altérer directement les données du joueur.
 

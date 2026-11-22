@@ -17,6 +17,6 @@ bool hawkinsLlmRuntimePromptFits(const char* prompt, unsigned maxNewTokens);
 // tâche FreeRTOS dédiée : l'inférence est bloquante pendant le calcul.
 bool hawkinsLlmRuntimeGenerate(const char* prompt, char* output,
                               size_t outputCapacity,
-                              unsigned maxNewTokens = 9U);
+                              unsigned maxNewTokens = 10U);
 
 }  // namespace hawkins
