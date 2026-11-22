@@ -825,6 +825,40 @@ bool llm_init_embedded(Transformer* T, const uint8_t* model_bytes, size_t model_
       && s->att && s->logits && s->key_cache && s->value_cache;
 }
 
+// Libère les buffers de calcul si le chargement du modèle échoue à mi-chemin.
+// Les pointeurs de poids/tokenizer pointent vers la Flash mappée et ne sont pas libérés.
+void llm_free(Transformer* T) {
+  if (!T) return;
+  RunState* s = &T->state;
+#define LLM_RELEASE(member) do { \
+  if (s->member) heap_caps_free(s->member); \
+  s->member = nullptr; \
+} while (0)
+  LLM_RELEASE(x);
+  LLM_RELEASE(xb);
+  LLM_RELEASE(xb2);
+  LLM_RELEASE(hb);
+  LLM_RELEASE(hb2);
+  LLM_RELEASE(q);
+  LLM_RELEASE(k);
+  LLM_RELEASE(v);
+  LLM_RELEASE(att);
+  LLM_RELEASE(logits);
+  LLM_RELEASE(key_cache);
+  LLM_RELEASE(value_cache);
+  LLM_RELEASE(key_cache4);
+  LLM_RELEASE(value_cache4);
+  LLM_RELEASE(k_gscales);
+  LLM_RELEASE(v_gscales);
+#undef LLM_RELEASE
+  if (g_xq) heap_caps_free(g_xq);
+  if (g_xs) heap_caps_free(g_xs);
+  g_xq = nullptr;
+  g_xs = nullptr;
+  g_fmt = 0;
+  memset(T, 0, sizeof(*T));
+}
+
 // ============================================================================
 //  Walking tokenizer — no per-token index in heap. The blob lives in flash
 //  and we linear-scan it for lookups. Each scan touches ~256 KB of mmap'd
