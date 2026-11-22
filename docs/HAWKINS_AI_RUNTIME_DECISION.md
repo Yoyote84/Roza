@@ -1,14 +1,40 @@
 # Décision d'architecture — narrateur IA Hawkins hors ligne
 
-> **Décision historique supersédée le 21 novembre 2026.**  
-> Le pont IA Android/USB décrit dans ce document n'est plus l'architecture cible. La nouvelle décision est le narrateur génératif embarqué directement sur le Cardputer ADV, basé sur le moteur open source Cardputer AI/REZOR et adapté au jeu ROZA. Voir [l'audit de l'étape 1/5](HAWKINS_LOCAL_AI_STEP1_AUDIT.md).
+> **Architecture actuelle — étape 4/5.** Le narrateur tourne directement sur le M5Stack Cardputer ADV. Le pont Android/USB HKA/1 est historique et n'est plus requis par le jeu.
 
-Ce document est conservé pour l'historique technique du pont Android/HKA/1 et pour expliquer les versions déjà compilées. Il ne doit plus guider les nouveaux développements du narrateur.
+## Décision
 
-## Ancienne architecture (historique uniquement)
+- Matériel cible : ESP32-S3FN8 du Cardputer ADV, 8 Mo de Flash, sans PSRAM.
+- Moteur : port C++ Cardputer AI/REZOR intégré au firmware ROZA.
+- Modèle : LeCarnet-3M adapté en français, exporté en CRDP v3 LLaMA Q4_0 row-planar.
+- Tokenizer : CTK2 GPT-2 byte-level BPE.
+- Stockage : poids et tokenizer intégrés à l'image applicative et lus directement depuis la Flash mappée. Aucun fichier modèle sur la microSD n'est nécessaire.
+- Fonctionnement : aucune connexion au téléphone, USB série, Wi-Fi, serveur ou Internet n'est requise pendant une partie.
 
-Le narrateur IA fonctionnait sur le téléphone Android, avec le Cardputer comme autorité du jeu, via USB série CDC. Cette approche a été testée en compilation mais a entraîné des difficultés répétées de réception et de décodage HKA/1 sur le matériel réel.
+## Raccordement du firmware
 
-La cible nouvelle ne dépend plus de ce pont. Le firmware Hawkins devra exécuter son petit modèle génératif sur l'ESP32-S3 lui-même, sans téléphone, sans serveur et sans réseau.
+- `firmware/src/hawkins_llm/model_data.S` expose les limites des binaires embarqués.
+- `firmware/src/hawkins_llm/runtime.cpp` initialise le moteur, le tokenizer et le sampler, puis génère une narration courte.
+- `firmware/src/hawkins_app.cpp` construit un prompt compact à partir de l'événement Hawkins, du personnage et du choix du joueur.
+- Une tâche FreeRTOS dédiée exécute la génération ; la boucle UI principale conserve la gestion des entrées et de l'écran.
+- Le protocole compagnon HKA/1 n'est plus utilisé par le jeu et a été retiré du lecteur de commandes série.
 
-Pour les détails de la décision actuelle, du modèle candidat, des limites matérielles et du plan en cinq étapes, consulter `docs/HAWKINS_LOCAL_AI_STEP1_AUDIT.md`.
+## Responsabilités et garde-fous
+
+Le modèle produit uniquement du texte narratif. Les trois propositions exposées par l'interface sont des choix contrôlés par ROZA. Leur sélection est enregistrée dans la mémoire narrative et peut alimenter la narration suivante ; elle n'autorise pas le modèle à modifier les PV, les caractéristiques, l'inventaire, les missions, les compétences ou les sauvegardes.
+
+Si le chargement du modèle ou une génération échoue, le narrateur affiche un état d'indisponibilité et le jeu déterministe reste utilisable.
+
+## Limites matérielles
+
+Le premier profil utilise un contexte de 32 tokens et limite chaque génération à 16 nouveaux tokens. Il s'agit d'un profil très compact, destiné à une narration brève. La qualité des réponses, la vitesse, le heap réellement libre et la stabilité ne sont pas déclarés validés ici.
+
+## Validation
+
+- L'étape 3 livre les vrais poids et le tokenizer.
+- L'étape 4 raccorde ces fichiers au firmware et au jeu.
+- Les contrôles de qualité des réponses, les mesures sur la carte, la compilation finale, la vérification Flash/RAM et l'installation sont réservés à l'étape 5, puis aux retours d'essai.
+
+## Ancienne architecture (historique)
+
+L'application Android `android/hawkins-ai-bridge` et le protocole `HKA/1` restent dans le dépôt comme prototype historique. Ils ne sont plus une dépendance du jeu Hawkins.
