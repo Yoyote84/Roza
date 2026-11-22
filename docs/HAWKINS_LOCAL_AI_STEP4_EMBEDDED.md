@@ -1,5 +1,7 @@
 # Hawkins — étape 4/5 : intégration de l'IA embarquée
 
+<badge>Étape 4 intégrée — prête pour l'étape 5</badge>
+
 ## Objectif
 
 Intégrer le modèle français LeCarnet-3M, livré à l'étape 3, directement dans l'application Hawkins du firmware ROZA. À la fin de cette étape, le code est conçu pour produire la narration sur le Cardputer ADV sans compagnon Android, câble USB vers le téléphone, Wi-Fi ou Internet.
@@ -60,11 +62,12 @@ Une fonction `llm_free` libère les allocations de calcul si l'initialisation es
 - [x] Génération déplacée vers une tâche FreeRTOS.
 - [x] Chemin compagnon Android/HKA retiré du flux du jeu.
 - [x] Documentation mise à jour.
-- [ ] Publication des binaires dans `firmware/src/hawkins_llm/assets/` par le workflow d'export de l'étape 3.
-- [ ] Compilation du firmware avec les deux binaires réellement présents dans le dépôt.
-- [ ] Mesures physiques de mémoire, débit et qualité sur le Cardputer : réservées après l'étape 5.
+- [x] Publication des poids, du tokenizer, du manifeste et des SHA-256 dans `firmware/src/hawkins_llm/assets/`.
+- [x] Chemins `.incbin` alignés sur les fichiers publiés ; runtime local raccordé à Hawkins.
+- [ ] Compilation complète de l'image finale : réservée à l'étape 5.
+- [ ] Mesures physiques de mémoire, débit, qualité et stabilité sur le Cardputer : réservées après l'étape 5.
 
-Tant que la publication des binaires n'est pas terminée, la source d'embarquement `.S` référence les chemins attendus, mais la compilation de l'image complète ne peut pas être considérée comme finalisée.
+La publication des binaires est terminée. La source d'embarquement `.S` référence les fichiers présents dans le dépôt. L'intégration logicielle de l'étape 4 est réalisée ; la compilation de l'image complète et sa validation sont volontairement reportées à l'étape 5.
 
 ## Frontière avec l'étape 5
 
