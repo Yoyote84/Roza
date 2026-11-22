@@ -1,11 +1,6 @@
 name: Hawkins French embedded model (step 3)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "firmware/tools/hawkinsllm/**"
-      - ".github/workflows/hawkins-fr-model.yml"
   workflow_dispatch:
 
 permissions:
