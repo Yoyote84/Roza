@@ -1,6 +1,6 @@
 #include "runtime.h"
 
-#include "llm.h"
+#include "port.h"
 
 #include <Arduino.h>
 #include <esp_system.h>
@@ -113,8 +113,15 @@ bool hawkinsLlmRuntimeInit() {
   memset(&tokenizer, 0, sizeof(tokenizer));
   memset(&sampler, 0, sizeof(sampler));
 
-  if (!llm_init_embedded(&transformer, hawkins_model_start, modelSize,
-                         kRuntimeContextLimit)) {
+  const HawkinsLlmApi& api = hawkinsLlmGetApi();
+  if (!api.initEmbedded || !api.tokenizerFromMemory || !api.buildSampler ||
+      !api.forward || !api.sample || !api.encode || !api.decode) {
+    Serial.println("[hawkins-llm] table API du moteur incomplete");
+    return false;
+  }
+
+  if (!api.initEmbedded(&transformer, hawkins_model_start, modelSize,
+                        kRuntimeContextLimit)) {
     llm_free(&transformer);
     Serial.printf("[hawkins-llm] en-tete ou allocation du modele invalide (%u octets)\n",
                   static_cast<unsigned>(modelSize));
@@ -129,16 +136,16 @@ bool hawkinsLlmRuntimeInit() {
     return false;
   }
 
-  if (!llm_tokenizer_from_memory(&tokenizer, hawkins_tokenizer_start,
-                                 tokenizerSize,
-                                 transformer.config.vocab_size)) {
+  if (!api.tokenizerFromMemory(&tokenizer, hawkins_tokenizer_start,
+                               tokenizerSize,
+                               transformer.config.vocab_size)) {
     llm_free(&transformer);
     Serial.println("[hawkins-llm] tokenizer CTK2 invalide");
     return false;
   }
 
-  llm_build_sampler(&sampler, transformer.config.vocab_size,
-                    0.80f, 0.92f,
+  api.buildSampler(&sampler, transformer.config.vocab_size,
+                   0.80f, 0.92f,
                     static_cast<uint64_t>(esp_random()));
   runtimeReady = true;
   Serial.printf("[hawkins-llm] modele embarque pret: CRDP v3 LLaMA, vocab=%d, contexte=%d, poids=%u, tokenizer=%u\n",
@@ -176,9 +183,10 @@ bool hawkinsLlmRuntimeGenerate(const char* prompt, char* output,
   memcpy(boundedPrompt, prompt + sourceStart, boundedLength);
   boundedPrompt[boundedLength] = '\0';
 
+  const HawkinsLlmApi& api = hawkinsLlmGetApi();
   int tokens[kMaxEncodedPromptTokens] = {};
   int tokenCount = 0;
-  llm_encode(&tokenizer, boundedPrompt, 1, 0, tokens, &tokenCount);
+  api.encode(&tokenizer, boundedPrompt, 1, 0, tokens, &tokenCount);
   if (tokenCount < 2 || tokenCount > kMaxEncodedPromptTokens) return false;
 
   const int contextLimit =
@@ -203,7 +211,7 @@ bool hawkinsLlmRuntimeGenerate(const char* prompt, char* output,
 
   float* logits = nullptr;
   for (int position = 0; position < tokenCount; ++position) {
-    logits = llm_forward(&transformer, tokens[position], position);
+    logits = api.forward(&transformer, tokens[position], position);
     if (!logits) return false;
   }
 
@@ -213,12 +221,12 @@ bool hawkinsLlmRuntimeGenerate(const char* prompt, char* output,
   for (unsigned generated = 0U;
        generated < generationLimit && position < contextLimit;
        ++generated) {
-    const int next = llm_sample(&sampler, logits);
+    const int next = api.sample(&sampler, logits);
     if (next < 0 || next >= tokenizer.vocab_size) break;
     if (next == tokenizer.eos_id) break;
 
     piece[0] = '\0';
-    const char* decoded = llm_decode(&tokenizer, previous, next,
+    const char* decoded = api.decode(&tokenizer, previous, next,
                                      piece, sizeof(piece));
     if (decoded && decoded[0] != '\0') {
       const size_t used = strlen(output);
@@ -238,7 +246,7 @@ bool hawkinsLlmRuntimeGenerate(const char* prompt, char* output,
     ++position;
     previous = next;
     if (position >= contextLimit) break;
-    logits = llm_forward(&transformer, next, position - 1);
+    logits = api.forward(&transformer, next, position - 1);
     if (!logits) break;
   }
 
