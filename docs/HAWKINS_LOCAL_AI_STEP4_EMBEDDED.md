@@ -1,6 +1,6 @@
 # Hawkins — étape 4/5 : intégration de l'IA embarquée
 
-<badge>Étape 4 intégrée — prête pour l'étape 5</badge>
+**État : étape 4 intégrée — prête pour l'étape 5.**
 
 ## Objectif
 
