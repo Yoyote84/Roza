@@ -236,6 +236,7 @@ jobs:
             *.bin BUILD_MANIFEST.json model_manifest.json MODEL_SHA256SUMS.txt \
             PLATFORMIO_MEMORY.txt PLATFORMIO_BUILD_REPORT.txt ELF_SECTIONS.txt INSTALLATION.txt \
             > SHA256SUMS.txt)
+          (cd "$PACKAGE" && sha256sum -c SHA256SUMS.txt)
           ls -lh "$PACKAGE"
 
       - name: Upload flashable firmware package

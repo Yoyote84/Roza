@@ -34,7 +34,7 @@ void logInternalHeap(const char* phase) {
   const uint32_t capabilities = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
   const size_t freeBytes = heap_caps_get_free_size(capabilities);
   const size_t largestBlock = heap_caps_get_largest_free_block(capabilities);
-  Serial.printf("[hawkins-llm] HEAP %s : libre=%u octets, bloc_max=%u octets\\n",
+  Serial.printf("[hawkins-llm] HEAP %s : libre=%u octets, bloc_max=%u octets\n",
                 phase, static_cast<unsigned>(freeBytes),
                 static_cast<unsigned>(largestBlock));
 }
