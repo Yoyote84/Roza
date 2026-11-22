@@ -75,7 +75,7 @@ char aiNarration[hawkins::kHawkinsAiTextCapacity + 1U] = {};
 char aiChoices[hawkins::kHawkinsAiChoiceCount][hawkins::kHawkinsAiChoiceCapacity + 1U] = {};
 uint8_t aiChoiceCount = 0U;
 char aiUserAction[hawkins::kHawkinsAiChoiceCapacity + 1U] = {};
-char aiWorkerPrompt[128] = {};
+char aiWorkerPrompt[256] = {};
 char aiWorkerOutput[hawkins::kHawkinsAiTextCapacity + 1U] = {};
 portMUX_TYPE aiWorkerMux = portMUX_INITIALIZER_UNLOCKED;
 const char* aiStatusText = "IA LOCALE EN ATTENTE";
@@ -244,7 +244,7 @@ void hawkinsAiNarrationTask(void*) {
 
   char generated[hawkins::kHawkinsAiTextCapacity + 1U] = {};
   const bool ok = hawkins::hawkinsLlmRuntimeGenerate(
-      prompt, generated, sizeof(generated), 16U);
+      prompt, generated, sizeof(generated), 12U);
 
   portENTER_CRITICAL(&aiWorkerMux);
   snprintf(aiWorkerOutput, sizeof(aiWorkerOutput), "%s", generated);
@@ -269,18 +269,29 @@ bool requestAiNarration() {
   const hawkins::WorldState* world = hawkins::hawkinsRuntimeWorld();
   const char* eventName = world
       ? hawkins::eventTypeName(world->latestEvent.type) : "HAWKINS";
+  const uint32_t day = world ? world->simulatedDays : 0U;
+  const uint8_t tension = world ? world->tension : 0U;
+  const uint8_t anomaly = world ? world->anomalyLevel : 0U;
   const char* playerName = playerLoaded ? player.name : "Joueur";
+  const char* className = playerLoaded
+      ? hawkins::characterClass(player.classId).name : "Aucune classe";
+  const uint8_t level = playerLoaded ? player.level : 0U;
+  const uint8_t hp = playerLoaded ? player.hitPoints : 0U;
+  const uint8_t stress = playerLoaded ? player.stress : 0U;
+  const char* objective = currentMovementObjective();
   const char* action = aiUserAction[0] != '\0'
-      ? aiUserAction : "observer la scene";
+      ? aiUserAction : "observer";
 
-  // Le modèle a un contexte de 32 tokens. On transmet volontairement un
-  // instantané très court du jeu ; le runtime conserve le marqueur Bot: et la
-  // fin du contexte si le tokenizer dépasse cette fenêtre.
+  // Le modèle dispose de 32 tokens au total : une partie est réservée à la
+  // réponse. L'ordre place l'état joueur, le monde et l'objectif avant
+  // l'action afin que le runtime conserve le contexte le plus utile.
   char prompt[sizeof(aiWorkerPrompt)] = {};
   const int promptLength = snprintf(
       prompt, sizeof(prompt),
-      "User: Hawkins. %s. %s: %s. Continue en français.\nBot:",
-      eventName, playerName, action);
+      "User: %s, %s, niveau %u, PV %u, stress %u. Jour %lu, tension %u, anomalie %u, %s. Mission: %s. Action: %s. Bot:",
+      playerName, className, unsigned(level), unsigned(hp), unsigned(stress),
+      static_cast<unsigned long>(day), unsigned(tension), unsigned(anomaly),
+      eventName, objective, action);
   if (promptLength < 0 ||
       static_cast<size_t>(promptLength) >= sizeof(prompt)) {
     aiStatusText = "CONTEXTE IA TROP LONG";
