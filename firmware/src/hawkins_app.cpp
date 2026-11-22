@@ -1,5 +1,6 @@
 #include "hawkins_app.h"
 #include "hawkins_runtime.h"
+#include "hawkins_ai_protocol.h"  // tailles bornées des buffers de narration/choix
 #include "hawkins_nvs.h"
 #include "hawkins_exploration.h"
 #include "hawkins_character.h"
@@ -269,7 +270,7 @@ bool requestAiNarration() {
   const char* eventName = world
       ? hawkins::eventTypeName(world->latestEvent.type) : "HAWKINS";
   const char* playerName = playerLoaded ? player.name : "Joueur";
-  const char* action = aiUserAction[0] != '\\0'
+  const char* action = aiUserAction[0] != '\0'
       ? aiUserAction : "observer la scene";
 
   // Le modèle a un contexte de 32 tokens. On transmet volontairement un
@@ -278,7 +279,7 @@ bool requestAiNarration() {
   char prompt[sizeof(aiWorkerPrompt)] = {};
   const int promptLength = snprintf(
       prompt, sizeof(prompt),
-      "User: Hawkins. %s. %s: %s. Continue en français.\\nBot:",
+      "User: Hawkins. %s. %s: %s. Continue en français.\nBot:",
       eventName, playerName, action);
   if (promptLength < 0 ||
       static_cast<size_t>(promptLength) >= sizeof(prompt)) {
@@ -289,7 +290,7 @@ bool requestAiNarration() {
 
   portENTER_CRITICAL(&aiWorkerMux);
   snprintf(aiWorkerPrompt, sizeof(aiWorkerPrompt), "%s", prompt);
-  aiWorkerOutput[0] = '\\0';
+  aiWorkerOutput[0] = '\0';
   aiWorkerDone = false;
   aiWorkerOk = false;
   portEXIT_CRITICAL(&aiWorkerMux);
@@ -298,10 +299,10 @@ bool requestAiNarration() {
   aiPending = true;
   aiTimedOut = false;
   aiRequestAtMs = millis();
-  aiNarration[0] = '\\0';
+  aiNarration[0] = '\0';
   aiChoiceCount = 0U;
   aiStatusText = "NARRATION LOCALE EN COURS...";
-  aiUserAction[0] = '\\0';
+  aiUserAction[0] = '\0';
 
   const BaseType_t created = xTaskCreatePinnedToCore(
       hawkinsAiNarrationTask, "hawkins_ai", 8192, nullptr, 2, nullptr, 0);
@@ -1002,7 +1003,7 @@ void hawkinsAppAiUpdate() {
       return;
     }
     aiPending = false;
-    if (succeeded && generated[0] != '\\0') {
+    if (succeeded && generated[0] != '\0') {
       snprintf(aiNarration, sizeof(aiNarration), "%s", generated);
       snprintf(aiChoices[0], sizeof(aiChoices[0]), "%s", "Observer");
       snprintf(aiChoices[1], sizeof(aiChoices[1]), "%s", "Repondre");
@@ -1011,11 +1012,11 @@ void hawkinsAppAiUpdate() {
       aiStatusText = "NARRATION GENEREE SUR LE CARDPUTER";
       addNarrativeRecord(hawkins::NarrativeRecordType::AiNarration, 0U,
                          static_cast<uint16_t>(aiChoiceCount), 0U);
-      Serial.printf("[hawkins-llm] narration locale recue: %u octets, %u choix\\n",
+      Serial.printf("[hawkins-llm] narration locale recue: %u octets, %u choix\n",
                     static_cast<unsigned>(strlen(aiNarration)),
                     static_cast<unsigned>(aiChoiceCount));
     } else {
-      aiNarration[0] = '\\0';
+      aiNarration[0] = '\0';
       aiChoiceCount = 0U;
       aiStatusText = "IA INDISPONIBLE - JEU LOCAL ACTIF";
       Serial.println("[hawkins-llm] generation interrompue ou sans texte");
@@ -1035,7 +1036,7 @@ void hawkinsAppEnter() {
   const bool modelReady = hawkins::hawkinsLlmRuntimeInit();
   aiStatusText = modelReady ? "IA LOCALE EMBARQUEE PRETE"
                             : "IA LOCALE INDISPONIBLE - JEU ACTIF";
-  Serial.printf("[hawkins-llm] modele embarque %s; le jeu reste autonome\\n",
+  Serial.printf("[hawkins-llm] modele embarque %s; le jeu reste autonome\n",
                 modelReady ? "pret" : "indisponible");
   showAiNarration = false;
   candidateActive = false;
