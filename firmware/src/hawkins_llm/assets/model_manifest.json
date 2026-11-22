@@ -1,0 +1,35 @@
+{
+  "status": "valid",
+  "model": {
+    "bytes": 1050048,
+    "version": 3,
+    "architecture": "llama",
+    "dim": 64,
+    "hidden": 256,
+    "layers": 8,
+    "heads": 16,
+    "vocabulary": 14104,
+    "context": 32,
+    "quantization": "Q4_0 row-planar"
+  },
+  "tokenizer": {
+    "bytes": 230722,
+    "format": "CTK2 byte-level BPE",
+    "vocabulary": 14104,
+    "eos_id": 14103,
+    "merges": 13892,
+    "max_token_bytes": 19,
+    "distinct_byte_token_ids": 211,
+    "unknown_fallback_id": 14102,
+    "bytes_using_unknown_fallback": 46
+  },
+  "base_firmware_bytes": 3769088,
+  "estimated_embedded_total_bytes": 5049858,
+  "application_partition_bytes": 8257536,
+  "safety_margin_bytes": 262144,
+  "remaining_after_margin_bytes": 2945534,
+  "estimated_llm_dynamic_heap_bytes": 127872,
+  "estimated_llm_dynamic_heap_kib": 124.88,
+  "runtime_heap_note": "Arithmetic estimate from llm_init_embedded allocations; not a measurement of free heap on the physical Cardputer. Stage 5 must log heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) before/after init.",
+  "note": "Estimation before stage-4 embedding; final binary size and runtime heap must be remeasured."
+}
