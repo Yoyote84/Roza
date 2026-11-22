@@ -1,18 +1,14 @@
-# Pont IA locale Hawkins par USB CDC
+# Ancien protocole HKA/1 — référence historique
 
-Cette livraison introduit le protocole de transport HKA/1 et ses tests natifs. Le pont ne modifie pas les sauvegardes ni l'état du personnage.
+**Statut : obsolète pour le jeu Hawkins actuel.**
 
-## Format
+Le protocole HKA/1 décrivait un ancien pont entre le Cardputer et un compagnon Android. L'étape 4 a remplacé ce chemin : le narrateur utilise désormais le moteur LeCarnet embarqué dans la Flash du Cardputer.
 
-Les trames sont des lignes UTF-8 précédées de `HKA/1 `, terminées par LF. L'application compagnon doit utiliser la liaison USB série du Cardputer, pas le Wi-Fi.
+Le firmware n'a plus besoin d'une trame `hello`, `narrate`, `narration`, `ack` ou `nack` pour produire une scène. Le lecteur série est réservé aux commandes ROZA habituelles. Aucun deuxième lecteur série n'est créé.
 
-- Téléphone vers Cardputer : `{"type":"hello","version":1}`
-- Cardputer vers téléphone : `{"type":"narrate","id":N,"context":{...}}`
-- Téléphone vers Cardputer : `{"type":"narration","id":N,"text":"..."}`
-- Erreur : `{"type":"error","id":N,"message":"..."}`
+L'application Android et le code du protocole sont conservés uniquement pour retracer l'ancien prototype. Ne pas les utiliser comme procédure d'installation ou comme dépendance à l'étape 5.
 
-Le firmware doit limiter la taille des trames, vérifier le numéro de requête, et ne jamais appliquer des actions de gameplay proposées par le modèle sans validation explicite.
-
-## État
-
-Cette livraison est une fondation testée en CI, et non une intégration complète du port USB ni l'application Android d'inférence. Le passage à l'étape 5 est prématuré tant que ces éléments ne sont pas livrés et compilés.
+Voir :
+- `docs/HAWKINS_LOCAL_AI_STEP1_AUDIT.md` — plan des cinq étapes ;
+- `docs/HAWKINS_LOCAL_AI_STEP3_MODEL_FR.md` — modèle français livré ;
+- `docs/HAWKINS_LOCAL_AI_STEP4_EMBEDDED.md` — intégration embarquée actuelle.
