@@ -315,8 +315,11 @@ bool requestAiNarration() {
   aiStatusText = "NARRATION LOCALE EN COURS...";
   aiUserAction[0] = '\0';
 
+  // loopTask du firmware tourne sur le cœur 1. En lançant le worker IA
+  // sur ce cœur, le moteur matriciel REZOR crée son mm_worker sur le cœur 0 ;
+  // celui-ci peut calculer pendant que loopTask reste réveillable sur le cœur 1.
   const BaseType_t created = xTaskCreatePinnedToCore(
-      hawkinsAiNarrationTask, "hawkins_ai", 8192, nullptr, 2, nullptr, 0);
+      hawkinsAiNarrationTask, "hawkins_ai", 8192, nullptr, 2, nullptr, 1);
   if (created != pdPASS) {
     aiWorkerRunning = false;
     aiPending = false;
