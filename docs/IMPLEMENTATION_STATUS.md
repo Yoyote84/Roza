@@ -69,3 +69,16 @@ Audit documentaire actualisé sur `main` après le commit `c83499428c564ada2c969
 ## Rapport obligatoire à chaque lot
 
 Indiquer branche, SHA complet, fichiers modifiés, recherche de doublons, commandes et résultats, compilation locale, lien CI du SHA exact, tests logiciels, essais physiques (ou « non testés sur matériel »), risques et prochaine action. Une CI verte prouve uniquement la compilation dans l'environnement CI.
+
+
+## Hawkins — intégration de l'IA locale (plan en cinq étapes)
+
+Ce suivi concerne le jeu Hawkins et complète le statut général du firmware ROZA.
+
+- **Étape 1/5 — architecture :** moteur embarqué retenu, contraintes Cardputer ADV et séparation des responsabilités documentées dans `docs/HAWKINS_LOCAL_AI_STEP1_AUDIT.md`.
+- **Étape 2/5 — moteur :** port du moteur Cardputer AI/REZOR dans `firmware/src/hawkins_llm/`.
+- **Étape 3/5 — modèle français :** LeCarnet-3M fine-tuné et exporté en poids CRDP v3 LLaMA Q4_0 + tokenizer CTK2. Le paquet final et les empreintes sont documentés dans `docs/HAWKINS_LOCAL_AI_STEP3_MODEL_FR.md`. Le workflow republie actuellement les deux binaires dans `firmware/src/hawkins_llm/assets/` pour les inclure dans le firmware.
+- **Étape 4/5 — intégration en cours :** runtime local `runtime.cpp/.h`, symboles `model_data.S`, contrôle préalable de l'en-tête CRDP, gestion des échecs d'allocation, prompt court basé sur le monde/personnage/objectif/action, tâche FreeRTOS séparée et retrait de la dépendance HKA/1 au compagnon Android. Voir `docs/HAWKINS_LOCAL_AI_STEP4_EMBEDDED.md`.
+- **Étape 5/5 — firmware final et essais :** pas encore commencée. Le paquet Factory et la première installation sur le Cardputer ADV restent réservés à cette étape.
+
+**État honnête :** la source de l'intégration de l'étape 4 est présente, mais l'étape ne sera pas déclarée terminée tant que les fichiers binaires ne seront pas publiés dans `assets/` et incorporés à l'image applicative. Aucune génération qualitative du modèle ni aucun essai matériel intermédiaire n'est déclaré. La qualité des réponses, le heap réel, le débit et la stabilité seront vérifiés après l'étape 5.
