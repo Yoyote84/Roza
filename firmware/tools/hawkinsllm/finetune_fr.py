@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # The stage-3 workflow publishes the exported binaries for the offline stage-4 firmware.
+# Asset publication refreshes main after model training to preserve parallel stage-4 commits.
 """Fine-tune TheREZOR/TinyTalk on short French chat pairs for an 80-token MCU window."""
 
 from __future__ import annotations
