@@ -8,7 +8,7 @@ Ce dossier contient le moteur d'inférence C++ issu de [therezor/cardputer-ai](h
 - Modèle : `MaxLSB/LeCarnet-3M`, révision `0bf134cfceb1b00c7c56a0ebbc1560ec634c3502`, licence MIT.
 - Poids : CRDP v3, LLaMA, Q4_0 row-planar.
 - Tokenizer : CTK2 GPT-2 byte-level BPE.
-- Profil : contexte de 32 tokens ; génération plafonnée à 12 nouveaux tokens.
+- Profil : contexte de 32 tokens ; génération plafonnée à 9 nouveaux tokens, conforme à la fenêtre d'entraînement exportée.
 
 ## Embarquement Flash
 
@@ -23,7 +23,7 @@ Les fichiers produits à l'étape 3 sont publiés dans `assets/` par le workflow
 
 ## Runtime et application
 
-- `runtime.cpp` valide les limites des binaires, initialise `Transformer`, `Tokenizer` et `Sampler`, puis exécute la génération.
+- `runtime.cpp` valide les limites des binaires, initialise `Transformer`, `Tokenizer` et `Sampler`, vérifie le budget CTK2 avant l'inférence et refuse un prompt trop long au lieu d'en supprimer silencieusement le début.
 - `hawkins_app.cpp` construit un prompt court à partir du monde Hawkins, du personnage et de l'action du joueur.
 - La génération s'exécute dans une tâche FreeRTOS dédiée sur le cœur 1 ; le moteur garde son worker de calcul Q4 sur le cœur 0.
 - Les résultats sont rapatriés dans la boucle principale pour modifier l'écran et la mémoire narrative.

@@ -1,9 +1,9 @@
 #include "port.h"
 
 // Les pointeurs vers chaque entrée publique gardent le moteur réel dans le
-// firmware lié. Les poids et le tokenizer exportés à l'étape 3 seront raccordés
-// par l'application Hawkins à l'étape 4.
-// Aucun modèle n'est chargé ici : aucune allocation du cache KV n'est faite.
+// firmware lié. Les poids et le tokenizer LeCarnet sont embarqués par
+// model_data.S ; runtime.cpp les initialise à l'entrée du jeu Hawkins.
+// Cette table centralise les appels au moteur REZOR, sans copie ni stub.
 const HawkinsLlmApi& hawkinsLlmGetApi() {
   static const HawkinsLlmApi api = {
       &llm_init_embedded,

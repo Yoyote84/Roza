@@ -55,6 +55,37 @@ size_t safeUtf8Length(const char* text, size_t length) {
   return length;
 }
 
+// Encode exactement le prompt fourni, sans couper son début ou sa fin.
+// Le tokenizer CTK2 produit au plus un token par octet, plus le BOS.
+bool encodeBoundedPrompt(const char* prompt, int* tokens, int& tokenCount) {
+  tokenCount = 0;
+  if (!prompt || !tokens) return false;
+  const size_t promptLength = strnlen(prompt, kMaxPromptBytes + 1U);
+  if (promptLength == 0U || promptLength > kMaxPromptBytes ||
+      safeUtf8Length(prompt, promptLength) != promptLength) return false;
+
+  char boundedPrompt[kMaxPromptBytes + 1U] = {};
+  memcpy(boundedPrompt, prompt, promptLength);
+  boundedPrompt[promptLength] = '\0';
+
+  const HawkinsLlmApi& api = hawkinsLlmGetApi();
+  if (!api.encode) return false;
+  api.encode(&tokenizer, boundedPrompt, 1, 0, tokens, &tokenCount);
+  return tokenCount >= 2 && tokenCount <= kMaxEncodedPromptTokens;
+}
+
+int runtimeContextLimit() {
+  return transformer.config.seq_len < kRuntimeContextLimit
+      ? transformer.config.seq_len : kRuntimeContextLimit;
+}
+
+unsigned runtimeGenerationLimit(unsigned requested) {
+  const int contextLimit = runtimeContextLimit();
+  if (contextLimit < 2) return 0U;
+  const unsigned maximum = static_cast<unsigned>(contextLimit - 1);
+  return requested < maximum ? requested : maximum;
+}
+
 }  // namespace
 
 bool hawkinsLlmRuntimeInit() {
@@ -159,6 +190,17 @@ bool hawkinsLlmRuntimeReady() {
   return initAttempted && runtimeReady;
 }
 
+bool hawkinsLlmRuntimePromptFits(const char* prompt, unsigned maxNewTokens) {
+  if (!hawkinsLlmRuntimeReady()) return false;
+  int tokens[kMaxEncodedPromptTokens] = {};
+  int tokenCount = 0;
+  if (!encodeBoundedPrompt(prompt, tokens, tokenCount)) return false;
+  const int contextLimit = runtimeContextLimit();
+  const unsigned generationLimit = runtimeGenerationLimit(maxNewTokens);
+  const int promptLimit = contextLimit - static_cast<int>(generationLimit);
+  return promptLimit >= 2 && tokenCount <= promptLimit;
+}
+
 bool hawkinsLlmRuntimeGenerate(const char* prompt, char* output,
                               size_t outputCapacity,
                               unsigned maxNewTokens) {
@@ -166,47 +208,18 @@ bool hawkinsLlmRuntimeGenerate(const char* prompt, char* output,
   output[0] = '\0';
   if (!hawkinsLlmRuntimeReady() || !prompt || prompt[0] == '\0') return false;
 
-  // CTK2 peut produire au plus un token par octet d'entrée, plus le BOS.
-  // Borner la chaîne avant llm_encode(), dont l'API ne reçoit pas la capacité
-  // du tableau de sortie, évite tout dépassement du tampon fixe.
-  char boundedPrompt[kMaxPromptBytes + 1U] = {};
-  const size_t sourceLength = strnlen(prompt, 1024U);
-  if (sourceLength == 0U || sourceLength >= 1024U) return false;
-  size_t sourceStart = sourceLength > kMaxPromptBytes
-      ? sourceLength - kMaxPromptBytes : 0U;
-  while (sourceStart < sourceLength &&
-         (static_cast<unsigned char>(prompt[sourceStart]) & 0xC0U) == 0x80U) {
-    ++sourceStart;
-  }
-  const size_t boundedLength = sourceLength - sourceStart;
-  if (boundedLength == 0U || boundedLength > kMaxPromptBytes) return false;
-  memcpy(boundedPrompt, prompt + sourceStart, boundedLength);
-  boundedPrompt[boundedLength] = '\0';
-
   const HawkinsLlmApi& api = hawkinsLlmGetApi();
   int tokens[kMaxEncodedPromptTokens] = {};
   int tokenCount = 0;
-  api.encode(&tokenizer, boundedPrompt, 1, 0, tokens, &tokenCount);
-  if (tokenCount < 2 || tokenCount > kMaxEncodedPromptTokens) return false;
+  if (!encodeBoundedPrompt(prompt, tokens, tokenCount)) return false;
 
-  const int contextLimit =
-      transformer.config.seq_len < kRuntimeContextLimit
-          ? transformer.config.seq_len : kRuntimeContextLimit;
-  if (contextLimit < 2) return false;
-
-  const unsigned generationLimit =
-      maxNewTokens < static_cast<unsigned>(contextLimit - 1)
-          ? maxNewTokens : static_cast<unsigned>(contextLimit - 1);
+  const int contextLimit = runtimeContextLimit();
+  const unsigned generationLimit = runtimeGenerationLimit(maxNewTokens);
   const int promptLimit = contextLimit - static_cast<int>(generationLimit);
-  if (promptLimit < 2) return false;
-
-  // Conserver le BOS et la fin du prompt, notamment le marqueur "Bot:".
-  if (tokenCount > promptLimit) {
-    const int keepTail = promptLimit - 1;
-    memmove(tokens + 1, tokens + tokenCount - keepTail,
-            static_cast<size_t>(keepTail) * sizeof(tokens[0]));
-    tokens[0] = tokenizer.eos_id;
-    tokenCount = promptLimit;
+  if (contextLimit < 2 || promptLimit < 2 || tokenCount > promptLimit) {
+    Serial.printf("[hawkins-llm] prompt refuse : %d tokens, maximum %d (generation %u)\n",
+                  tokenCount, promptLimit, generationLimit);
+    return false;
   }
 
   float* logits = nullptr;

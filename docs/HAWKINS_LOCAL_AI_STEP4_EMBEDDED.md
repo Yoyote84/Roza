@@ -23,13 +23,15 @@ Le Cardputer reste l'autorité sur les règles du jeu et les sauvegardes.
 
 ### 2. Runtime local
 
-`runtime.cpp` initialise le transformeur LLaMA CRDP v3, le tokenizer CTK2 et le sampler. Le profil de départ utilise un contexte de 32 tokens et une génération de 12 tokens maximum.
+`runtime.cpp` initialise le transformeur LLaMA CRDP v3, le tokenizer CTK2 et le sampler. Le profil utilise un contexte de 32 tokens et une génération de 9 tokens maximum, conformément à la fenêtre d'entraînement du modèle. Le runtime compte les tokens CTK2 avant l'inférence : il refuse un contexte trop long au lieu de supprimer silencieusement les premières informations.
 
 Le moteur nettoie les allocations temporaires si l'initialisation échoue. Les échecs de chargement ou une génération vide désactivent seulement le narrateur : le jeu reste utilisable.
 
 ### 3. Raccordement à Hawkins
 
 `hawkins_app.cpp` demande au runtime une narration dans une tâche FreeRTOS séparée, afin de ne pas bloquer directement la boucle d'affichage. Le contexte transmis contient un instantané compact du joueur, du monde, de l'événement, de l'objectif actif et de l'action choisie.
+
+Le prompt compact transmet le nom et la classe du personnage, ses PV lorsque le budget le permet, le niveau de tension du monde, l'événement, l'objectif actif et l'action choisie. Plusieurs formes compactes sont essayées avec le véritable tokenizer ; le prompt retenu tient dans le contexte avant le démarrage de l'inférence.
 
 Le texte généré est affiché sur la page du narrateur et ajouté à la mémoire narrative. Les choix visibles de cette première intégration restent contrôlés par ROZA : Observer, Répondre, Se cacher. Leur sélection ne donne pas au modèle le droit d'altérer directement les données du joueur.
 
@@ -64,6 +66,7 @@ Une fonction `llm_free` libère les allocations de calcul si l'initialisation es
 - [x] Documentation mise à jour.
 - [x] Publication des poids, du tokenizer, du manifeste et des SHA-256 dans `firmware/src/hawkins_llm/assets/`.
 - [x] Chemins `.incbin` alignés sur les fichiers publiés ; runtime local raccordé à Hawkins.
+- [x] Budget de prompt vérifié avec le tokenizer CTK2 réel ; aucun contexte joueur n'est tronqué silencieusement.
 - [ ] Compilation complète de l'image finale : réservée à l'étape 5.
 - [ ] Mesures physiques de mémoire, débit, qualité et stabilité sur le Cardputer : réservées après l'étape 5.
 

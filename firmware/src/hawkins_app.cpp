@@ -235,6 +235,62 @@ const char* currentMovementObjective() {
   return "OBJECTIFS ACTUELS TERMINES";
 }
 
+const char* compactAiClassName(uint8_t classId) {
+  switch (classId) {
+    case 0U: return "explorateur";
+    case 1U: return "technicien";
+    case 2U: return "enqueteur";
+    case 3U: return "protecteur";
+    case 4U: return "medecin";
+    case 5U: return "sensitif";
+    default: return "inconnu";
+  }
+}
+
+const char* compactAiEventName(hawkins::EventType type) {
+  switch (type) {
+    case hawkins::EventType::StrangeSignal: return "signal";
+    case hawkins::EventType::PowerAnomaly: return "anomalie";
+    case hawkins::EventType::CreatureTrace: return "trace";
+    case hawkins::EventType::FactionMovement: return "faction";
+    case hawkins::EventType::DistressCall: return "detresse";
+    case hawkins::EventType::PortalFluctuation: return "breche";
+    default: return "aucun";
+  }
+}
+
+const char* compactAiObjective() {
+  if (!missionsReady) return "mission";
+  if (hawkins::missionStatus(missions, hawkins::MissionId::FirstSignal) ==
+      hawkins::MissionStatus::Active) return "Lia";
+  if (hawkins::missionStatus(missions, hawkins::MissionId::ThreeSectors) ==
+      hawkins::MissionStatus::Active) return "secteur";
+  if (hawkins::missionStatus(missions, hawkins::MissionId::AnomalyTrail) ==
+      hawkins::MissionStatus::Active) return "signal";
+  return "termine";
+}
+
+const char* compactAiAction(const char* action) {
+  if (action && strcmp(action, "Repondre") == 0) return "repondre";
+  if (action && strcmp(action, "Se cacher") == 0) return "cacher";
+  return "observer";
+}
+
+void compactAiName(char* output, size_t capacity, const char* source,
+                   size_t maximumCharacters) {
+  if (!output || capacity == 0U) return;
+  size_t written = 0U;
+  if (source) {
+    for (size_t i = 0U; source[i] != '\0' && written + 1U < capacity &&
+                        written < maximumCharacters; ++i) {
+      char value = source[i];
+      if (value >= 'A' && value <= 'Z') value = static_cast<char>(value + ('a' - 'A'));
+      output[written++] = value;
+    }
+  }
+  while (written > 0U && output[written - 1U] == ' ') --written;
+  output[written] = '\0';
+}
 
 void hawkinsAiNarrationTask(void*) {
   char prompt[sizeof(aiWorkerPrompt)] = {};
@@ -244,7 +300,7 @@ void hawkinsAiNarrationTask(void*) {
 
   char generated[hawkins::kHawkinsAiTextCapacity + 1U] = {};
   const bool ok = hawkins::hawkinsLlmRuntimeGenerate(
-      prompt, generated, sizeof(generated), 12U);
+      prompt, generated, sizeof(generated), 9U);
 
   portENTER_CRITICAL(&aiWorkerMux);
   snprintf(aiWorkerOutput, sizeof(aiWorkerOutput), "%s", generated);
@@ -267,34 +323,69 @@ bool requestAiNarration() {
   }
 
   const hawkins::WorldState* world = hawkins::hawkinsRuntimeWorld();
-  const char* eventName = world
-      ? hawkins::eventTypeName(world->latestEvent.type) : "HAWKINS";
+  const char* playerName = playerLoaded ? player.name : "Joueur";
+  const char* className = compactAiClassName(playerLoaded ? player.classId : 255U);
+  const uint8_t hp = playerLoaded ? player.hitPoints : 0U;
+  const uint8_t stress = playerLoaded ? player.stress : 0U;
   const uint32_t day = world ? world->simulatedDays : 0U;
   const uint8_t tension = world ? world->tension : 0U;
   const uint8_t anomaly = world ? world->anomalyLevel : 0U;
-  const char* playerName = playerLoaded ? player.name : "Joueur";
-  const char* className = playerLoaded
-      ? hawkins::characterClass(player.classId).name : "Aucune classe";
-  const uint8_t level = playerLoaded ? player.level : 0U;
-  const uint8_t hp = playerLoaded ? player.hitPoints : 0U;
-  const uint8_t stress = playerLoaded ? player.stress : 0U;
-  const char* objective = currentMovementObjective();
-  const char* action = aiUserAction[0] != '\0'
-      ? aiUserAction : "observer";
+  const uint8_t pressure = tension > anomaly ? tension : anomaly;
+  const char* mood = pressure > 5U ? "danger" : (pressure > 2U ? "instable" : "calme");
+  const char* event = world ? compactAiEventName(world->latestEvent.type) : "aucun";
+  const char* objective = compactAiObjective();
+  const char* action = compactAiAction(aiUserAction);
 
-  // Le modèle dispose de 32 tokens au total : une partie est réservée à la
-  // réponse. L'ordre place l'état joueur, le monde et l'objectif avant
-  // l'action afin que le runtime conserve le contexte le plus utile.
+  char fullName[hawkins::kCharacterNameCapacity + 1U] = {};
+  char shortName[6] = {};
+  compactAiName(fullName, sizeof(fullName), playerName,
+                hawkins::kCharacterNameCapacity);
+  compactAiName(shortName, sizeof(shortName), playerName, 5U);
+  if (fullName[0] == '\0') snprintf(fullName, sizeof(fullName), "joueur");
+  if (shortName[0] == '\0') snprintf(shortName, sizeof(shortName), "joueur");
+
+  // Le moteur ne tronque plus le début du prompt. On essaie d'abord un
+  // contexte riche, puis des variantes compactes dont le budget CTK2 est
+  // vérifié avec le vrai tokenizer avant de lancer l'inférence.
   char prompt[sizeof(aiWorkerPrompt)] = {};
-  const int promptLength = snprintf(
+  int promptLength = snprintf(
       prompt, sizeof(prompt),
-      "User: %s, %s, niveau %u, PV %u, stress %u. Jour %lu, tension %u, anomalie %u, %s. Mission: %s. Action: %s. Bot:",
-      playerName, className, unsigned(level), unsigned(hp), unsigned(stress),
-      static_cast<unsigned long>(day), unsigned(tension), unsigned(anomaly),
-      eventName, objective, action);
-  if (promptLength < 0 ||
-      static_cast<size_t>(promptLength) >= sizeof(prompt)) {
-    aiStatusText = "CONTEXTE IA TROP LONG";
+      "User: %s %s PV%u S%u J%lu %s %s %s %s Bot:",
+      fullName, className, unsigned(hp), unsigned(stress),
+      static_cast<unsigned long>(day), mood, event, objective, action);
+  bool promptFits = promptLength > 0 &&
+      static_cast<size_t>(promptLength) < sizeof(prompt) &&
+      hawkins::hawkinsLlmRuntimePromptFits(prompt, 9U);
+
+  if (!promptFits) {
+    promptLength = snprintf(prompt, sizeof(prompt),
+        "User: %s %s PV%u %s %s %s %s Bot:",
+        fullName, className, unsigned(hp), mood, event, objective, action);
+    promptFits = promptLength > 0 &&
+        static_cast<size_t>(promptLength) < sizeof(prompt) &&
+        hawkins::hawkinsLlmRuntimePromptFits(prompt, 9U);
+  }
+
+  if (!promptFits) {
+    promptLength = snprintf(prompt, sizeof(prompt),
+        "User: %s %s %s %s %s %s Bot:",
+        shortName, className, mood, event, objective, action);
+    promptFits = promptLength > 0 &&
+        static_cast<size_t>(promptLength) < sizeof(prompt) &&
+        hawkins::hawkinsLlmRuntimePromptFits(prompt, 9U);
+  }
+
+  if (!promptFits) {
+    promptLength = snprintf(prompt, sizeof(prompt),
+        "User: %s %s %s %s %s Bot:",
+        shortName, event, objective, action, mood);
+    promptFits = promptLength > 0 &&
+        static_cast<size_t>(promptLength) < sizeof(prompt) &&
+        hawkins::hawkinsLlmRuntimePromptFits(prompt, 9U);
+  }
+
+  if (!promptFits) {
+    aiStatusText = "CONTEXTE IA INCOMPATIBLE AVEC 32 TOKENS";
     dirty = true;
     return false;
   }
