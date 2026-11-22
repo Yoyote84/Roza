@@ -127,6 +127,10 @@ jobs:
 
       - name: Publish the stage-3 model binaries into the firmware source tree
         run: |
+          # Model training takes several minutes; bring the branch up to its
+          # current head before committing the generated binaries.
+          git fetch origin main
+          git checkout -B main origin/main
           mkdir -p firmware/src/hawkins_llm/assets
           cp "$RUNNER_TEMP/model_lecarnet_q4.bin" firmware/src/hawkins_llm/assets/model_lecarnet_q4.bin
           cp "$RUNNER_TEMP/tokenizer_lecarnet_ctk2.bin" firmware/src/hawkins_llm/assets/tokenizer_lecarnet_ctk2.bin
