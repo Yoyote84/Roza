@@ -19,7 +19,6 @@ namespace hawkins {
 namespace {
 
 constexpr int kRuntimeContextLimit = 32;
-constexpr int kPromptTokenLimit = 16;
 constexpr int kMaxEncodedPromptTokens = 192;
 constexpr size_t kDecodeScratchBytes = 128U;
 
