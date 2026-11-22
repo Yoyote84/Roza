@@ -20,6 +20,7 @@ namespace {
 
 constexpr int kRuntimeContextLimit = 32;
 constexpr int kMaxEncodedPromptTokens = 192;
+constexpr size_t kMaxPromptBytes = kMaxEncodedPromptTokens - 1U;
 constexpr size_t kDecodeScratchBytes = 128U;
 
 Transformer transformer{};
@@ -126,9 +127,26 @@ bool hawkinsLlmRuntimeGenerate(const char* prompt, char* output,
   output[0] = '\0';
   if (!hawkinsLlmRuntimeReady() || !prompt || prompt[0] == '\0') return false;
 
+  // CTK2 peut produire au plus un token par octet d'entrée, plus le BOS.
+  // Borner la chaîne avant llm_encode(), dont l'API ne reçoit pas la capacité
+  // du tableau de sortie, évite tout dépassement du tampon fixe.
+  char boundedPrompt[kMaxPromptBytes + 1U] = {};
+  const size_t sourceLength = strnlen(prompt, 1024U);
+  if (sourceLength == 0U || sourceLength >= 1024U) return false;
+  size_t sourceStart = sourceLength > kMaxPromptBytes
+      ? sourceLength - kMaxPromptBytes : 0U;
+  while (sourceStart < sourceLength &&
+         (static_cast<unsigned char>(prompt[sourceStart]) & 0xC0U) == 0x80U) {
+    ++sourceStart;
+  }
+  const size_t boundedLength = sourceLength - sourceStart;
+  if (boundedLength == 0U || boundedLength > kMaxPromptBytes) return false;
+  memcpy(boundedPrompt, prompt + sourceStart, boundedLength);
+  boundedPrompt[boundedLength] = '\\0';
+
   int tokens[kMaxEncodedPromptTokens] = {};
   int tokenCount = 0;
-  llm_encode(&tokenizer, prompt, 1, 0, tokens, &tokenCount);
+  llm_encode(&tokenizer, boundedPrompt, 1, 0, tokens, &tokenCount);
   if (tokenCount < 2 || tokenCount > kMaxEncodedPromptTokens) return false;
 
   const int contextLimit =
