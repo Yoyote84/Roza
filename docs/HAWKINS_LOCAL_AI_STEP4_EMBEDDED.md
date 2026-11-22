@@ -1,6 +1,6 @@
 # Hawkins — étape 4/5 : intégration de l'IA embarquée
 
-**État : étape 4 intégrée — prête pour l'étape 5.**
+**État : étape 4 intégrée et vérifiée par CI — commit `f748e2c`, exécution GitHub Actions n°145 entièrement verte.**
 
 ## Objectif
 
@@ -67,13 +67,17 @@ Une fonction `llm_free` libère les allocations de calcul si l'initialisation es
 - [x] Publication des poids, du tokenizer, du manifeste et des SHA-256 dans `firmware/src/hawkins_llm/assets/`.
 - [x] Chemins `.incbin` alignés sur les fichiers publiés ; runtime local raccordé à Hawkins.
 - [x] Budget de prompt vérifié avec le tokenizer CTK2 réel ; aucun contexte joueur n'est tronqué silencieusement.
-- [ ] Compilation complète de l'image finale : réservée à l'étape 5.
-- [ ] Mesures physiques de mémoire, débit, qualité et stabilité sur le Cardputer : réservées après l'étape 5.
+- [x] Compilation du firmware Cardputer ADV dans la CI n°145.
+- [x] Liaison du moteur LLM et du noyau SIMD vérifiée.
+- [x] Image Factory de contrôle assemblée et déposée en artefact CI.
+- [x] Tests natifs Hawkins, protocole IA et moteur LLM réussis.
+- [x] Rendu des écrans via le code de dessin du firmware réussi.
+- [ ] Mesures du heap libre, du débit et de la stabilité sur le Cardputer réel : étape 5.
 
-La publication des binaires est terminée. La source d'embarquement `.S` référence les fichiers présents dans le dépôt. L'intégration logicielle de l'étape 4 est réalisée ; la compilation de l'image complète et sa validation sont volontairement reportées à l'étape 5.
+La publication des binaires est terminée. La source d'embarquement `.S` référence les fichiers présents dans le dépôt. L'intégration logicielle et la validation CI de l'étape 4 sont réalisées. Le paquet de livraison Stage 5 ajoutera le manifeste de build, le rapport des sections ELF, les contrôles de capacité de partition et les marqueurs de mesure du heap interne. Aucune validation physique n'est revendiquée ici.
 
 ## Frontière avec l'étape 5
 
 Cette étape réalise le raccordement logiciel. Elle ne déclare pas que la qualité des réponses, la vitesse ou la stabilité sont validées.
 
-L'étape 5 reste la livraison d'un seul firmware complet, la compilation finale, les contrôles Flash/RAM, le paquet Factory et l'installation sur le vrai Cardputer ADV. Les évaluations de réponses de l'IA auront lieu sur cette version complète, après les essais de l'utilisateur.
+L'étape 5 poursuit la livraison d'un firmware complet avec manifeste, rapport Flash/RAM, paquet Factory et vérification SHA-256, puis l'installation et les essais sur le vrai Cardputer ADV. Les évaluations de réponses de l'IA auront lieu sur cette version complète, après les essais de l'utilisateur.

@@ -23,7 +23,10 @@ Le compagnon Android présent dans le dépôt correspond à un ancien prototype 
 - `bootloader.bin` ;
 - `partitions.bin` ;
 - `INSTALLATION.txt` ;
-- `SHA256SUMS.txt` et manifeste de build.
+- `BUILD_MANIFEST.json` (commit, cible, tailles et état des contrôles) ;
+- `ELF_SECTIONS.txt`, `PLATFORMIO_MEMORY.txt` et `PLATFORMIO_BUILD_REPORT.txt` ;
+- `model_manifest.json` et `MODEL_SHA256SUMS.txt` (provenance des poids) ;
+- `SHA256SUMS.txt` pour vérifier tous les fichiers du paquet.
 
 Les poids du modèle et le tokenizer sont incorporés dans ces binaires. Ils ne seront pas à télécharger séparément après le flash.
 
@@ -39,8 +42,17 @@ Les poids du modèle et le tokenizer sont incorporés dans ces binaires. Ils ne 
 
 Ne pas flasher une image intermédiaire produite avant l'étape 5. La compilation ou les contrôles CI ne remplacent pas un essai sur le Cardputer ADV réel.
 
-## Contrôles de l'étape 5
+## Mesures RAM et Flash
+
+Le rapport PlatformIO du build CI fournit l'occupation liée statique. Sur le build validé de l'étape 4 (SHA `f748e2c`), le résumé était :
+
+- RAM liée : 123 404 / 327 680 octets (37,7 %) ;
+- Flash applicative : 5 052 229 / 8 257 536 octets (61,2 %).
+
+Ces valeurs sont celles de la compilation, pas le heap restant pendant l'exécution. Le runtime écrit maintenant trois marqueurs série `[hawkins-llm] HEAP` : avant le chargement, après les poids et lorsque l'IA est prête. Ils affichent le heap interne libre et le plus grand bloc libre. Le relevé réel doit être effectué sur le Cardputer ADV avec le firmware final.
+
+## Essais physiques à effectuer après flash
 
 Après la livraison du firmware complet, l'essai sur carte devra vérifier le démarrage, l'ouverture du narrateur, une génération française locale, la navigation parmi les choix, la poursuite du jeu sans téléphone ni réseau, les sauvegardes et le comportement lorsque l'IA est indisponible.
 
-Les mesures de mémoire libre, de vitesse et de stabilité seront consignées à ce moment-là.
+Consigner le heap libre et le plus grand bloc avant/après init, le temps d'initialisation, le délai de génération et la stabilité sur plusieurs narrations. Ces mesures ne sont pas déclarées validées par la CI.

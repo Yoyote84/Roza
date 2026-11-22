@@ -4,6 +4,7 @@
 
 #include <Arduino.h>
 #include <esp_system.h>
+#include <esp_heap_caps.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -28,6 +29,15 @@ Tokenizer tokenizer{};
 Sampler sampler{};
 bool initAttempted = false;
 bool runtimeReady = false;
+
+void logInternalHeap(const char* phase) {
+  const uint32_t capabilities = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+  const size_t freeBytes = heap_caps_get_free_size(capabilities);
+  const size_t largestBlock = heap_caps_get_largest_free_block(capabilities);
+  Serial.printf("[hawkins-llm] HEAP %s : libre=%u octets, bloc_max=%u octets\\n",
+                phase, static_cast<unsigned>(freeBytes),
+                static_cast<unsigned>(largestBlock));
+}
 
 size_t safeUtf8Length(const char* text, size_t length) {
   if (!text || length == 0U) return 0U;
@@ -151,6 +161,7 @@ bool hawkinsLlmRuntimeInit() {
     return false;
   }
 
+  logInternalHeap("avant modele");
   if (!api.initEmbedded(&transformer, hawkins_model_start, modelSize,
                         kRuntimeContextLimit)) {
     llm_free(&transformer);
@@ -159,6 +170,7 @@ bool hawkinsLlmRuntimeInit() {
     return false;
   }
 
+  logInternalHeap("apres poids");
   if (transformer.config.arch != ARCH_LLAMA ||
       transformer.config.vocab_size <= 0 ||
       transformer.config.seq_len < kRuntimeContextLimit) {
@@ -179,6 +191,7 @@ bool hawkinsLlmRuntimeInit() {
                    0.80f, 0.92f,
                     static_cast<uint64_t>(esp_random()));
   runtimeReady = true;
+  logInternalHeap("IA prete");
   Serial.printf("[hawkins-llm] modele embarque pret: CRDP v3 LLaMA, vocab=%d, contexte=%d, poids=%u, tokenizer=%u\n",
                 transformer.config.vocab_size, transformer.config.seq_len,
                 static_cast<unsigned>(modelSize),
