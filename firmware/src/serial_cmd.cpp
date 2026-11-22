@@ -1,5 +1,4 @@
 #include "serial_cmd.h"
-#include "hawkins_app.h"
 #include <cstring>
 
 #include <M5Unified.h>
@@ -1080,7 +1079,6 @@ static void handleSerialCmd(const String& raw) {
 }
 
 void serialCmdPoll() {
-  // HKA/1 est route par ce lecteur CDC unique ; aucun second Serial.read().
   static char buf[1793];
   static size_t len = 0U;
   static bool discard = false;
@@ -1092,11 +1090,7 @@ void serialCmdPoll() {
       const size_t n = len;
       len = 0U;
       if (!skip && n > 0U) {
-        if (n >= 6U && memcmp(buf, "HKA/1 ", 6U) == 0) {
-          if (!hawkinsAppHandleSerialLine(buf, n)) {
-            Serial.println("[hawkins-ai] trame ignoree");
-          }
-        } else if (n < 192U) {
+        if (n < 192U) {
           buf[n] = '\0';
           handleSerialCmd(String(buf));
         } else {
