@@ -1,75 +1,46 @@
 # Installation finale — Hawkins sur Cardputer ADV
 
-Cette livraison comporte deux programmes distincts :
+**Ce document décrit la cible de l'étape 5. Aucun firmware intermédiaire ne doit être installé pendant les étapes 1 à 4.**
 
-- **ROZA / Hawkins firmware** : le fichier `.bin` à flasher sur le M5Stack Cardputer ADV.
-- **Hawkins AI Companion** : l'application Android qui exécute le modèle localement sur le téléphone et communique avec le Cardputer par USB-C.
+## Architecture finale prévue
 
-L'application Android ne remplace pas le firmware du Cardputer. Les deux doivent être installés pour utiliser le narrateur IA.
+Le narrateur LeCarnet-3M est intégré directement dans le firmware ROZA / Hawkins :
 
-## Télécharger les fichiers
+- poids CRDP v3 et tokenizer CTK2 compilés dans l'image applicative ;
+- inférence locale sur l'ESP32-S3 du Cardputer ADV ;
+- aucune application Android compagnon requise ;
+- aucun téléphone, Wi-Fi, serveur ou accès Internet requis pendant une partie ;
+- aucune copie du modèle sur microSD nécessaire.
 
-- [Builds et APK Android — workflow Hawkins AI Android](https://github.com/Yoyote84/Roza/actions/workflows/hawkins-ai-android.yml)
-- [Firmware Cardputer ADV et image BIN — workflow ROZA](https://github.com/Yoyote84/Roza/actions/workflows/roza-web-viewer.yml)
+Le compagnon Android présent dans le dépôt correspond à un ancien prototype et ne fait plus partie de la procédure d'installation actuelle.
 
-Sur chaque page, ouvrez la dernière exécution réussie de la branche `main`, puis téléchargez son artefact :
+## Fichiers de livraison
 
-- Android : `hawkins-ai-android-offline`. Il contient `Hawkins-AI-Companion.apk`, une notice courte et `SHA256SUMS.txt`.
-- Cardputer : `ROZA-Cardputer-ADV-Hawkins-<commit>`. Il contient l'image usine, l'image application seule, les fichiers de démarrage et la procédure de flash.
+À l'étape 5, le workflow final doit fournir un artefact contenant au minimum :
 
-Les artefacts CI sont conservés pendant 90 jours. Téléchargez-les et gardez-en une copie locale.
+- `ROZA-Cardputer-ADV-Hawkins-factory.bin` — image complète à flasher à `0x0000` ;
+- `ROZA-Cardputer-ADV-Hawkins-application.bin` — application seule, prévue pour `0x10000` uniquement avec le bootloader et la table ROZA correspondants ;
+- `bootloader.bin` ;
+- `partitions.bin` ;
+- `INSTALLATION.txt` ;
+- `SHA256SUMS.txt` et manifeste de build.
 
-## 1. Installer le firmware sur le Cardputer
+Les poids du modèle et le tokenizer sont incorporés dans ces binaires. Ils ne seront pas à télécharger séparément après le flash.
 
-1. Téléchargez et extrayez l'artefact firmware.
-2. Pour une installation complète, utilisez **`ROZA-Cardputer-ADV-Hawkins-factory.bin` à l'adresse `0x0000`**. Cette image regroupe le bootloader, la table de partitions et l'application.
-3. Branchez le Cardputer ADV en USB-C à un ordinateur ou à un appareil compatible USB-OTG et utilisez un outil de flash ESP32-S3.
-4. Vérifiez la procédure et les adresses dans le fichier `INSTALLATION.txt` inclus dans l'artefact.
+## Flash USB-C
 
-N'essayez pas de flasher le fichier usine à l'adresse `0x10000`. L'image application seule, elle, est prévue pour `0x10000` et uniquement si le bootloader et la table de partitions ROZA correspondants sont déjà installés.
+1. Télécharger l'artefact Factory de l'étape 5.
+2. Connecter le Cardputer ADV par un câble USB-C compatible données.
+3. Utiliser un outil de flash ESP32-S3.
+4. Pour une installation complète, flasher le fichier Factory à l'adresse `0x0000`.
+5. Suivre les adresses précises inscrites dans `INSTALLATION.txt` de cet artefact.
 
-**Copier le fichier BIN sur la microSD ne flashe pas le microcontrôleur.** Le flash se fait via la liaison USB avec un outil compatible ESP32-S3.
+**Copier un fichier BIN sur la microSD ne flashe pas le microcontrôleur.** Le flash s'effectue par USB avec un outil ESP32-S3.
 
-## 2. Installer le compagnon Android
+Ne pas flasher une image intermédiaire produite avant l'étape 5. La compilation ou les contrôles CI ne remplacent pas un essai sur le Cardputer ADV réel.
 
-1. Extrayez l'artefact `hawkins-ai-android-offline`.
-2. Copiez `Hawkins-AI-Companion.apk` sur le téléphone et ouvrez-le pour l'installer. Android peut demander d'autoriser temporairement l'installation depuis cette source.
-3. L'application cible Android 13 ou supérieur ; elle est prévue pour fonctionner sur le Galaxy Z Flip6.
-4. Ouvrez Hawkins AI Companion.
+## Contrôles de l'étape 5
 
-L'APK ne contient pas le modèle de langage : ce choix évite d'intégrer plusieurs gigaoctets au programme et de devoir retélécharger le modèle à chaque mise à jour.
+Après la livraison du firmware complet, l'essai sur carte devra vérifier le démarrage, l'ouverture du narrateur, une génération française locale, la navigation parmi les choix, la poursuite du jeu sans téléphone ni réseau, les sauvegardes et le comportement lorsque l'IA est indisponible.
 
-## 3. Préparer le modèle local
-
-Le modèle choisi pour cette première livraison est **Qwen3.5-4B Q4_K_M**, au format GGUF :
-
-[Ouvrir le modèle GGUF officiel ggml-org sur Hugging Face](https://huggingface.co/ggml-org/Qwen3.5-4B-GGUF)
-
-Téléchargez le fichier `Qwen3.5-4B-Q4_K_M.gguf` une seule fois, lorsque vous avez une connexion, ou transférez-le sur le téléphone par USB. Sa fiche indique environ 3,03 Go et une licence Apache 2.0.
-
-Dans l'application :
-1. Appuyez sur **Choisir un modèle GGUF** et sélectionnez le fichier.
-2. Attendez la fin de la copie dans le stockage privé.
-3. Appuyez sur **Charger le modèle** et attendez le statut indiquant que l'inférence locale est prête.
-
-L'application copie le modèle dans son espace privé. Il faut donc prévoir environ 3,3 Go d'espace libre supplémentaire pour cette copie, en plus du fichier source. Le modèle doit aussi disposer de suffisamment de mémoire vive pour être chargé.
-
-## 4. Relier le téléphone et le Cardputer
-
-1. Allumez le Cardputer ADV avec le firmware ROZA / Hawkins.
-2. Reliez le téléphone au Cardputer avec un câble USB-C compatible données et OTG.
-3. Dans Hawkins AI Companion, appuyez sur **Connecter le Cardputer en USB**.
-4. Autorisez l'accès USB lorsqu'Android le demande.
-5. Dans le jeu, ouvrez le narrateur avec la touche **A**. Utilisez les choix **1**, **2** ou **3** ; **R** relance la scène et **Q** quitte l'écran du narrateur.
-
-La liaison utilise le port série USB à 115200 bauds. Elle ne nécessite ni Wi-Fi, ni partage de connexion, ni données mobiles.
-
-## Fonctionnement hors ligne
-
-Après installation de l'APK, flash du Cardputer et import initial du GGUF, le jeu et son narrateur local sont conçus pour fonctionner sans réseau. Le premier téléchargement des fichiers nécessite toutefois une connexion ou un transfert local préalable.
-
-Le Cardputer reste l'autorité pour les personnages, missions, inventaire, statistiques et sauvegardes. L'IA fournit une narration et des choix ; elle ne modifie pas directement les sauvegardes.
-
-## Limites de validation
-
-Les builds CI vérifient la compilation, les tests logiciels et la génération des paquets. Ils ne prouvent pas encore le fonctionnement sur les deux appareils physiques. Le test complet à réaliser après installation est : charger le modèle sur le Z Flip6, connecter le Cardputer en USB-C, demander une narration, choisir une réponse et vérifier que la partie continue correctement après déconnexion du téléphone.
+Les mesures de mémoire libre, de vitesse et de stabilité seront consignées à ce moment-là.
