@@ -653,16 +653,17 @@ bool llm_init_embedded(Transformer* T, const uint8_t* model_bytes, size_t model_
   };
   size_t off = 64;
 
-  if (p->arch == ARCH_GPTNEO) {
-    // v3 row-planar Q4 works for both GPT-Neo and LLaMA compute graphs.
-    T->stride_wq    = (size_t)p->dim        * v3_row_stride(p->dim);
-    T->stride_wk    = (size_t)kv_dim        * v3_row_stride(p->dim);
-    T->stride_wv    = (size_t)kv_dim        * v3_row_stride(p->dim);
-    T->stride_wo    = (size_t)p->dim        * v3_row_stride(p->dim);
-    T->stride_w1w3  = (size_t)p->hidden_dim * v3_row_stride(p->dim);
-    T->stride_w2    = (size_t)p->dim        * v3_row_stride(p->hidden_dim);
+  if (g_fmt == (int)VERSION_NEO_V3) {
+    // CRDP v3 always stores Q4 tensors row-planar, including the LLaMA
+    // compute graph used by LeCarnet. Select the graph separately below.
+    T->stride_wq    = (size_t)(p->n_heads * head_size) * v3_row_stride(p->dim);
+    T->stride_wk    = (size_t)kv_dim                 * v3_row_stride(p->dim);
+    T->stride_wv    = (size_t)kv_dim                 * v3_row_stride(p->dim);
+    T->stride_wo    = (size_t)p->dim                 * v3_row_stride(p->dim);
+    T->stride_w1w3  = (size_t)p->hidden_dim          * v3_row_stride(p->dim);
+    T->stride_w2    = (size_t)p->dim                 * v3_row_stride(p->hidden_dim);
   } else {
-    T->stride_wq    = q4_bytes((size_t)(p->n_heads    * head_size) * p->dim);
+    T->stride_wq    = q4_bytes((size_t)(p->n_heads * head_size) * p->dim);
     T->stride_wk    = q4_bytes((size_t)kv_dim * p->dim);
     T->stride_wv    = q4_bytes((size_t)kv_dim * p->dim);
     T->stride_wo    = q4_bytes((size_t)p->dim * (p->n_heads * head_size));
