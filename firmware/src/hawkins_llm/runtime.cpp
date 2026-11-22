@@ -142,7 +142,7 @@ bool hawkinsLlmRuntimeGenerate(const char* prompt, char* output,
   const size_t boundedLength = sourceLength - sourceStart;
   if (boundedLength == 0U || boundedLength > kMaxPromptBytes) return false;
   memcpy(boundedPrompt, prompt + sourceStart, boundedLength);
-  boundedPrompt[boundedLength] = '\\0';
+  boundedPrompt[boundedLength] = '\0';
 
   int tokens[kMaxEncodedPromptTokens] = {};
   int tokenCount = 0;
