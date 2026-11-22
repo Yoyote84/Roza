@@ -124,6 +124,10 @@ typedef struct {
 bool   llm_init_embedded(Transformer* t, const uint8_t* model_bytes, size_t model_size,
                          int kv_seq_len);
 
+// Libère toutes les allocations internes après un échec d'initialisation.
+// Les poids et le tokenizer vivent en Flash et ne sont jamais libérés ici.
+void   llm_free(Transformer* t);
+
 // Parse a tokenizer blob (also in flash). Allocates almost nothing.
 bool   llm_tokenizer_from_memory(Tokenizer* tk, const uint8_t* data, size_t size,
                                  int vocab_size);
