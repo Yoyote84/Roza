@@ -77,6 +77,38 @@ bool hawkinsLlmRuntimeInit() {
   const size_t tokenizerSize =
       static_cast<size_t>(tokenizerEnd - tokenizerBegin);
 
+  // Prévalider l'en-tête CRDP avant que llm_init_embedded() ne calcule les
+  // strides. Un binaire absent ou mal formé ne doit jamais provoquer une
+  // division par zéro ni des tailles d'allocation non bornées.
+  if (modelSize < 64U || memcmp(hawkins_model_start, "CRDP", 4U) != 0) {
+    Serial.println("[hawkins-llm] en-tete CRDP absent ou trop court");
+    return false;
+  }
+  uint32_t formatVersion = 0U;
+  int dimensions[7] = {};
+  memcpy(&formatVersion, hawkins_model_start + 4U, sizeof(formatVersion));
+  memcpy(dimensions, hawkins_model_start + 8U, sizeof(dimensions));
+  const uint8_t sharedClassifier = hawkins_model_start[36U];
+  const uint8_t quantType = hawkins_model_start[37U];
+  const uint8_t modelArch = hawkins_model_start[38U];
+  const int dim = dimensions[0];
+  const int hidden = dimensions[1];
+  const int layers = dimensions[2];
+  const int heads = dimensions[3];
+  const int kvHeads = dimensions[4];
+  const int vocab = dimensions[5];
+  const int context = dimensions[6];
+  if (formatVersion != 3U || modelArch != ARCH_LLAMA ||
+      quantType != 4U || sharedClassifier != 1U ||
+      dim <= 0 || dim > 512 || hidden <= 0 || hidden > 1024 ||
+      layers <= 0 || layers > 16 || heads <= 0 || heads > 16 ||
+      kvHeads != heads || dim % heads != 0 || dim % 32 != 0 ||
+      hidden % 32 != 0 || vocab <= 0 || vocab > 16000 ||
+      context < kRuntimeContextLimit || context > 64) {
+    Serial.println("[hawkins-llm] dimensions CRDP incompatibles avec le profil Cardputer");
+    return false;
+  }
+
   memset(&transformer, 0, sizeof(transformer));
   memset(&tokenizer, 0, sizeof(tokenizer));
   memset(&sampler, 0, sizeof(sampler));
