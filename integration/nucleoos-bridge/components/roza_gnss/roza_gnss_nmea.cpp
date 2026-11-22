@@ -1,4 +1,5 @@
 #include "roza_gnss_nmea.h"
+#include "roza_gnss_checksum.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -88,12 +89,12 @@ extern "C" bool roza_gnss_parse_sentence(const char *sentence, roza_gnss_fix_t *
     char *star = strchr(line, '*');
     if (!star || strlen(star + 1) < 2) return false;
 
-    unsigned int expected = 0;
-    if (sscanf(star + 1, "%2x", &expected) != 1) return false;
+    uint8_t expected = 0;
+    if (!roza_nmea_parse_checksum(star + 1, &expected)) return false;
 
     unsigned char checksum = 0;
     for (const char *p = line + 1; p < star; ++p) checksum ^= static_cast<unsigned char>(*p);
-    if (checksum != static_cast<unsigned char>(expected)) return false;
+    if (checksum != expected) return false;
     *star = '\0';
 
     char *fields[20] = {};

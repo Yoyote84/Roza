@@ -115,9 +115,14 @@ jobs:
             -o /tmp/roza-launcher-input-test
           /tmp/roza-launcher-input-test
 
-      - name: Test Cap LoRa-1262 GNSS NMEA parser on the host
+      - name: Test Cap LoRa-1262 strict NMEA checksum on the host
         shell: bash
         run: |
+          c++ -std=c++17 -Wall -Wextra -Werror \
+            -I integration/nucleoos-bridge/components/roza_gnss/include \
+            tests/roza_gnss_checksum_test.cpp \
+            -o /tmp/roza-gnss-checksum-test
+          /tmp/roza-gnss-checksum-test
           c++ -std=c++17 -Wall -Wextra -Werror \
             -I integration/nucleoos-bridge/components/roza_gnss/include \
             integration/nucleoos-bridge/components/roza_gnss/roza_gnss_nmea.cpp \

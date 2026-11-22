@@ -48,6 +48,17 @@ int main()
 
     const char *bad_checksum = "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*46";
     assert(!roza_gnss_parse_sentence(bad_checksum, &fix));
+    const std::string extra_checksum_text = std::string(gga) + "x";
+    assert(!roza_gnss_parse_sentence(extra_checksum_text.c_str(), &fix));
+    const std::string invalid_checksum_hex =
+        std::string(gga).substr(0, std::string(gga).find('*')) + "*4G";
+    assert(!roza_gnss_parse_sentence(invalid_checksum_hex.c_str(), &fix));
+    const std::string truncated_checksum =
+        std::string(gga).substr(0, std::string(gga).find('*')) + "*4";
+    assert(!roza_gnss_parse_sentence(truncated_checksum.c_str(), &fix));
+    const std::string signed_checksum =
+        std::string(gga).substr(0, std::string(gga).find('*')) + "*+1";
+    assert(!roza_gnss_parse_sentence(signed_checksum.c_str(), &fix));
 
     const char *unsupported = "$GPGSA,A,3,04,05,09,12,24,25,29,31,,,,1.8,1.0,1.5*33";
     assert(!roza_gnss_parse_sentence(unsupported, &fix));
