@@ -1,6 +1,5 @@
 #include "hawkins_app.h"
 #include "hawkins_runtime.h"
-#include "hawkins_ai_protocol.h"
 #include "hawkins_nvs.h"
 #include "hawkins_exploration.h"
 #include "hawkins_character.h"
@@ -8,7 +7,7 @@
 #include "hawkins_adventure.h"
 #include "hawkins_adventure_store.h"
 #include "hawkins_narrative_store.h"
-#include "hawkins_llm/port.h"
+#include "hawkins_llm/runtime.h"
 #include "hawkins_sd_backup.h"
 #include "sd_files.h"
 #include "gnss.h"
@@ -16,6 +15,8 @@
 
 #include <cstdio>
 #include <cstring>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace {
 
@@ -63,29 +64,20 @@ bool showStorage = false;
 bool restoreConfirmation = false;
 
 bool showAiNarration = false;
-bool aiPhoneSeen = false;
 bool aiPending = false;
-uint32_t aiLastHeartbeatMs = 0U;
+bool aiWorkerRunning = false;
+bool aiWorkerDone = false;
+bool aiWorkerOk = false;
+bool aiTimedOut = false;
 uint32_t aiRequestAtMs = 0U;
-uint32_t aiRequestId = 0U;
 char aiNarration[hawkins::kHawkinsAiTextCapacity + 1U] = {};
 char aiChoices[hawkins::kHawkinsAiChoiceCount][hawkins::kHawkinsAiChoiceCapacity + 1U] = {};
 uint8_t aiChoiceCount = 0U;
 char aiUserAction[hawkins::kHawkinsAiChoiceCapacity + 1U] = {};
+char aiWorkerPrompt[128] = {};
+char aiWorkerOutput[hawkins::kHawkinsAiTextCapacity + 1U] = {};
+portMUX_TYPE aiWorkerMux = portMUX_INITIALIZER_UNLOCKED;
 const char* aiStatusText = "IA LOCALE EN ATTENTE";
-
-void sendAiProtocolAck(uint32_t id, const char* type, const char* status) {
-  if (id == 0U || !type || !status) return;
-  char frame[192];
-  const int length = snprintf(
-      frame, sizeof(frame),
-      "HKA/1 {\"type\":\"%s\",\"id\":%lu,\"status\":\"%s\"}\n",
-      type, static_cast<unsigned long>(id), status);
-  if (length > 0 && static_cast<size_t>(length) < sizeof(frame)) {
-    Serial.write(reinterpret_cast<const uint8_t*>(frame),
-                 static_cast<size_t>(length));
-  }
-}
 
 void setGpsStatus(const char* text) {
   if (gpsStatusText != text) {
@@ -243,135 +235,91 @@ const char* currentMovementObjective() {
 }
 
 
-const char* missionStatusLabel(hawkins::MissionId id) {
-  if (!missionsReady) return "indisponible";
-  switch (hawkins::missionStatus(missions, id)) {
-    case hawkins::MissionStatus::Locked: return "verrouillee";
-    case hawkins::MissionStatus::Active: return "active";
-    case hawkins::MissionStatus::Complete: return "terminee";
-  }
-  return "inconnue";
-}
+void hawkinsAiNarrationTask(void*) {
+  char prompt[sizeof(aiWorkerPrompt)] = {};
+  portENTER_CRITICAL(&aiWorkerMux);
+  memcpy(prompt, aiWorkerPrompt, sizeof(prompt));
+  portEXIT_CRITICAL(&aiWorkerMux);
 
-void escapeJsonText(const char* source, char* output, size_t capacity) {
-  size_t used = 0U;
-  if (!output || capacity == 0U) return;
-  output[0] = '\0';
-  if (!source) return;
-  for (size_t i = 0U; source[i] != '\0' && used + 2U < capacity; ++i) {
-    const char c = source[i];
-    if (c == '"' || c == '\\') output[used++] = '\\';
-    if (static_cast<unsigned char>(c) < 0x20U) output[used++] = ' ';
-    else output[used++] = c;
-  }
-  output[used] = '\0';
+  char generated[hawkins::kHawkinsAiTextCapacity + 1U] = {};
+  const bool ok = hawkins::hawkinsLlmRuntimeGenerate(
+      prompt, generated, sizeof(generated), 16U);
+
+  portENTER_CRITICAL(&aiWorkerMux);
+  snprintf(aiWorkerOutput, sizeof(aiWorkerOutput), "%s", generated);
+  aiWorkerOk = ok;
+  aiWorkerDone = true;
+  portEXIT_CRITICAL(&aiWorkerMux);
+  vTaskDelete(nullptr);
 }
 
 bool requestAiNarration() {
-  if (aiPending) {
-    aiStatusText = "UNE REPONSE EST DEJA EN COURS";
+  if (aiPending || aiWorkerRunning) {
+    aiStatusText = "UNE NARRATION EST DEJA EN COURS";
     dirty = true;
     return false;
   }
-  if (!aiPhoneSeen || millis() - aiLastHeartbeatMs > 15000U) {
-    aiStatusText = "BRANCHER LE Z FLIP6 EN USB";
+  if (!hawkins::hawkinsLlmRuntimeReady()) {
+    aiStatusText = "IA LOCALE INDISPONIBLE - JEU ACTIF";
     dirty = true;
     return false;
-  }
-
-  char memorySummary[hawkins::kNarrativeSummaryCapacity] = {};
-  if (!narrativeReady ||
-      !hawkins::formatNarrativeMemorySummary(
-          narrative, memorySummary, sizeof(memorySummary))) {
-    snprintf(memorySummary, sizeof(memorySummary), "%s",
-             "memoire narrative indisponible");
   }
 
   const hawkins::WorldState* world = hawkins::hawkinsRuntimeWorld();
-  const uint32_t day = world ? world->simulatedDays : 0U;
-  const uint8_t tension = world ? world->tension : 0U;
-  const uint8_t anomaly = world ? world->anomalyLevel : 0U;
-  const uint8_t factions = world ? world->factionActivity : 0U;
-  const char* eventName = world ? hawkins::eventTypeName(world->latestEvent.type)
-                                : "AUCUN";
-  const uint8_t eventIntensity = world ? world->latestEvent.intensity : 0U;
-  const char* playerName = playerLoaded ? player.name : "NON CREE";
-  const char* className = playerLoaded
-      ? hawkins::characterClass(player.classId).name : "AUCUNE";
-  const uint8_t level = playerLoaded ? player.level : 0U;
-  const uint32_t xp = playerLoaded ? player.xp : 0U;
-  const uint8_t hp = playerLoaded ? player.hitPoints : 0U;
-  const uint8_t hpMax = playerLoaded ? hawkins::characterMaxHitPoints(player) : 0U;
-  const uint8_t stress = playerLoaded ? player.stress : 0U;
-  const uint8_t firstChoice = adventureReady ? adventure.firstContactChoice : 0U;
-  const uint8_t medkits = adventureReady
-      ? adventure.items[static_cast<uint8_t>(hawkins::AdventureItem::Medkit)] : 0U;
-  const uint8_t calmingTea = adventureReady
-      ? adventure.items[static_cast<uint8_t>(hawkins::AdventureItem::CalmingTea)] : 0U;
-  const uint8_t evidence = adventureReady
-      ? adventure.items[static_cast<uint8_t>(hawkins::AdventureItem::Evidence)] : 0U;
+  const char* eventName = world
+      ? hawkins::eventTypeName(world->latestEvent.type) : "HAWKINS";
+  const char* playerName = playerLoaded ? player.name : "Joueur";
+  const char* action = aiUserAction[0] != '\\0'
+      ? aiUserAction : "observer la scene";
 
-  char escapedAction[hawkins::kHawkinsAiChoiceCapacity * 3U + 1U];
-  escapeJsonText(aiUserAction, escapedAction, sizeof(escapedAction));
-  char context[1400];
-  const int contextLength = snprintf(
-      context, sizeof(context),
-      "{\"game\":\"HAWKINS\",\"language\":\"fr\",\"day\":%lu,"
-      "\"world\":{\"tension\":%u,\"anomaly\":%u,\"factions\":%u,"
-      "\"event\":\"%s\",\"event_intensity\":%u},"
-      "\"exploration\":{\"sectors\":%lu,\"discoveries\":%lu,"
-      "\"cell\":\"%08lX\",\"objective\":\"%s\"},"
-      "\"player\":{\"created\":%s,\"name\":\"%s\",\"class\":\"%s\","
-      "\"level\":%u,\"xp\":%lu,\"hp\":%u,\"hp_max\":%u,\"stress\":%u},"
-      "\"missions\":{\"first_signal\":\"%s\",\"three_sectors\":\"%s\","
-      "\"anomaly_trail\":\"%s\"},"
-      "\"adventure\":{\"first_contact_choice\":%u,\"medkits\":%u,"
-      "\"calming_tea\":%u,\"evidence\":%u,\"skills_mask\":%u},"
-      "\"player_action\":\"%s\",\"memory\":\"%s\"}",
-      static_cast<unsigned long>(day), unsigned(tension), unsigned(anomaly),
-      unsigned(factions), eventName, unsigned(eventIntensity),
-      static_cast<unsigned long>(exploration.sectorsVisited),
-      static_cast<unsigned long>(exploration.discoveries),
-      static_cast<unsigned long>(exploration.lastCellKey),
-      currentMovementObjective(), playerLoaded ? "true" : "false",
-      playerName, className, unsigned(level), static_cast<unsigned long>(xp),
-      unsigned(hp), unsigned(hpMax), unsigned(stress),
-      missionStatusLabel(hawkins::MissionId::FirstSignal),
-      missionStatusLabel(hawkins::MissionId::ThreeSectors),
-      missionStatusLabel(hawkins::MissionId::AnomalyTrail),
-      unsigned(firstChoice), unsigned(medkits), unsigned(calmingTea),
-      unsigned(evidence), unsigned(adventureReady ? adventure.unlockedSkills : 0U),
-      escapedAction, memorySummary);
-  if (contextLength < 0 ||
-      static_cast<size_t>(contextLength) >= sizeof(context)) {
+  // Le modèle a un contexte de 32 tokens. On transmet volontairement un
+  // instantané très court du jeu ; le runtime conserve le marqueur Bot: et la
+  // fin du contexte si le tokenizer dépasse cette fenêtre.
+  char prompt[sizeof(aiWorkerPrompt)] = {};
+  const int promptLength = snprintf(
+      prompt, sizeof(prompt),
+      "User: Hawkins. %s. %s: %s. Continue en français.\\nBot:",
+      eventName, playerName, action);
+  if (promptLength < 0 ||
+      static_cast<size_t>(promptLength) >= sizeof(prompt)) {
     aiStatusText = "CONTEXTE IA TROP LONG";
     dirty = true;
     return false;
   }
 
-  ++aiRequestId;
-  if (aiRequestId == 0U) ++aiRequestId;
-  char line[hawkins::kHawkinsAiMaxLine + 1U];
-  if (!hawkins::buildHawkinsAiRequestLine(
-          aiRequestId, context, line, sizeof(line))) {
-    aiStatusText = "ERREUR PREPARATION CONTEXTE";
+  portENTER_CRITICAL(&aiWorkerMux);
+  snprintf(aiWorkerPrompt, sizeof(aiWorkerPrompt), "%s", prompt);
+  aiWorkerOutput[0] = '\\0';
+  aiWorkerDone = false;
+  aiWorkerOk = false;
+  portEXIT_CRITICAL(&aiWorkerMux);
+
+  aiWorkerRunning = true;
+  aiPending = true;
+  aiTimedOut = false;
+  aiRequestAtMs = millis();
+  aiNarration[0] = '\\0';
+  aiChoiceCount = 0U;
+  aiStatusText = "NARRATION LOCALE EN COURS...";
+  aiUserAction[0] = '\\0';
+
+  const BaseType_t created = xTaskCreatePinnedToCore(
+      hawkinsAiNarrationTask, "hawkins_ai", 8192, nullptr, 2, nullptr, 0);
+  if (created != pdPASS) {
+    aiWorkerRunning = false;
+    aiPending = false;
+    aiStatusText = "MEMOIRE INSUFFISANTE POUR L'IA";
     dirty = true;
     return false;
   }
-  Serial.write(reinterpret_cast<const uint8_t*>(line), strlen(line));
-  aiPending = true;
-  aiRequestAtMs = millis();
-  aiUserAction[0] = '\0';
-  aiNarration[0] = '\0';
-  aiChoiceCount = 0U;
-  aiStatusText = "LE MAITRE DU JEU REFLECHIT...";
+
   dirty = true;
   return true;
 }
 
 void drawAiNarrationPage() {
   cv.fillScreen(TFT_BLACK);
-  drawPageHeader("HAWKINS / NARRATEUR", "IA LOCALE USB", ACCENT);
+  drawPageHeader("HAWKINS / NARRATEUR", "IA EMBARQUEE", ACCENT);
   cv.setFont(&fonts::Font0);
   cv.setTextSize(1);
   cv.setTextDatum(top_left);
@@ -1034,93 +982,61 @@ void awardExplorationExperience(uint16_t amount) {
 }  // namespace
 
 void hawkinsAppAiUpdate() {
+  bool completed = false;
+  bool succeeded = false;
+  char generated[hawkins::kHawkinsAiTextCapacity + 1U] = {};
+
+  portENTER_CRITICAL(&aiWorkerMux);
+  if (aiWorkerDone) {
+    completed = true;
+    succeeded = aiWorkerOk;
+    snprintf(generated, sizeof(generated), "%s", aiWorkerOutput);
+    aiWorkerDone = false;
+  }
+  portEXIT_CRITICAL(&aiWorkerMux);
+
+  if (completed) {
+    aiWorkerRunning = false;
+    if (aiTimedOut) {
+      aiTimedOut = false;
+      return;
+    }
+    aiPending = false;
+    if (succeeded && generated[0] != '\\0') {
+      snprintf(aiNarration, sizeof(aiNarration), "%s", generated);
+      snprintf(aiChoices[0], sizeof(aiChoices[0]), "%s", "Observer");
+      snprintf(aiChoices[1], sizeof(aiChoices[1]), "%s", "Repondre");
+      snprintf(aiChoices[2], sizeof(aiChoices[2]), "%s", "Se cacher");
+      aiChoiceCount = 3U;
+      aiStatusText = "NARRATION GENEREE SUR LE CARDPUTER";
+      addNarrativeRecord(hawkins::NarrativeRecordType::AiNarration, 0U,
+                         static_cast<uint16_t>(aiChoiceCount), 0U);
+      Serial.printf("[hawkins-llm] narration locale recue: %u octets, %u choix\\n",
+                    static_cast<unsigned>(strlen(aiNarration)),
+                    static_cast<unsigned>(aiChoiceCount));
+    } else {
+      aiNarration[0] = '\\0';
+      aiChoiceCount = 0U;
+      aiStatusText = "IA INDISPONIBLE - JEU LOCAL ACTIF";
+      Serial.println("[hawkins-llm] generation interrompue ou sans texte");
+    }
+    dirty = true;
+  }
+
   if (aiPending && millis() - aiRequestAtMs > 270000U) {
     aiPending = false;
-    aiStatusText = "DELAI DEPASSE - VERIFIER LE TELEPHONE";
+    aiTimedOut = true;
+    aiStatusText = "DELAI IA DEPASSE - JEU TOUJOURS ACTIF";
     dirty = true;
   }
-  if (aiPhoneSeen && millis() - aiLastHeartbeatMs > 15000U && !aiPending &&
-      strcmp(aiStatusText, "TELEPHONE DECONNECTE") != 0) {
-    aiStatusText = "TELEPHONE DECONNECTE";
-    dirty = true;
-  }
-}
-
-bool hawkinsAppHandleSerialLine(const char* line, size_t length) {
-  if (!line || length < 6U || memcmp(line, "HKA/1 ", 6U) != 0) return false;
-  hawkins::HawkinsAiMessage message{};
-  const char* parseError = "invalid_frame";
-  if (!hawkins::parseHawkinsAiMessage(line, length, message, &parseError)) {
-    Serial.printf("[hawkins-ai] trame HKA invalide: raison=%s len=%u pending=%u id=%lu\n",
-                  parseError, static_cast<unsigned>(length),
-                  aiPending ? 1U : 0U, static_cast<unsigned long>(aiRequestId));
-    aiPending = false;
-    aiChoiceCount = 0U;
-    aiNarration[0] = '\0';
-    aiStatusText = "REPONSE IA INVALIDE - VOIR USB";
-    sendAiProtocolAck(aiRequestId, "nack", parseError);
-    dirty = true;
-    return true;
-  }
-  if (message.kind == hawkins::HawkinsAiMessageKind::Hello) {
-    aiPhoneSeen = true;
-    aiLastHeartbeatMs = millis();
-    if (!aiPending && strcmp(aiStatusText, "TELEPHONE DECONNECTE") == 0) {
-      aiStatusText = "TELEPHONE USB CONNECTE";
-      dirty = true;
-    }
-    return true;
-  }
-  if (!aiPending) {
-    Serial.printf("[hawkins-ai] reponse sans demande: id=%lu\n",
-                  static_cast<unsigned long>(message.requestId));
-    sendAiProtocolAck(message.requestId, "nack", "no_pending_request");
-    return true;
-  }
-  if (message.requestId != aiRequestId) {
-    Serial.printf("[hawkins-ai] mauvais id: recu=%lu attendu=%lu\n",
-                  static_cast<unsigned long>(message.requestId),
-                  static_cast<unsigned long>(aiRequestId));
-    sendAiProtocolAck(message.requestId, "nack", "request_id_mismatch");
-    return true;
-  }
-
-  aiPending = false;
-  if (message.kind == hawkins::HawkinsAiMessageKind::Narration) {
-    snprintf(aiNarration, sizeof(aiNarration), "%s", message.text);
-    aiChoiceCount = message.choiceCount;
-    for (uint8_t i = 0U; i < aiChoiceCount; ++i) {
-      snprintf(aiChoices[i], sizeof(aiChoices[i]), "%s", message.choices[i]);
-    }
-    aiStatusText = "SCENE GENEREE SUR LE TELEPHONE";
-    addNarrativeRecord(hawkins::NarrativeRecordType::AiNarration, 0U,
-                       static_cast<uint16_t>(aiChoiceCount), 0U);
-    Serial.printf("[hawkins-ai] narration acceptee id=%lu texte=%u choix=%u\n",
-                  static_cast<unsigned long>(message.requestId),
-                  static_cast<unsigned>(strlen(message.text)),
-                  static_cast<unsigned>(message.choiceCount));
-  } else if (message.kind == hawkins::HawkinsAiMessageKind::Error) {
-    snprintf(aiNarration, sizeof(aiNarration), "%s", message.text);
-    aiChoiceCount = 0U;
-    aiStatusText = "ERREUR DU NARRATEUR LOCAL";
-    Serial.printf("[hawkins-ai] erreur acceptee id=%lu\n",
-                  static_cast<unsigned long>(message.requestId));
-  }
-  dirty = true;
-  sendAiProtocolAck(message.requestId, "ack",
-                    message.kind == hawkins::HawkinsAiMessageKind::Narration
-                        ? "narration_accepted" : "error_accepted");
-  return true;
 }
 
 void hawkinsAppEnter() {
-  const HawkinsLlmApi& llm = hawkinsLlmGetApi();
-  const bool engineLinked = llm.initEmbedded && llm.tokenizerFromMemory &&
-      llm.buildSampler && llm.forward && llm.forwardAt && llm.slideContext &&
-      llm.sample && llm.encode && llm.decode;
-  Serial.printf("[hawkins-llm] moteur %s; modele %s (etape 3)\n",
-                engineLinked ? "lie au firmware" : "incomplet",
-                "non embarque");
+  const bool modelReady = hawkins::hawkinsLlmRuntimeInit();
+  aiStatusText = modelReady ? "IA LOCALE EMBARQUEE PRETE"
+                            : "IA LOCALE INDISPONIBLE - JEU ACTIF";
+  Serial.printf("[hawkins-llm] modele embarque %s; le jeu reste autonome\\n",
+                modelReady ? "pret" : "indisponible");
   showAiNarration = false;
   candidateActive = false;
   lastSampleMs = 0U;
