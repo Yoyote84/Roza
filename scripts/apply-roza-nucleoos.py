@@ -14,6 +14,7 @@ UI_FILE = NUCLEO_ROOT / "firmware/components/nucleo_ui/nucleo_ui.cpp"
 I18N_FILE = NUCLEO_ROOT / "firmware/components/nucleo_storage/nucleo_i18n.c"
 CLOCK_ZONE_FILE = NUCLEO_ROOT / "firmware/components/nucleo_setup/clock_zones.h"
 MAIN_FILE = NUCLEO_ROOT / "firmware/main/main.c"
+APP_REGISTRY_FILE = NUCLEO_ROOT / "firmware/components/nucleo_app/include/nucleo_app.h"
 UPDATE_ENGINE_FILE = NUCLEO_ROOT / "firmware/components/nucleo_app/nucleo_update.c"
 UPDATE_UI_FILE = NUCLEO_ROOT / "firmware/components/nucleo_app/app_updates.cpp"
 
@@ -160,6 +161,9 @@ def main() -> int:
         ('        nucleo_app_register_builtins();      bootmark("app-builtins");',
          '        nucleo_app_register_builtins();\n        roza_register_launcher_partitions();\n        roza_register_launcher_sd();\n        roza_register_launcher_diagnostics();\n        roza_register_launcher_display();\n        roza_register_gnss();\n        roza_register_lora();\n        bootmark("app-builtins");'),
     ])
+    registry_changed = replace_exact(APP_REGISTRY_FILE, [
+        ("#define NUCLEO_APP_MAX 80", "#define NUCLEO_APP_MAX 88"),
+    ])
     updater_changed = replace_exact(UPDATE_ENGINE_FILE, [
         ('#define UPD_BASE        "https://indecenti.github.io/NucleoOs/"',
          '#define UPD_BASE        "https://updates.roza.invalid/"   // fail-closed until ROZA publishes its own signed release channel'),
@@ -192,6 +196,7 @@ def main() -> int:
         f"theme={'modifie' if theme_changed else 'deja present'}, "
         f"splash={'modifie' if ui_changed else 'deja present'}, "
         f"apps ROZA={'modifiees' if main_changed else 'deja presentes'}, "
+        f"capacite registry={'modifiee' if registry_changed else 'deja presente'}, "
         f"verrou OTA={'modifie' if updater_changed or updates_ui_changed else 'deja present'}."
     )
     print("Langue francaise par defaut appliquee ; les choix deja enregistres sont conserves.")

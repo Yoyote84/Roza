@@ -372,7 +372,7 @@ def main() -> int:
 
     require(
         "firmware/components/nucleo_app/include/nucleo_app.h",
-        "#define NUCLEO_APP_MAX 80",
+        "#define NUCLEO_APP_MAX 88",
     )
     require(
         "integration/nucleoos-bridge/components/roza_lora/roza_lora.cpp",

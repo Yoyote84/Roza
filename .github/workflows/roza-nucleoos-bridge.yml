@@ -77,7 +77,7 @@ jobs:
           nucleoos_commit=cb0f1a5356ddd6f96ec6b31bbcba5d55f52d8123
           git clone --filter=blob:none --no-checkout --depth=1 --single-branch --branch main https://github.com/indecenti/NucleoOs.git nucleoos
           git -C nucleoos sparse-checkout init --cone
-          git -C nucleoos sparse-checkout set firmware sdk/native tools/anima-host
+          git -C nucleoos sparse-checkout set firmware sdk/native tools/anima-host tools/launcher-host
           if ! git -C nucleoos cat-file -e "${nucleoos_commit}^{commit}"; then
             git -C nucleoos fetch --filter=blob:none --depth=1 origin "${nucleoos_commit}"
           fi
@@ -102,6 +102,8 @@ jobs:
             scripts/check-roza-fusion-contract.py \
             scripts/verify-roza-flash-image.py \
             scripts/create-roza-build-manifest.py
+          python3 tests/test_roza_app_registry_capacity.py
+          node nucleoos/tools/launcher-host/check.mjs
           python3 scripts/check-roza-fusion-contract.py
 
       - name: Test Launcher input translation on the host
