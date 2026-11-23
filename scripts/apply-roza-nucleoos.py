@@ -162,7 +162,7 @@ def main() -> int:
          '        nucleo_app_register_builtins();\n        roza_register_launcher_partitions();\n        roza_register_launcher_sd();\n        roza_register_launcher_diagnostics();\n        roza_register_launcher_display();\n        roza_register_gnss();\n        roza_register_lora();\n        bootmark("app-builtins");'),
     ])
     registry_changed = replace_exact(APP_REGISTRY_FILE, [
-        ("#define NUCLEO_APP_MAX 80", "#define NUCLEO_APP_MAX 88"),
+        ("#define NUCLEO_APP_MAX 80", "#define NUCLEO_APP_MAX 92"),
     ])
     updater_changed = replace_exact(UPDATE_ENGINE_FILE, [
         ('#define UPD_BASE        "https://indecenti.github.io/NucleoOs/"',

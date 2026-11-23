@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 HEADER = ROOT / "nucleoos/firmware/components/nucleo_app/include/nucleo_app.h"
 SOURCE = ROOT / "nucleoos/firmware/components/nucleo_app/nucleo_app.cpp"
+SETUP_SOURCE = ROOT / "nucleoos/firmware/components/nucleo_setup/nucleo_setup.c"
 PATCH = ROOT / "scripts/apply-roza-nucleoos.py"
 MIN_STORE_SLOTS = 12
 
@@ -15,6 +16,7 @@ MIN_STORE_SLOTS = 12
 def main() -> int:
     header = HEADER.read_text(encoding="utf-8")
     source = SOURCE.read_text(encoding="utf-8")
+    setup_source = SETUP_SOURCE.read_text(encoding="utf-8")
     patch = PATCH.read_text(encoding="utf-8")
 
     capacity_match = re.search(r"^#define NUCLEO_APP_MAX (\d+)$", header, re.MULTILINE)
@@ -30,11 +32,19 @@ def main() -> int:
     if not builtin:
         raise SystemExit("nucleo_app_register_builtins body not found")
     builtin_calls = re.findall(r"nucleo_register_[A-Za-z0-9_]+\(\)", builtin.group(1))
+    setup = re.search(
+        r"void nucleo_setup_register_apps\(void\)\s*\{(.*?)\n\}",
+        setup_source,
+        re.DOTALL,
+    )
+    if not setup:
+        raise SystemExit("nucleo_setup_register_apps body not found")
+    setup_calls = re.findall(r"\bnucleo_app_register\s*\(", setup.group(1))
     roza_apps = set(re.findall(r"roza_register_([A-Za-z0-9_]+)\(\);", patch))
     if len(roza_apps) != 6:
         raise SystemExit(f"Expected six native ROZA app hooks, found {sorted(roza_apps)}")
 
-    dynamic_room = capacity - len(builtin_calls) - len(roza_apps)
+    dynamic_room = capacity - len(builtin_calls) - len(setup_calls) - len(roza_apps)
     if dynamic_room < MIN_STORE_SLOTS:
         raise SystemExit(
             f"Store registry room too small: {dynamic_room} slots "
@@ -43,8 +53,8 @@ def main() -> int:
 
     print(
         "ROZA app registry capacity: PASS "
-        f"({capacity}, {len(builtin_calls)} built-ins, {len(roza_apps)} ROZA apps, "
-        f"{dynamic_room} dynamic Store slots)"
+        f"({capacity}, {len(builtin_calls)} built-ins, {len(setup_calls)} setup app, "
+        f"{len(roza_apps)} ROZA apps, {dynamic_room} dynamic Store slots)"
     )
     return 0
 
