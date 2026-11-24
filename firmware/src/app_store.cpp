@@ -187,7 +187,7 @@ static bool parseCatalogDocument(JsonDocument& doc) {
 // Le catalogue validé est mis en cache sur SD pour permettre de retrouver et lancer
 // les paquets déjà installés même lorsque le Cardputer est hors ligne.
 static void cacheCatalogBody(const String& body) {
-  if (!sdMounted || body.length() == 0) return;
+  if (!sdMounted || body.length() == 0 || body.length() > MAX_CATALOG_BYTES) return;
   if (!SD.exists("/ROZA") && !SD.mkdir("/ROZA")) return;
   if (!SD.exists("/ROZA/apps") && !SD.mkdir("/ROZA/apps")) return;
 
@@ -245,6 +245,12 @@ static bool loadCachedCatalog() {
 
     File file = SD.open(catalogPath, FILE_READ);
     if (!file) return false;
+    const size_t cacheSize = file.size();
+    if (cacheSize == 0 || cacheSize > MAX_CATALOG_BYTES) {
+      file.close();
+      setStoreError("Taille du cache catalogue invalide.");
+      return false;
+    }
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, file);
     file.close();
@@ -416,7 +422,10 @@ static bool loadInstalled(int index) {
     CanvasLease lease;
     File file = SD.open(path, FILE_READ);
     if (!file) setStoreError("Fichier installe introuvable.");
-    else {
+    else if (file.size() == 0 || file.size() > MAX_PACKAGE_BYTES) {
+      file.close();
+      setStoreError("Taille du paquet local invalide.");
+    } else {
       JsonDocument doc;
       DeserializationError err = deserializeJson(doc, file);
       file.close();
