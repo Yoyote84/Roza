@@ -58,6 +58,26 @@ jobs:
         working-directory: firmware
         run: cp src/secrets.h.example src/secrets.h
 
+      - name: Diagnostiquer les en-têtes Bluetooth de l'environnement ESP32-S3
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Paquets SDK / Arduino installés :"
+          find "$HOME/.platformio/packages" -maxdepth 2 -type d -name 'framework-arduinoespressif32*' -print
+          echo "En-tête Bluedroid :"
+          find "$HOME/.platformio/packages" -type f -name 'esp_bt_main.h' -print
+          echo "En-têtes BLE associés :"
+          find "$HOME/.platformio/packages" -type f -name 'esp_bt.h' -print
+          find "$HOME/.platformio/packages" -type f -name 'esp_gap_ble_api.h' -print
+          find "$HOME/.platformio/packages" -type f -name 'esp_ble_gap_api.h' -print
+          echo "Options Bluetooth exposées par sdkconfig :"
+          find "$HOME/.platformio/packages" -type f -name 'sdkconfig.h' -print0 | while IFS= read -r -d '' f; do
+            if grep -qE 'CONFIG_(BT_ENABLED|BLUEDROID_ENABLED|BT_BLUEDROID_ENABLED)' "$f"; then
+              echo "---- $f"
+              grep -E 'CONFIG_(BT_ENABLED|BLUEDROID_ENABLED|BT_BLUEDROID_ENABLED)' "$f" || true
+            fi
+          done
+
       - name: Compile firmware Cardputer ADV
         working-directory: firmware
         shell: bash
