@@ -214,9 +214,8 @@ jobs:
 
           Le manifeste BUILD_MANIFEST.json indique le commit, la cible, la taille
           de l'image, la capacite de la partition, le resume RAM/Flash PlatformIO
-          et la provenance du modele. ELF_SECTIONS.txt detaille les sections liees.
+          et les informations de validation CI. ELF_SECTIONS.txt detaille les sections liees.
           PLATFORMIO_MEMORY.txt contient le resume de memoire du compilateur.
-           contient les empreintes des poids et du tokenizer.
           SHA256SUMS.txt verifie tous les fichiers de livraison.
 
           La carte microSD sert au stockage ; copier un BIN sur la SD ne flashe
