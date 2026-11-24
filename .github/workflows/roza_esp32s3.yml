@@ -25,7 +25,7 @@ on:
 
 env:
   # Version de PlatformIO à installer (omettre "latest" non valide pour pip)
-  PLATFORMIO_VERSION: 6.1.6
+  PLATFORMIO_VERSION: 6.2.0
 
 permissions:
   contents: read
@@ -51,6 +51,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install "platformio==${PLATFORMIO_VERSION}"
+
+      - name: Vérifier les versions PlatformIO et des dépendances
+        run: |
+          platformio --version
+          platformio pkg list -e cardputer-adv
 
       - name: Compiler le firmware avec PlatformIO
         run: |

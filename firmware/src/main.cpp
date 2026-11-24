@@ -1121,7 +1121,7 @@ void setup() {
   bootMark("m5-begin-call");
   M5.begin(cfg);
   bootMark("m5-begin-done");
-  M5.Display.setRotation(1);
+  M5.Display.setRotation(0);
   brightInit();                           // 从 NVS 恢复屏幕亮度偏好
   M5.Display.setBrightness(brightVal());
   SW = M5.Display.width();

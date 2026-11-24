@@ -1,6 +1,6 @@
 **English** | [简体中文](dependency-pins.zh-CN.md)
 
-# Dependency Version Pinning (2026-09-24)
+# Verrouillage des versions des dépendances (mise à jour du 24/11/2026)
 
     Summary up front: **The platform, Arduino core, and all libraries are strictly pinned to exact versions**.
     Any upgrade must be performed and tested individually following the procedure at the end of this document.
@@ -10,20 +10,37 @@
 
 ---
 
-## Currently Pinned Versions
+## Migration du socle — décision du 24/11/2026
+
+La base active visée pour le Cardputer ADV est désormais :
+
+- PlatformIO Espressif32 **8.0.0** ;
+- Arduino-ESP32 **3.3.12**, basé sur ESP-IDF **5.5.5** ;
+- M5Unified **0.3.0** et M5GFX **0.3.0**, obligatoirement synchronisés ;
+- PlatformIO Core **6.2.0** dans la CI.
+
+La sélection 8.0.0 reste volontairement plus conservatrice que la branche Arduino 4.0 / ESP-IDF 6.1.1. Les dépendances non indispensables au portage restent épinglées à leurs versions précédentes : elles seront mises à niveau séparément uniquement si un conflit de compilation ou un besoin concret l'exige.
+
+**Attention :** les mesures RAM/Flash de la section benchmark ci-dessous ont été obtenues sous Arduino 2.0.17 / ESP-IDF 4.4.7. Elles sont un point de comparaison historique, pas une mesure de la nouvelle base. La compilation et la CI doivent fournir de nouvelles mesures avant de déclarer la migration validée.
+
+M5Unified/M5GFX 0.3.0 change la sémantique des rotations absolues : sur Cardputer / Cardputer ADV, l'ancien `setRotation(1)` devient `setRotation(0)` pour conserver le même paysage. Les fonctions dont le type de retour change de `void` à `bool` doivent être adaptées à leurs usages. Les tests matériels d'écran, micro, haut-parleur, SPI, clavier ADV et IMU restent obligatoires.
+
+---
+
+## Versions actuellement épinglées après migration
 
 | Dependency | Version | Notes |
 |---|---|---|
-| platform `espressif32` | 7.0.1 | |
-| `framework-arduinoespressif32` | 3.20017.241212 | Arduino 2.0.17 / ESP-IDF 4.4.7 |
-| M5Unified | 0.2.20 | See upgrade notes below; must move together with M5GFX |
-| M5GFX | 0.2.27 | M5Unified declares an open range; without pinning, newer versions get pulled |
+| platform `espressif32` | 8.0.0 | Arduino 3.3.12 / IDF 5.5.5 |
+| `framework-arduinoespressif32` | Résolu par la plateforme 8.0.0 | Arduino 3.3.12 / ESP-IDF 5.5.5 |
+| M5Unified | 0.3.0 | À synchroniser avec M5GFX 0.3.0 |
+| M5GFX | 0.3.0 | Épinglé explicitement avec M5Unified 0.3.0 |
 | FastLED | 3.10.3 | **Do not upgrade**; see details below |
 | ArduinoJson | 7.4.3 | |
 | RadioLib | 7.7.1 | |
 | TinyGPSPlus | 1.1.0 | |
 | LibSSH-ESP32 | 5.9.0 | |
-| ESP8266Audio | 1.9.9 (git tag) | Newer releases require ESP-IDF 5; this project uses IDF 4 and will fail to compile |
+| ESP8266Audio | 1.9.9 (git tag) | Conservé pour isoler la migration; compatibilité IDF 5.5.5 à confirmer par le build |
 
 ---
 
@@ -50,7 +67,7 @@ Measured via `pio run` in an isolated test environment, upgrading each library i
 | Only FastLED → 3.10.5 | 117,308 | 4,006,213 | **RAM +6.3KB, Flash +375KB** |
 | Upgrade all dependencies | 117,444 | 4,019,265 | RAM +6.5KB, Flash +388KB |
 
-### FastLED 3.10.5: Do Not Upgrade
+### FastLED 3.10.5 : ne pas mettre à niveau dans cette migration
 
 - Newly added audio/FFT compilation units (`fl.audio+.cpp.o`, unused by this project) introduce references to `std::ios_base::Init`. The linker pulls in libstdc++'s complete iostream and locale machinery (`std::locale::_Impl`, `time_get`/`money_get`/`num_get`, wide character formatting, etc.). Memory impact: `.flash.rodata` +227KB, `.flash.text` +147KB, `.dram0.bss` +6KB, IRAM +1KB.
 - Driver architecture changed: 3.10.3 uses RMT hardware for GPIO21 (`ClocklessController<21, SK6812>`), whereas 3.10.5 falls back to `ClocklessBlockingGeneric` on this IDF 4 core, toggling pins via busy-waiting CPU cycles. LED effect modes update every 30ms, which would contend for CPU cycles against I2S audio and Wi-Fi processing.
@@ -58,7 +75,7 @@ Measured via `pio run` in an isolated test environment, upgrading each library i
 
 Upgrades should be deferred until upstream removes the iostream dependency and retains hardware RMT support on IDF 4.
 
-### M5Unified 0.2.23 + M5GFX 0.2.30: Beneficial, but Requires Targeted Regression
+### Historique — M5Unified 0.2.23 + M5GFX 0.2.30 (versions remplacées)
 
 M5Unified 0.2.23 mandates M5GFX ≥ 0.2.30; both must be updated concurrently.
 
@@ -76,9 +93,9 @@ Trade-offs:
 - Board auto-detection logic was rewritten, specifically altering the internal bus containing BMI270 and ES8311.
 - Flash +13KB, RAM negligible change.
 
-### Platform espressif32: No Need to Upgrade
+### Historique — décision PlatformIO antérieure au 24/11/2026 (remplacée)
 
-The 7.1.x release continues to provide Arduino core 2.0.17 (IDF 4.4.7), adding framework support for ESP-IDF 6.1 which offers no benefits to Arduino projects. Neither choice impacts ESP8266Audio 1.9.9.
+Cette conclusion décrivait la base 7.1.x antérieure. Elle est remplacée par la migration vers PlatformIO 8.0.0, qui fournit Arduino-ESP32 3.3.12 / ESP-IDF 5.5.5. ESP8266Audio 1.9.9 reste conservé uniquement pour isoler les changements et doit être vérifié sous ce nouveau core.
 
 ---
 
