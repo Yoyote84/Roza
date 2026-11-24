@@ -64,6 +64,33 @@ jobs:
           set -euo pipefail
           pio run -e cardputer-adv 2>&1 | tee "$RUNNER_TEMP/platformio-memory-report.txt"
 
+      - name: Run parser, memory, network-policy and SD resource tests
+        working-directory: firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suite in irtest loratest odidtest gnsstest jsontest oventest powertest ramtest astrotest calctest clocktest; do
+            echo "::group::Suite $suite"
+            bash "tools/$suite/build.sh"
+            echo "::endgroup::"
+          done
+          JSON_INC="-I .pio/libdeps/cardputer-adv/ArduinoJson/src"
+          for test in test alert_test hist_test hosts_test opid_test radar_test config_test; do
+            echo "::group::Router/RID $test"
+            g++ -std=c++17 $JSON_INC "tools/routertest/$test.cpp" -o "/tmp/roza-$test"
+            "/tmp/roza-$test"
+            echo "::endgroup::"
+          done
+          echo "::group::Memory regression self-test"
+          python tools/memsweep.py --selftest
+          echo "::endgroup::"
+          echo "::group::BadApple SD binary format"
+          python tools/badapple_pack_test.py
+          echo "::endgroup::"
+          echo "::group::Flash package guards"
+          python tools/package_flash_test.py
+          echo "::endgroup::"
+
       - name: Assemble flashable Cardputer ADV images
         working-directory: firmware
         shell: bash
