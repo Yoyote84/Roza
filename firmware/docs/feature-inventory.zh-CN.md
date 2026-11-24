@@ -23,8 +23,8 @@
 | **HID** | 3/8 | 5 | BT Keys · BT Media · Ducky | 设备当键盘/遥控器敲别人（BLE/USB） |
 | **SIG** | 4/8 | 4 | LoRa · GNSS · Map · IR | 其它收发通道（隔空信号与定位） |
 | **SKY** | 6/8 | 2 | Astro · Weather · Planes · Sats · Typhoon · Quake | 抬头看天（天文/气象/天灾/空中交通） |
-| **MORE** | 8/8 | **0** | GitHub · Radio · FX · OKX · Reader · BadApple · Apps · Settings |
-| **RPG** | 1/8 | 7 | Hawkins | 离线角色扮演游戏 | 个人服务仪表盘、多媒体与系统设置 |
+| **MORE** | 8/8 | **0** | GitHub · Radio · FX · OKX · Reader · BadApple · Apps · Settings | 个人服务仪表盘、多媒体与系统设置 |
+| **RPG** | 1/8 | 7 | Hawkins | 离线角色扮演游戏 |
 
 ⚠️ **每组硬上限 8（4×2 网格，每组正好一屏，不做上下滚动）**。TOOLS 和 MORE 已经满员（8/8）。
 总容量 64、已用 41，余量分布在 SCAN(3) / NET(2) / HID(5) / SIG(4) / SKY(2) / RPG(7)。
