@@ -2,6 +2,7 @@
 // Private values may be supplied by firmware/src/secrets.h (never commit that file).
 // Empty defaults keep every application buildable without accounts, API keys or a server.
 #pragma once
+#include <string.h>
 
 #if defined(__has_include)
 #  if __has_include("secrets.h")
@@ -21,8 +22,8 @@
 #ifndef CHAT_ROOT_CA
 #define CHAT_ROOT_CA ""
 #endif
-#ifndef CHAT_ALLOW_INSECURE
-#define CHAT_ALLOW_INSECURE false
+#ifdef CHAT_ALLOW_INSECURE
+static_assert(!CHAT_ALLOW_INSECURE, "CHAT_ALLOW_INSECURE must be false: ROZA always verifies TLS certificates.");
 #endif
 
 #ifndef GITHUB_USER
@@ -42,3 +43,12 @@
 #ifndef CLASH_PROXY_GROUP
 #define CLASH_PROXY_GROUP ""
 #endif
+
+// Reject placeholder values copied verbatim from secrets.h.example.
+static inline bool rozaConfigIsPlaceholder(const char* value) {
+  if (!value || !value[0]) return true;
+  static const char* const markers[] = { "COLLER_", "VOTRE_", "ADRESSE_IP", "YOUR_", "CHANGE_ME", "PLACEHOLDER" };
+  for (size_t i = 0; i < sizeof(markers) / sizeof(markers[0]); ++i)
+    if (strstr(value, markers[i])) return true;
+  return false;
+}

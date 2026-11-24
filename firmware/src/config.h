@@ -18,7 +18,7 @@
 #define ROZA_LANGUAGE "FR"
 #endif
 
-// --- NTP 服务器（按顺序尝试）。默认偏向中国大陆可达；海外 utilisateurs peuvent change to pool.ntp.org system ---
+// --- Serveurs NTP (essayes dans l'ordre), adaptes a une configuration francaise/europeenne. ---
 #ifndef CFG_NTP_1
 #define CFG_NTP_1 "fr.pool.ntp.org"
 #endif

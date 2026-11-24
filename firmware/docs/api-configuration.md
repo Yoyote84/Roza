@@ -55,3 +55,11 @@ les valeurs vides par défaut pour toutes les autres.
 - Les appels réseau doivent rester déclenchés par l'utilisation de l'application concernée,
   pas par le démarrage général du firmware.
 - Les fonctionnalités hors ligne et les pilotes matériels ne doivent pas dépendre des API.
+
+
+## Stabilité réseau et sécurité
+
+- Les requêtes HTTPS utilisent le bundle de certificats racines embarqué ou une CA explicitement configurée. La validation du certificat reste obligatoire ; une ancienne définition `CHAT_ALLOW_INSECURE=true` fait échouer la compilation.
+- Les chaînes d'exemple `COLLER_...`, `VOTRE_...`, `ADRESSE_IP...`, `YOUR_...` et `PLACEHOLDER` sont détectées et refusées pour les paramètres sensibles.
+- **Router** pilote l'API REST externe de Clash/Mihomo ; ce n'est pas l'interface web d'un routeur domestique. Configurez `CLASH_BASE` avec l'adresse LAN du contrôleur, par exemple `http://192.168.1.10:9090`, puis le nom exact du groupe dans `CLASH_PROXY_GROUP`. Mihomo doit écouter une interface accessible depuis le Wi-Fi du Cardputer (par exemple `external-controller: 0.0.0.0:9090`) et être protégé par `secret` si le réseau le nécessite. N'exposez pas ce port à Internet. Cette version utilise le contrôleur local HTTP ; une URL HTTPS est refusée plutôt que de contourner la validation TLS.
+- Le radar satellite espace ses demandes pour rester sous la limite publiée de 100 transactions horaires pour l'endpoint N2YO `above`, et conserve les champs d'erreur du service afin de distinguer une erreur de clé ou de quota d'une réponse normale vide.

@@ -3,7 +3,7 @@
 # 功能清单（Cardputer ADV 固件）
 
 从代码里逐个扒出来的，不是从 README 抄的。口径：
-**40 个 app / 85 个 Screen / 7 个分组**。
+**40 个 app / 7 个分组**（以 `firmware/src/globals.cpp` 中的 `APPS[]` 和 `GROUPS[]` 为准）。
 
 读法：
 - **子页** = 在 `pages.cpp` 的翻页链里，用 `.`/`/` 前后翻，底部有页码点
@@ -19,14 +19,14 @@
 |---|---|---|---|---|
 | **TOOLS** | 8/8 | **0** | Time · IMU · Files · Spectrum · Calc · Converter · Player · Hash Oven | 本地工具，不依赖射频 |
 | **SCAN** | 5/8 | 3 | WiFi Chan · Sniffer · Wardrive · Drone ID · BLE Scan | 被动找东西（混杂模式/扫描，不需要连上） |
-| **NET** | 5/8 | 3 | Hotspot · LAN Scan · NetProbe · Router · SSH | 主动网络收发（需连上或自己当 AP） |
+| **NET** | 6/8 | 2 | Hotspot · LAN Scan · NetProbe · Router · SSH · ChatGPT | 主动网络收发（需连上或自己当 AP） |
 | **HID** | 3/8 | 5 | BT Keys · BT Media · Ducky | 设备当键盘/遥控器敲别人（BLE/USB） |
 | **SIG** | 4/8 | 4 | LoRa · GNSS · Map · IR | 其它收发通道（隔空信号与定位） |
 | **SKY** | 6/8 | 2 | Astro · Weather · Planes · Sats · Typhoon · Quake | 抬头看天（天文/气象/天灾/空中交通） |
-| **MORE** | 8/8 | **0** | ChatGPT · GitHub · Radio · FX · OKX · Reader · BadApple · Settings | 个人服务仪表盘、多媒体与系统设置 |
+| **MORE** | 8/8 | **0** | GitHub · Radio · FX · OKX · Reader · BadApple · Apps · Settings | 个人服务仪表盘、多媒体与系统设置 |
 
 ⚠️ **每组硬上限 8（4×2 网格，每组正好一屏，不做上下滚动）**。TOOLS 和 MORE 已经满员（8/8）。
-总容量 56、已用 39，余量分布在 SCAN(3) / NET(3) / HID(5) / SIG(4) / SKY(2)。
+总容量 56、已用 40，余量分布在 SCAN(3) / NET(2) / HID(5) / SIG(4) / SKY(2)。
 
 ---
 

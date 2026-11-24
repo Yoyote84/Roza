@@ -1,11 +1,15 @@
 #pragma once
 #include "WiFiClientSecure.h"
 
+enum followRedirects_t { HTTPC_DISABLE_FOLLOW_REDIRECTS, HTTPC_STRICT_FOLLOW_REDIRECTS, HTTPC_FORCE_FOLLOW_REDIRECTS };
+
 class HTTPClient {
 public:
   bool begin(WiFiClient&, const String&) { return false; }
   bool begin(const String&) { return false; }
   void useHTTP10(bool) {}
+  void setFollowRedirects(followRedirects_t) {}
+  void setReuse(bool) {}
   void setConnectTimeout(int) {}
   void setUserAgent(const char*) {}
   void setUserAgent(const String&) {}

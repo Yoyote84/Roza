@@ -455,7 +455,7 @@ int main() {
   };
 
   simResponses.push_back({"/summary/", restampQuakes(slurpFile("../data/usgs_quakes.json"))});
-  simResponses.push_back({"..", slurpFile("../data/frankfurter_usdcny.json")});
+  simResponses.push_back({"api.frankfurter.dev", slurpFile("../data/frankfurter_usdcny.json")});
   simResponses.push_back({"quotedPrice", slurpFile("../data/okx_exchange_rate.json")});
   simResponses.push_back({"targetTc.json",       slurpFile("../data/jma_target.json")});
   simResponses.push_back({"specifications.json", slurpFile("../data/jma_specifications.json")});
@@ -546,15 +546,15 @@ int main() {
   shoot("out/okx.png",                drawOkx,       SCREEN_OKX);
 
   {
-    const int nested = fxPointCount();
-    simSetResponse("..", slurpFile("../data/frankfurter_usdcny_flat.json"));
+    const int ordered = fxPointCount();
+    simSetResponse("api.frankfurter.dev", slurpFile("../data/frankfurter_usdcny_flat.json"));
     fxKey('r');
     drawFx();
     fxUpdate();
-    const int flat = fxPointCount();
-    const bool ok = (nested > 0 && nested == flat);
-    printf("fx: nested=%d flat=%d -> %s\n", nested, flat,
-           ok ? "ok" : "FAIL 两种形状解出的点数对不上");
+    const int reordered = fxPointCount();
+    const bool ok = (ordered > 0 && ordered == reordered);
+    printf("fx: Frankfurter v2 ordered=%d reordered=%d -> %s\n", ordered, reordered,
+           ok ? "ok" : "FAIL v2 row ordering changed the parsed point count");
     if (!ok) selfTestFailed = true;
   }
 

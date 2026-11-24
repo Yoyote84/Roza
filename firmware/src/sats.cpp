@@ -21,7 +21,10 @@ static const int MAX_SATS = 60;
 // 共 18330 字节，其中绝大多数在地平线以下、进来就被 `el < 0` 扔掉，纯属白下载。
 // 而这一页还背着 TLS，17KB 的响应直接把堆挤到 6.2KB，body 读不完，报 json: IncompleteInput。
 // 收到贴合各自地平线的半径之后：Starlink 4 颗 680 字节，GPS 11 颗 1842 字节。
-static const uint32_t AUTO_MS = 30000;
+static const uint32_t AUTO_MS = 90000;  // N2YO /above : 100 transactions par heure au maximum
+static const uint32_t N2YO_MIN_REQUEST_MS = 90000;
+static uint32_t n2yoLastRequestMs = 0;
+static bool n2yoHasRequested = false;
 
 struct SatCat { const char* name; int id; int radiusDeg; };
 static const SatCat CATS[] = { {"STARLINK", 52, 25}, {"GPS", 20, 90} };
@@ -63,7 +66,7 @@ static void fetchSats() {
   if (!sats) sats = (Sat*)malloc(sizeof(Sat) * MAX_SATS);
   if (!sats) { errMsg = "out of memory"; dirty = true; return; }
 
-  if (strlen(N2YO_API_KEY) == 0) { errMsg = "no N2YO key in secrets.h"; dirty = true; return; }
+  if (rozaConfigIsPlaceholder(N2YO_API_KEY)) { errMsg = "configure a real N2YO_API_KEY in secrets.h"; dirty = true; return; }
   if (!wifiEnsureConnected()) { errMsg = "wifi not connected"; dirty = true; return; }
   // 证书校验要比有效期，时钟没对上必然失败——分开报，别混成网络错
   if (!tlsClockReady()) { errMsg = "waiting for clock (NTP)"; dirty = true; return; }
@@ -71,6 +74,16 @@ static void fetchSats() {
   GeoFix fix;
   if (!geoGet(fix, &errMsg)) { dirty = true; return; }
   fromGps = fix.fromGps;
+
+  const uint32_t nowMs = millis();
+  if (n2yoHasRequested && nowMs - n2yoLastRequestMs < N2YO_MIN_REQUEST_MS) {
+    uint32_t waitSec = (N2YO_MIN_REQUEST_MS - (nowMs - n2yoLastRequestMs) + 999) / 1000;
+    errMsg = String("N2YO cooldown: wait ") + String(waitSec) + "s";
+    dirty = true;
+    return;
+  }
+  n2yoLastRequestMs = nowMs;
+  n2yoHasRequested = true;
 
   char url[200];
   snprintf(url, sizeof(url),
@@ -102,6 +115,11 @@ static void fetchSats() {
   // 只回 {"info":{...,"satcount":0}}），光看 above 在不在分不出"天上没有"和"响应坏了"。
   JsonObject fi = filter["info"].to<JsonObject>();
   fi["satcount"] = true;
+  fi["transactionscount"] = true;
+  filter["error"] = true;
+  filter["message"] = true;
+  filter["msg"] = true;
+  filter["detail"] = true;
 
   JsonDocument doc;
   HttpJsonOptions options(10000, 15000);
@@ -112,6 +130,16 @@ static void fetchSats() {
   // getString() 会替我们解块。weather.cpp 顶上早就记了这条坑，这一页当时没照做。
   options.stream = false;
   if (!fetchJsonHttp(client, url, doc, &filter, options, errMsg)) { dirty = true; return; }
+
+  // L'API peut renvoyer une enveloppe d'erreur (quota ou clé) sans objet info.
+  // Les champs error/message/msg sont conservés par le filtre pour afficher la vraie cause.
+  if (!doc["error"].isNull() || !doc["message"].isNull() || !doc["msg"].isNull()) {
+    const char* apiError = doc["error"].is<const char*>() ? doc["error"].as<const char*>() : nullptr;
+    if (!apiError) apiError = doc["error"]["message"] | doc["message"] | doc["msg"] | doc["detail"] | "";
+    errMsg = apiError[0] ? String("N2YO: ") + apiError : "N2YO API error reply";
+    dirty = true;
+    return;
+  }
 
   // 分清三件事，别都显示成 0：
   //   连 info 都没有        -> 响应根本不是我们以为的东西（协议变了/又踩了解析假成功）

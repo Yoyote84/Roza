@@ -43,6 +43,9 @@ struct MockHttpConfig {
   uint32_t capturedConnectTimeout = 0;
   uint32_t capturedTimeout = 0;
   bool useHttp10Called = false;
+  bool reuseCalled = false;
+  bool reuseValue = true;
+  int redirectMode = -1;
   bool endCalled = false;
   bool beginCalled = false;
 
@@ -57,18 +60,23 @@ struct MockHttpConfig {
     capturedConnectTimeout = 0;
     capturedTimeout = 0;
     useHttp10Called = false;
+    reuseCalled = false; reuseValue = true; redirectMode = -1;
     endCalled = false;
     beginCalled = false;
   }
 };
 
 extern MockHttpConfig g_mockHttp;
+enum followRedirects_t { HTTPC_DISABLE_FOLLOW_REDIRECTS, HTTPC_STRICT_FOLLOW_REDIRECTS, HTTPC_FORCE_FOLLOW_REDIRECTS };
 
 class Client {};
 
 class HTTPClient {
 public:
   void useHTTP10(bool) { g_mockHttp.useHttp10Called = true; }
+  void setFollowRedirects(followRedirects_t mode) { g_mockHttp.redirectMode = (int)mode; }
+  void setReuse(bool reuse) { g_mockHttp.reuseCalled = true; g_mockHttp.reuseValue = reuse; }
+  static String errorToString(int code) { return String(code == -1 ? "connection refused" : "mock HTTP error"); }
   void setConnectTimeout(uint32_t ms) { g_mockHttp.capturedConnectTimeout = ms; }
   void setTimeout(uint32_t ms) { g_mockHttp.capturedTimeout = ms; }
 

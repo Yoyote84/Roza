@@ -69,21 +69,3 @@ Audit documentaire actualisé sur `main` après le commit `c83499428c564ada2c969
 ## Rapport obligatoire à chaque lot
 
 Indiquer branche, SHA complet, fichiers modifiés, recherche de doublons, commandes et résultats, compilation locale, lien CI du SHA exact, tests logiciels, essais physiques (ou « non testés sur matériel »), risques et prochaine action. Une CI verte prouve uniquement la compilation dans l'environnement CI.
-
-
-## Hawkins — intégration de l'IA locale (plan en cinq étapes)
-
-Ce suivi concerne le jeu Hawkins et complète le statut général du firmware ROZA.
-
-- **Étape 1/5 — architecture :** moteur embarqué retenu, contraintes Cardputer ADV et séparation des responsabilités documentées dans `docs/HAWKINS_LOCAL_AI_STEP1_AUDIT.md`.
-- **Étape 2/5 — moteur :** port du moteur Cardputer AI/REZOR dans `firmware/src/hawkins_llm/`.
-- **Étape 3/5 — modèle français :** LeCarnet-3M fine-tuné et exporté en poids CRDP v3 LLaMA Q4_0 + tokenizer CTK2. Les fichiers binaires finaux, le manifeste et les SHA-256 sont publiés dans `firmware/src/hawkins_llm/assets/`. Le rapport est dans `docs/HAWKINS_LOCAL_AI_STEP3_MODEL_FR.md`.
-- **Étape 4/5 — intégration et validation CI terminées :** runtime local, modèle/tokenizer embarqués, prompt borné au vrai budget CTK2, 9 tokens de texte + EOS, tâche FreeRTOS et retrait du compagnon Android. Commit validé : `f748e2c3b00705894f5ed2b19b75f3146948dae2`, run CI n°145 entièrement vert (compilation Cardputer, moteur/SIMD, paquet Factory de contrôle, tests natifs et simulateur SDL).
-- **Étape 5/5 — firmware final compilé et conditionné :** exécution GitHub Actions `44971906521` entièrement réussie sur le code `83fadcfbe05127339c3218d09d545101817a2955`. Le paquet Factory et l'application seule sont produits, les fichiers de provenance et rapports sont inclus, et `sha256sum -c` valide toutes les empreintes avant l'envoi de l'artefact.
-- **Essai physique restant :** installer le Factory sur le Cardputer ADV, vérifier le démarrage, le lancement du jeu et du narrateur hors ligne, puis relever les messages série de heap et les délais d'inférence. Il n'y a pas encore de mesure sur l'appareil réel.
-
-**Mesures PlatformIO du build final (exécution `44971906521`) :** RAM liée 123 404 / 327 680 octets (37,7 %) ; Flash applicative 5 052 425 / 8 257 536 octets (61,2 %). L'image Factory fait 5 118 320 octets (`0x4e1970`). Ces valeurs de compilation ne représentent pas le heap libre en fonctionnement.
-
-**État honnête :** toutes les vérifications CI, la génération du Factory, les contrôles SHA-256, les tests natifs et le rendu hôte sont verts. Les relevés du heap interne seront produits au démarrage par les marqueurs série `[hawkins-llm] HEAP`, mais leurs valeurs, le temps de génération, la qualité des réponses et la stabilité doivent encore être observés sur le Cardputer physique.
-
-**Artefact final :** [ROZA-Cardputer-ADV-Hawkins-83fadcfbe05127339c3218d09d545101817a2955](https://github.com/Yoyote84/Roza/actions/runs/44971906521) (artefact conservé jusqu'au 20 février 2027).

@@ -14,7 +14,7 @@
 
 static const int   MAX_PLANES  = 12;
 static const int   RADIUS_NM   = 50;              // 查询半径（海里）
-static const uint32_t AUTO_MS  = 25000;           // 停在这页时的自动刷新间隔
+static const uint32_t AUTO_MS  = 5UL * 60 * 1000; // ADS-B.lol: 500 requêtes/jour sans clé
 
 struct Plane {
   char  cs[10], type[6], reg[10];
@@ -33,9 +33,8 @@ static bool    fromGps = false;
 // ---- 航线（起降机场 + 行程进度）----
 //
 // ADS-B 报文里没有航线：机载广播只有位置/高度/速度/呼号。起降机场得拿呼号去排班库
-// 另查一次，这里用 adsbdb.com。公开数据、请求不带任何凭据，跟 sats.cpp / github.cpp
-// 是同一类，按 README「安全边界」那节用 setInsecure()。它只有 HTTPS（明文会 301），
-// 所以这一页破例吃一次 TLS 握手——但单条响应才 ~700B，且只查当前选中的那一架。
+// 另查一次，这里用 adsbdb.com。公开数据、请求不带任何凭据；HTTPS 证书由 ROZA CA bundle 校验。
+// 因而这一页仍会额外消耗一次 TLS 握手——但单条响应才 ~700B，且只查当前选中的那一架。
 //
 // ⚠️ 排班库是按呼号查的静态表，不是实时航迹：呼号复用/换季会给出完全不搭的航线
 // （实测有架在伦敦上空的飞机被返回成 ORD->LIR）。所以进度一律拿实测位置反算，
@@ -135,26 +134,29 @@ static float routeProgress(const Route& r, float lat, float lon, float* remainKm
 }
 
 static void fetchPlanes() {
+  errMsg.reserve(96);
   errMsg = "";
   lastFetchMs = millis();
 
   if (!wifiEnsureConnected()) { errMsg = "wifi not connected"; dirty = true; return; }
+  if (!tlsClockReady()) { errMsg = "waiting for clock (NTP)"; dirty = true; return; }
 
   GeoFix fix;
   if (!geoGet(fix, &errMsg)) { dirty = true; return; }
   fromGps = fix.fromGps;
 
-  // 明文 HTTP：跟地图瓦片同一个道理——公开数据、请求不带任何凭据，
-  // 而 TLS 握手要几百毫秒 + 40KB 连续堆（实测握手期间 largestBlock 从 90KB 掉到 47KB），
-  // 进这一页那"卡顿一秒"主要就是它。实测这个接口明文返回 200 且是 Content-Length
-  // 定长编码（不是 chunked），配下面的 getStream() 流式解析刚好。
+  // ADS-B.lol exige le point d'accès HTTPS. Le certificat est vérifié via le bundle ROZA.
+  // Le canvas de 64,8 KB est libéré pendant TLS pour laisser un bloc contigu au handshake.
   char url[128];
-  snprintf(url, sizeof(url), "http://api.adsb.lol/v2/lat/%.4f/lon/%.4f/dist/%d",
+  snprintf(url, sizeof(url), "https://api.adsb.lol/v2/lat/%.4f/lon/%.4f/dist/%d",
            fix.lat, fix.lon, RADIUS_NM);
 
-  WiFiClient client;
-  // 机场附近这个接口能返回一两百架、几十上百 KB。板子没有 PSRAM，整包 JSON 进堆很危险，
-  // 所以用 filter 边流式解析边扔——只留下面这几个字段，堆占用跟返回大小基本脱钩。
+  WiFiClientSecure client;
+  tlsUseCaBundle(client);
+  client.setHandshakeTimeout(10);
+  CanvasLease lease;
+  // L'API peut renvoyer des dizaines de KB. Le filtre garde seulement les champs utiles ;
+  // on ne désactive jamais TLS pour économiser la RAM.
   JsonDocument filter;
   JsonObject fac = filter["ac"].add<JsonObject>();
   fac["flight"] = true; fac["t"] = true; fac["r"] = true;

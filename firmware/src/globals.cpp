@@ -198,7 +198,6 @@ const AppDef APPS[] = {
   {"GitHub",    APP_GITHUB},   {"Radio",    APP_RADIO},    {"FX",       APP_FX},
   {"OKX",       APP_OKX},      {"Reader",   APP_READER},   {"BadApple", APP_BADAPPLE},
   {"Apps",      APP_STORE},    {"Settings", APP_SETTINGS},
-  {"Hawkins",   APP_HAWKINS},
 };
 const int APP_COUNT = sizeof(APPS) / sizeof(APPS[0]);
 
@@ -207,7 +206,7 @@ const int APP_COUNT = sizeof(APPS) / sizeof(APPS[0]);
 // 先算这笔账（ui_common.cpp 的 drawGroupTabs）。
 constexpr GroupDef GROUPS[] = { {"TOOL", 0, 8}, {"SCAN", 8, 5}, {"NET", 13, 6},
                                 {"HID", 19, 3}, {"SIG", 22, 4}, {"SKY", 26, 6},
-                                {"MORE", 32, 8}, {"RPG", 40, 1} };
+                                {"MORE", 32, 8} };
 const int GROUP_COUNT = sizeof(GROUPS) / sizeof(GROUPS[0]);
 
 const int MENU_COLS = 4;

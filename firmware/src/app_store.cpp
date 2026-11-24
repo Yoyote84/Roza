@@ -149,10 +149,129 @@ static void refreshInstalledFlags() {
     storeApps[i].installed = sdMounted && SD.exists(path);
   }
 }
+static bool parseCatalogDocument(JsonDocument& doc) {
+  storeCount = 0;
+  JsonArray apps = doc["apps"].as<JsonArray>();
+  if (doc["format"].as<int>() != 1 || apps.isNull()) {
+    setStoreError("Format de catalogue non reconnu.");
+    return false;
+  }
+
+  for (JsonVariant item : apps) {
+    if (storeCount >= MAX_STORE_APPS) break;
+    StoreEntry candidate{};
+    const char* id = item["id"] | "";
+    const char* name = item["name"] | "";
+    const char* version = item["version"] | "";
+    const char* description = item["description"] | "";
+    const char* url = item["url"] | "";
+    if (!validAppId(id) ||
+        !copyField(candidate.id, sizeof(candidate.id), id, false) ||
+        !copyField(candidate.name, sizeof(candidate.name), name, false) ||
+        !copyField(candidate.version, sizeof(candidate.version), version, false) ||
+        !copyField(candidate.description, sizeof(candidate.description), description, true) ||
+        !copyField(candidate.url, sizeof(candidate.url), url, false) ||
+        strncmp(candidate.url, "https://raw.githubusercontent.com/", 33) != 0) continue;
+    storeApps[storeCount++] = candidate;
+  }
+
+  if (storeCount == 0) {
+    setStoreError("Aucune application ROZA compatible.");
+    return false;
+  }
+  if (storeSelected >= storeCount) storeSelected = storeCount - 1;
+  refreshInstalledFlags();
+  return true;
+}
+
+// Le catalogue validé est mis en cache sur SD pour permettre de retrouver et lancer
+// les paquets déjà installés même lorsque le Cardputer est hors ligne.
+static void cacheCatalogBody(const String& body) {
+  if (!sdMounted || body.length() == 0 || body.length() > MAX_CATALOG_BYTES) return;
+  if (!SD.exists("/ROZA") && !SD.mkdir("/ROZA")) return;
+  if (!SD.exists("/ROZA/apps") && !SD.mkdir("/ROZA/apps")) return;
+
+  const char* catalogPath = "/ROZA/apps/catalog.json";
+  const char* tempPath = "/ROZA/apps/catalog.tmp";
+  const char* backupPath = "/ROZA/apps/catalog.bak";
+  if (SD.exists(tempPath)) SD.remove(tempPath);
+
+  File temp = SD.open(tempPath, FILE_WRITE);
+  if (!temp) return;
+  size_t written = temp.write((const uint8_t*)body.c_str(), body.length());
+  temp.flush();
+  temp.close();
+  if (written != body.length()) {
+    SD.remove(tempPath);
+    return;
+  }
+
+  // Conserver l'ancien cache si la finalisation échoue ou si l'alimentation coupe.
+  bool hadPrevious = SD.exists(catalogPath);
+  if (SD.exists(backupPath)) {
+    if (!hadPrevious) {
+      if (!SD.rename(backupPath, catalogPath)) {
+        SD.remove(tempPath);
+        return;
+      }
+      hadPrevious = true;
+    } else {
+      SD.remove(backupPath);
+    }
+  }
+  if (hadPrevious && !SD.rename(catalogPath, backupPath)) {
+    SD.remove(tempPath);
+    return;
+  }
+  if (!SD.rename(tempPath, catalogPath)) {
+    if (hadPrevious) SD.rename(backupPath, catalogPath);
+    SD.remove(tempPath);
+    return;
+  }
+  if (hadPrevious) SD.remove(backupPath);
+}
+
+static bool loadCachedCatalog() {
+  if (!sdMounted) return false;
+
+  bool parsed = false;
+  {
+    CanvasLease lease;
+    const char* catalogPath = "/ROZA/apps/catalog.json";
+    const char* backupPath = "/ROZA/apps/catalog.bak";
+    // Récupération d'un cache interrompu entre les deux renommages.
+    if (!SD.exists(catalogPath) && SD.exists(backupPath)) SD.rename(backupPath, catalogPath);
+    else if (SD.exists(catalogPath) && SD.exists(backupPath)) SD.remove(backupPath);
+
+    File file = SD.open(catalogPath, FILE_READ);
+    if (!file) return false;
+    const size_t cacheSize = file.size();
+    if (cacheSize == 0 || cacheSize > MAX_CATALOG_BYTES) {
+      file.close();
+      setStoreError("Taille du cache catalogue invalide.");
+      return false;
+    }
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, file);
+    file.close();
+    if (err) {
+      setStoreError("Cache catalogue microSD invalide.");
+      return false;
+    }
+    parsed = parseCatalogDocument(doc);
+  }
+
+  if (parsed) setStoreError("Catalogue hors ligne (cache microSD).");
+  return parsed;
+}
+
 static void fetchCatalog() {
   setStoreError("");
   storeCount = 0;
-  if (!prepareNetwork()) return;
+  if (!prepareNetwork()) {
+    if (!loadCachedCatalog()) dirty = true;
+    return;
+  }
 
   WiFiClientSecure client;
   tlsUseCaBundle(client);
@@ -163,41 +282,21 @@ static void fetchCatalog() {
     String body;
     body.reserve(MAX_CATALOG_BYTES + 1);
     JsonDocument doc;
-    if (!readHttpBody(client, APP_CATALOG_URL, MAX_CATALOG_BYTES, body)) return;
-    DeserializationError err = deserializeJson(doc, body);
-    if (err) {
-      setStoreError("JSON invalide dans le catalogue.");
-      return;
+    if (readHttpBody(client, APP_CATALOG_URL, MAX_CATALOG_BYTES, body)) {
+      DeserializationError err = deserializeJson(doc, body);
+      if (err) setStoreError("JSON invalide dans le catalogue.");
+      else {
+        parsed = parseCatalogDocument(doc);
+        if (parsed) cacheCatalogBody(body);
+      }
     }
-    JsonArray apps = doc["apps"].as<JsonArray>();
-    if (doc["format"].as<int>() != 1 || apps.isNull()) {
-      setStoreError("Format de catalogue non reconnu.");
-      return;
-    }
-    for (JsonVariant item : apps) {
-      if (storeCount >= MAX_STORE_APPS) break;
-      StoreEntry candidate{};
-      const char* id = item["id"] | "";
-      const char* name = item["name"] | "";
-      const char* version = item["version"] | "";
-      const char* description = item["description"] | "";
-      const char* url = item["url"] | "";
-      if (!validAppId(id) ||
-          !copyField(candidate.id, sizeof(candidate.id), id, false) ||
-          !copyField(candidate.name, sizeof(candidate.name), name, false) ||
-          !copyField(candidate.version, sizeof(candidate.version), version, false) ||
-          !copyField(candidate.description, sizeof(candidate.description), description, true) ||
-          !copyField(candidate.url, sizeof(candidate.url), url, false) ||
-          strncmp(candidate.url, "https://raw.githubusercontent.com/", 33) != 0) continue;
-      storeApps[storeCount++] = candidate;
-    }
-    parsed = storeCount > 0;
-    if (!parsed) setStoreError("Aucune application ROZA compatible.");
   }
-  if (parsed) {
-    if (storeSelected >= storeCount) storeSelected = storeCount - 1;
-    refreshInstalledFlags();
+
+  if (!parsed && !loadCachedCatalog()) {
+    dirty = true;
+    return;
   }
+  if (parsed) setStoreError("");
   dirty = true;
 }
 
@@ -323,7 +422,10 @@ static bool loadInstalled(int index) {
     CanvasLease lease;
     File file = SD.open(path, FILE_READ);
     if (!file) setStoreError("Fichier installe introuvable.");
-    else {
+    else if (file.size() == 0 || file.size() > MAX_PACKAGE_BYTES) {
+      file.close();
+      setStoreError("Taille du paquet local invalide.");
+    } else {
       JsonDocument doc;
       DeserializationError err = deserializeJson(doc, file);
       file.close();
@@ -373,11 +475,8 @@ void appStoreEnter() {
   storeRunning = false;
   removeConfirm = false;
   storeSelected = 0;
-  if (!sdMounted) {
-    setStoreError("Carte microSD absente : installation impossible.");
-    dirty = true;
-    return;
-  }
+  // Le catalogue peut être consulté en ligne sans SD ; seule l'installation
+  // et la conservation des mini-applications nécessitent la carte.
   if (!ensureStoreMemory()) {
     dirty = true;
     return;
@@ -438,12 +537,7 @@ void appStoreDraw() {
   if (storeCount > 0) snprintf(position, sizeof(position), "%d/%d", storeSelected + 1, storeCount);
   else snprintf(position, sizeof(position), "CATALOGUE");
   drawPageHeader("ROZA Apps", position, ACCENT);
-  if (!sdMounted) {
-    cv.setTextColor(TFT_RED, TFT_BLACK);
-    cv.setTextDatum(middle_center);
-    cv.setTextSize(1);
-    cv.drawString("Carte microSD absente", SW / 2, 56);
-  } else if (storeCount == 0) {
+  if (storeCount == 0) {
     cv.setTextDatum(middle_center);
     cv.setTextSize(1);
     cv.setTextColor(storeError[0] ? TFT_YELLOW : ROZA_PAPER_DIM, TFT_BLACK);
@@ -461,7 +555,8 @@ void appStoreDraw() {
     cv.setTextSize(1);
     cv.setTextColor(ROZA_OLIVE_LIGHT, ROZA_INK);
     char version[24];
-    snprintf(version, sizeof(version), "v%s  %s", entry.version, entry.installed ? "INSTALLEE" : "A INSTALLER");
+    const char* installState = !sdMounted ? "SD REQUISE" : (entry.installed ? "INSTALLEE" : "A INSTALLER");
+    snprintf(version, sizeof(version), "v%s  %s", entry.version, installState);
     cv.drawString(version, 14, 47);
     const char* p = entry.description;
     int y = 62, lines = 0;
@@ -485,7 +580,10 @@ void appStoreDraw() {
       y += 11;
       ++lines;
     }
-    if (storeError[0]) {
+    if (!sdMounted) {
+      cv.setTextColor(TFT_YELLOW, ROZA_INK);
+      cv.drawString("MicroSD requise pour installer", 14, 99);
+    } else if (storeError[0]) {
       cv.setTextColor(TFT_YELLOW, ROZA_INK);
       cv.drawString(storeError, 14, 99);
     }

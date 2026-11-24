@@ -31,6 +31,7 @@
 #include "wifi_net.h"
 
 #include "api_config.h"
+#include "chat_url.h"
 
 String chatInput;
 String chatError;
@@ -192,7 +193,12 @@ static void chatWorkerBody() {
   String reply, err;
 
   // 配置错误不必先连 Wi-Fi；否则 key 漏填时会先白等 15 秒，用户只看到像网络坏了。
+  char urlBuffer[256] = {};
   if (!CHAT_BASE_URL || !CHAT_BASE_URL[0]) err = "no CHAT_BASE_URL configured";
+  else if (!chatBuildCompletionsUrl(CHAT_BASE_URL, urlBuffer, sizeof(urlBuffer)))
+    err = "CHAT_BASE_URL must be a valid HTTPS base URL";
+  if (!err.length() && CHAT_API_KEY[0] && rozaConfigIsPlaceholder(CHAT_API_KEY))
+    err = "replace the CHAT_API_KEY placeholder in secrets.h";
 
 
   // Wi-Fi 也在这儿连。以前这步走的是 connectWith()，它会往屏上刷握手日志，只能留在
@@ -221,40 +227,27 @@ static void chatWorkerBody() {
   workerPw   = "";
 
   WiFiClientSecure client;
-  // 同 okx.cpp：覆盖框架默认 120s 握手超时，避免大模型 API 握手丢包卡死主循环
   client.setHandshakeTimeout(15);
-  // 证书策略，从严到宽三档。这个请求的 Authorization 头里带着 API key，
-  // 发到一条没验过身份的连接上等于交给中间人，所以默认必须是校验过的。
-  //   1) 配了 CHAT_ROOT_CA -> 证书钉扎，最严（只认这一张根，连 bundle 里的别的 CA 都不认）
-  //   2) 否则用根证书 bundle -> 真校验。**这是现在的默认**，不用再手贴证书了
-  //   3) CHAT_ALLOW_INSECURE = true -> 显式降级，每次都往串口打一行警告
-  //
-  // ⚠️ 原来没有第 2 档，所以"不贴证书"只能失败关闭，Chat 页开箱即不可用。而 README 当时
-  //    不肯硬编证书的理由是"根证书会过期，到期后设备就连不上"——bundle 恰好解决它：
-  //    121 张根证书，过期一张还有其余的，换 CDN 换 CA 也照样能验。
-  if (CHAT_ROOT_CA && CHAT_ROOT_CA[0]) {
-    client.setCACert(CHAT_ROOT_CA);
-  } else if (CHAT_ALLOW_INSECURE) {
-    client.setInsecure();
-    Serial.println("[chat] ⚠ CHAT_ALLOW_INSECURE 打开着，本次请求不校验证书，API key 可被中间人窃取");
-  } else if (!tlsClockReady()) {
-    // 用 bundle 校验就要比证书有效期，时钟没对上必然失败。说清楚是等时钟，
-    // 别让人以为是网络或 key 的问题（开机后 NTP 是后台跑的，有几秒窗口）。
+  // Aucune dérogation TLS : racine explicitement épinglée ou bundle Mozilla intégré.
+  // Même avec une CA personnalisée, l'horloge doit être synchronisée pour vérifier sa validité.
+  if (!tlsClockReady()) {
     workerReply = "";
     workerErr   = "waiting for clock (NTP)";
     workerBody  = "";
     return;
-  } else {
-    tlsUseCaBundle(client);
   }
+  if (CHAT_ROOT_CA && CHAT_ROOT_CA[0]) client.setCACert(CHAT_ROOT_CA);
+  else tlsUseCaBundle(client);
 
   HTTPClient http;
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+  http.setReuse(false);
   http.setConnectTimeout(15000);   // TCP 连接超时，默认只有 5000ms，实机路由到这个域名经常不够
   http.setTimeout(60000);          // 这个是收数据的超时，HTTPClient::setTimeout 是 uint16_t，最大只能到 ~65s
   // 走 HTTP/1.0：服务端（尤其反代/网关）就不能回 chunked 分块编码，
   // 下面直接对 getStream() 流式解析才不会读到混在数据里的块长度行
   http.useHTTP10(true);
-  String url = String(CHAT_BASE_URL) + "/v1/chat/completions";
+  String url(urlBuffer);
   if (!http.begin(client, url)) {
     err = "http begin failed";
   } else {
@@ -356,36 +349,39 @@ void chatSend() {
     if (loadCreds(ss, pw)) { workerSsid = ss; workerPw = pw; }
   }
 
-  // 请求体在主线程组装好——不让任务去读 chatInput，免得跟键盘输入撞上
-  JsonDocument reqDoc;
-  reqDoc["model"] = CHAT_MODEL;
-  JsonArray msgs = reqDoc["messages"].to<JsonArray>();
-  for (int i = 0; i < chatHistoryCount; i++) {
-    JsonObject u = msgs.add<JsonObject>(); u["role"] = "user"; u["content"] = chatUsers[i];
-    JsonObject a = msgs.add<JsonObject>(); a["role"] = "assistant"; a["content"] = chatReplies[i];
+  // Assemble le JSON dans une portée courte : son allocation est libérée avant de créer la pile du worker.
+  {
+    JsonDocument reqDoc;
+    reqDoc["model"] = CHAT_MODEL;
+    JsonArray msgs = reqDoc["messages"].to<JsonArray>();
+    for (int i = 0; i < chatHistoryCount; i++) {
+      JsonObject u = msgs.add<JsonObject>(); u["role"] = "user"; u["content"] = chatUsers[i];
+      JsonObject a = msgs.add<JsonObject>(); a["role"] = "assistant"; a["content"] = chatReplies[i];
+    }
+    JsonObject m = msgs.add<JsonObject>();
+    m["role"] = "user";
+    m["content"] = chatInput;
+    workerBody = "";
+    serializeJson(reqDoc, workerBody);
   }
-  JsonObject m = msgs.add<JsonObject>();
-  m["role"] = "user";
-  m["content"] = chatInput;
-  workerBody = "";
-  serializeJson(reqDoc, workerBody);
 
+  // Libère d'abord le canvas (64,8 KB) : la tâche FreeRTOS de 16 KB était auparavant
+  // allouée avant cette libération et échouait donc sur le pic de mémoire.
+  canvasRelease();
   workerDone.store(false, std::memory_order_relaxed);
   workerBusy.store(true, std::memory_order_relaxed);   // 建任务之前先置位，免得任务先跑起来把它清掉
   busyStaticDrawn = false;
   busyLastDot = -1;
 
-  // 16KB 栈：mbedTLS 握手很吃栈，8KB 会溢出。跑在 core 0（Arduino 的 loop 在 core 1），
-  // 任务干完自己 vTaskDelete，栈随之还给堆，不是常驻开销。
+  // La pile 16 KB reste inchangée : elle est nécessaire au handshake mbedTLS sur ce core.
+  // Le canvas a déjà été libéré avant l'allocation de cette tâche.
   if (xTaskCreatePinnedToCore(chatWorker, "chat", 16384, nullptr, 1, nullptr, 0) != pdPASS) {
     workerBusy.store(false, std::memory_order_relaxed);
     chatError = "no memory for request";
     workerBody = "";
     workerSsid = "";
     workerPw   = "";
-  } else {
-    // 成功创建 worker 任务之后释放全局画布 cv，腾出 ~64.8KB 连续堆给 mbedTLS 握手
-    canvasRelease();
+    canvasRestore();
   }
   dirty = true;
 }

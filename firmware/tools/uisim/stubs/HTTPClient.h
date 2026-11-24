@@ -4,6 +4,7 @@
 // 这样 weatherFetch() 是"真跑"的——真解析、真填那些 static 变量，页面上出现的是真实布局。
 extern String simCannedResponse;
 extern String simResponseForPath(const char* url);
+enum followRedirects_t { HTTPC_DISABLE_FOLLOW_REDIRECTS, HTTPC_STRICT_FOLLOW_REDIRECTS, HTTPC_FORCE_FOLLOW_REDIRECTS };
 class HTTPClient {
   WiFiClient stream_;
   String response_;
@@ -17,6 +18,8 @@ public:
   void setUserAgent(const char*) {}
   void setTimeout(int) {}
   void useHTTP10(bool) {}
+  void setFollowRedirects(followRedirects_t) {}
+  static String errorToString(int) { return String("simulated HTTP error"); }
   // 2026-09-02 补：/traffic 那条常开流禁用 keep-alive 复用（见 router.cpp trafficEnsureOpen）。
   void setReuse(bool) {}
   int GET() { return 200; }

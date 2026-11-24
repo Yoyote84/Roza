@@ -73,7 +73,7 @@ INC="-I stubs -I $GFX -I $AJSON -I $TINYGPS -I $SSH $SDL_CFLAGS"
 # 剩下的界面 + 码表解析是纯逻辑，语法检查能挡住"函数名写错、参数对不上"这类错。
 # ram_profile.cpp 进来是为了另一件事：它整段输出都是格式串，而格式串跟参数类型对不上
 # 在板子上是**静默**的（照样烧得进去，打出来的数是垃圾）。-Werror=format 把它变成硬错。
-for f in globals pages icons ir ir_proto ram_profile clock settings_ui gnss spectrum hash_oven sha512_crypt crypto_engines ssh_app odid ridapp hawkins_world hawkins_save_codec hawkins_exploration hawkins_character hawkins_app; do
+for f in globals pages icons ir ir_proto ram_profile clock settings_ui gnss spectrum hash_oven sha512_crypt crypto_engines ssh_app odid ridapp; do
   "$CXX" -std=c++17 -fsyntax-only -Wformat -Werror=format $DEFS $INC "$ROOT/src/$f.cpp" || {
     echo "!! src/$f.cpp 语法检查没过（加了 app 的话，多半是 APPS[]/GROUPS[] 对不上）" >&2
     exit 1
