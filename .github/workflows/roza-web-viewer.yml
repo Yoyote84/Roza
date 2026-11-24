@@ -53,6 +53,10 @@ jobs:
         working-directory: firmware
         run: cp src/secrets.h.example src/secrets.h
 
+      - name: Vérifier l'absence des anciens composants du jeu retiré
+        working-directory: firmware
+        run: python tools/roza_feature_cleanup_test.py
+
       - name: Diagnostiquer les en-têtes Bluetooth de l'environnement ESP32-S3
         shell: bash
         run: |

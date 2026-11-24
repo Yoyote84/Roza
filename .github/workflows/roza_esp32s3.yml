@@ -57,6 +57,9 @@ jobs:
           platformio --version
           platformio pkg list -e cardputer-adv
 
+      - name: Vérifier l'absence des anciens composants du jeu retiré
+        run: python tools/roza_feature_cleanup_test.py
+
       - name: Compiler le firmware avec PlatformIO
         run: |
           platformio run -e cardputer-adv

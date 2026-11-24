@@ -300,7 +300,7 @@ static void drawGroupTabs() {
   }
 }
 
-// 41 个 App 的简练功能一句话导览 (常量字符串，0 额外堆开销)
+// Description concise des 40 applications du menu (chaînes constantes, sans allocation de tas).
 static const char* appDesc(AppId id) {
   switch (id) {
     case APP_TIME:      return "Horloge, chrono et minuterie";
@@ -341,7 +341,6 @@ static const char* appDesc(AppId id) {
     case APP_OKX:       return "Marches OKX";
     case APP_READER:    return "Lecteur de livres et textes";
     case APP_SETTINGS:  return "Parametres et veille";
-    case APP_HAWKINS:   return "JDR persistant et monde vivant";
     default:            return "";
   }
 }

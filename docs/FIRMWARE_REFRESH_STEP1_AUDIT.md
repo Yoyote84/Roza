@@ -1,5 +1,7 @@
 # РO3A — Audit de préparation à la modernisation du firmware (étape 1/5)
 
+> Mise à jour du périmètre au 25 novembre 2026 : le module de jeu et ses composants dédiés ont été retirés de la branche `main` (commit `ec9a4ed2646527a652cf549f826a93ff8a30581f`). Ce document reste un audit historique de la base examinée le 24 novembre ; les mesures antérieures au retrait ne décrivent pas le firmware actuel.
+
 **Date de l'audit :** 24 novembre 2026  
 **Dépôt :** `Yoyote84/Roza`  
 **Branche examinée :** `main`  
@@ -17,9 +19,9 @@ Trois décisions techniques ressortent :
 
 1. **Socle cible à prototyper :** Arduino-ESP32 4.0.0 / ESP-IDF 6.1.1, avec la plateforme PlatformIO communautaire pioarduino 61.04.00. La plateforme officielle PlatformIO 8.0.0 reste une option plus conservatrice, mais elle fournit Arduino 3.3.12 / ESP-IDF 5.5.5, pas Arduino 4.0.0. Le choix doit être confirmé par un build de référence avant de porter toutes les applications.
 2. **OTA A/B :** le partitionnement actuel n'a qu'une partition applicative `factory`. Il ne peut ni installer une image alternative, ni faire un retour automatique à la précédente. Un premier flash USB-C complet sera nécessaire pour changer les partitions.
-3. **Conserver le narrateur local sans sacrifier les applications :** les poids Hawkins et le tokenizer sont actuellement intégrés directement dans l'application. Une première piste réaliste consiste à les placer dans une partition de données Flash dédiée, accessible en mémoire mappée, puis à réserver deux partitions applicatives OTA. C'est une proposition à prototyper, pas une modification déjà validée.
+3. **Préserver le fonctionnement hors ligne :** conserver les applications générales, les pilotes GNSS/LoRa, le stockage et les outils réseau. Les modules explicitement retirés ne doivent pas être réintroduits lors de la modernisation.
 
-**Aucune application n'est proposée à la suppression.** Le lecteur audio, la radio MP3, BadApple, les outils réseau, le GNSS, le LoRa, le jeu Hawkins, le magasin d'applications et les autres modules restent dans le périmètre de conservation.
+**Périmètre de conservation :** toutes les applications générales et tous les pilotes ROZA restent préservés. Le module de jeu et ses composants dédiés ont ensuite été retirés explicitement du dépôt ; ce retrait ne constitue pas une autorisation de supprimer d'autres fonctions.
 
 ## 2. État réel du dépôt
 
@@ -34,7 +36,7 @@ L'arbre GitHub contient 501 entrées suivies au commit examiné. Le firmware act
 
 Les dossiers racine `main/`, `CMakeLists.txt`, `partitions.csv` et `sdkconfig.defaults` sont historiques et ne sont pas la fondation du firmware actif. Il ne faut pas migrer par erreur le mauvais projet.
 
-Le workflow CI utilise actuellement **PlatformIO Core 6.1.6**. Il compile le firmware, exécute des suites de tests hôte (GNSS, LoRa, IR, JSON, batterie, RAM, horloge, calculatrice, astronomie, Hawkins/LLM et routeur/RID), vérifie les fichiers binaires et contrôle le paquet de flash. Il n'effectue pas d'essai sur carte. Pour le commit `7d344a7...`, aucun statut de compilation CI n'a été retourné par la vérification du statut GitHub dans cet audit : un succès sur le commit courant n'est donc pas confirmé.
+Le workflow CI utilise actuellement **PlatformIO Core 6.1.6**. Il compile le firmware, exécute des suites de tests hôte (GNSS, LoRa, IR, JSON, batterie, RAM, horloge, calculatrice, astronomie et routeur/RID), vérifie les fichiers binaires et contrôle le paquet de flash. Il n'effectue pas d'essai sur carte. Pour le commit `7d344a7...`, aucun statut de compilation CI n'a été retourné par la vérification du statut GitHub dans cet audit : un succès sur le commit courant n'est donc pas confirmé.
 
 ### 2.2 Matériel réellement pris en charge
 
@@ -55,9 +57,9 @@ Le workflow CI utilise actuellement **PlatformIO Core 6.1.6**. Il compile le fir
 
 ### 2.3 Applications et fonctions à préserver
 
-Le fichier `firmware/docs/feature-inventory.md` annonce 40 applications / 85 écrans, mais les groupes affichés totalisent 39 entrées. L'inventaire doit être réconcilié avec les modules actuellement importés dans `main.cpp`, notamment Hawkins et PC Mode.
+Le fichier `firmware/docs/feature-inventory.md` annonce 40 applications / 85 écrans. Le menu actuellement déclaré dans `firmware/src/globals.cpp` contient 40 applications réparties en sept groupes ; cet état constitue la référence pour les prochains contrôles d'inventaire.
 
-Le périmètre observé comprend notamment : horloge/calendrier, chronomètre/minuteur, IMU, gestionnaire de fichiers, lecteur de texte, spectre micro, calculatrice, convertisseur, lecteur WAV, BadApple, radio MP3, météo, astronomie, satellites, avions/ADS-B, séismes/typhons, FX, OKX, GitHub, ChatGPT, SSH, Wi-Fi, BLE, hotspot, outils réseau, IR, LoRa, GNSS/cartographie, wardrive, outils HID, Hash Oven, App Store et Hawkins (monde, missions, sauvegardes, exploration et narrateur local).
+Le périmètre observé comprend notamment : horloge/calendrier, chronomètre/minuteur, IMU, gestionnaire de fichiers, lecteur de texte, spectre micro, calculatrice, convertisseur, lecteur WAV, BadApple, radio MP3, météo, astronomie, satellites, avions/ADS-B, séismes/typhons, FX, OKX, GitHub, ChatGPT, SSH, Wi-Fi, BLE, hotspot, outils réseau, IR, LoRa, GNSS/cartographie, wardrive, outils HID, Hash Oven et App Store.
 
 L'audit de migration devra établir une liste exhaustive par écran et par fonctionnalité, puis utiliser cette liste comme test de non-régression. Les noms d'applications ou leur présentation pourront être harmonisés lors de la nouvelle interface, mais pas au prix de retirer une fonction existante.
 
@@ -66,9 +68,8 @@ L'audit de migration devra établir une liste exhaustive par écran et par fonct
 - Le lecteur WAV lit du PCM 16 bits depuis la SD et utilise `M5.Speaker.playRaw()`.
 - La radio utilise ESP8266Audio pour décoder le MP3, avec une sortie adaptée vers `M5.Speaker`. Elle ne doit pas être confondue avec le lecteur WAV.
 - BadApple lit `/video/badapple.dat`, un format binaire propre au projet en 240×135, avec une image monochrome 1 bit par pixel. Ce n'est pas un lecteur MP4 généraliste.
-- Le narrateur Hawkins embarque actuellement le poids `model_lecarnet_q4.bin` (1 050 048 octets) et le tokenizer `tokenizer_lecarnet_ctk2.bin` (230 722 octets) dans l'application via `model_data.S`. Ensemble, ils représentent **1 280 770 octets** (environ 1,22 Mio). Le runtime utilise des adresses de Flash mappée et ne charge pas le modèle depuis la SD.
+- Les anciennes ressources de jeu et de narration locale ont été retirées du firmware actif. Le code applicatif ne doit plus embarquer de poids de modèle, de tokenizer ni de runtime associé.
 
-Ce dernier point est essentiel : transférer simplement le modèle sur microSD ne serait pas un changement de chemin de fichier anodin. Le runtime a besoin d'un accès aléatoire aux poids sans allouer plus d'un mégaoctet de RAM, ce que la carte sans PSRAM ne peut pas garantir. Une partition Flash de données en lecture seule, exposée par mémoire mappée, mérite un prototype avant d'envisager une lecture directe depuis SD.
 
 ## 3. Inventaire actuel et cibles stables candidates
 
@@ -114,16 +115,16 @@ Le paquetage actuel produit des empreintes SHA-256 et vérifie la structure, l'e
 
 La dernière taille documentée dans `firmware/UPSTREAMS.md` est un binaire application de **3 680 448 octets**, issu du workflow CI #39 du 4 novembre 2026 sur un ancien commit. Ce chiffre n'est pas une mesure du commit actuel.
 
-Les deux ressources Hawkins intégrées totalisent 1 280 770 octets. En les retirant de l'image applicative et en les plaçant dans une partition de données Flash séparée, le code applicatif résiduel théorique serait d'environ **2 399 678 octets** (sur la base de cette ancienne mesure).
+Les anciennes mesures de taille citées dans cet audit précèdent le retrait des ressources de jeu et ne doivent pas servir de référence au firmware actuel. La taille de l'application doit être remesurée sur un build complet du commit courant.
 
 Une disposition candidate à vérifier pourrait réserver :
 - deux slots applicatifs OTA de `0x340000` octets chacun (3 407 872 octets par slot) ;
-- une partition de données Hawkins de `0x140000` octets (1 310 720 octets), suffisante pour les deux assets actuels et une petite marge ;
+- aucune partition Flash dédiée à un jeu ou à un modèle de narration n'est désormais nécessaire ; la table OTA candidate doit être redimensionnée à partir de la taille réelle du firmware actuel.
 - NVS, PHY et `otadata`, avec alignement et zones de boot réservées.
 
 Sur ces seules valeurs historiques, le code aurait environ 1 008 194 octets de marge par slot. **Ce calcul ne valide pas le partitionnement** : la nouvelle fondation peut modifier fortement la taille, les données et les alignements. Une compilation réelle et la génération/inspection de la table seront indispensables.
 
-Le prototype doit démontrer que le runtime Hawkins peut lire le modèle depuis la partition de données Flash en mémoire mappée, sans copie intégrale en RAM. Si ce prototype échoue, il faudra réétudier la taille des slots et les stratégies de ressources ; il ne faut pas supprimer le narrateur ni les applications pour faire artificiellement rentrer l'image.
+Le dimensionnement OTA doit désormais être fondé sur le binaire actuel, les partitions nécessaires au démarrage et les marges de sécurité. Aucune hypothèse de stockage d'un modèle de narration embarqué ne doit être réintroduite.
 
 ### 4.3 Premier flash de migration
 
@@ -163,7 +164,7 @@ Le magasin `firmware/data/apps/catalog.json` installe aujourd'hui des mini-appli
 | Priorité | Risque | Mesure nécessaire avant de fermer le point |
 |---|---|---|
 | Critique | Nouveau core IDF6 casse des API de réseau, TLS, Bluetooth, USB, audio ou FreeRTOS | Inventaire des callsites et build isolé, puis migration par lots |
-| Critique | A/B OTA ne tient pas dans 8 Mio avec le modèle intégré | Prototype de partition de données Hawkins mappée et mesures de binaire après migration |
+| Critique | Capacité réelle des deux slots A/B OTA non démontrée sur le firmware actuel | Nouvelle compilation, mesure du binaire et vérification de la table de partitions avant d'activer l'OTA |
 | Critique | Mauvaise table de partitions / flash initiale | Paquet fusionné contrôlé, sauvegarde NVS et procédure USB-C de récupération |
 | Élevée | LibSSH-ESP32 5.9.0 sans nouvelle release fiable | Prouver la compilation et le SSH réel, ou choisir un remplacement maintenu |
 | Élevée | API RadioLib 8.0 rompue | Porter le pilote SX1262, vérifier réception, IRQ, TCXO, réglages, et laisser TX désactivé |
