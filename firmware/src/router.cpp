@@ -159,8 +159,8 @@ static String urlEncode(const char* src) {
 
 static bool clashGet(const char* path, JsonDocument& doc) {
   WiFiClient client;
-  char url[256];
-  snprintf(url, sizeof(url), "%s%s", CLASH_BASE, path);
+  // Toujours passer par la base normalisée pour éviter les chemins //proxies si CLASH_BASE finit par '/'.
+  String url = clashBaseUrl() + path;
   String authorization;
   if (CLASH_SECRET[0]) authorization = String("Bearer ") + CLASH_SECRET;
   const char* authHeader = CLASH_SECRET[0] ? authorization.c_str() : nullptr;

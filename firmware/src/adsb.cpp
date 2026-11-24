@@ -14,7 +14,7 @@
 
 static const int   MAX_PLANES  = 12;
 static const int   RADIUS_NM   = 50;              // 查询半径（海里）
-static const uint32_t AUTO_MS  = 25000;           // 停在这页时的自动刷新间隔
+static const uint32_t AUTO_MS  = 5UL * 60 * 1000; // ADS-B.lol: 500 requêtes/jour sans clé
 
 struct Plane {
   char  cs[10], type[6], reg[10];
@@ -33,9 +33,8 @@ static bool    fromGps = false;
 // ---- 航线（起降机场 + 行程进度）----
 //
 // ADS-B 报文里没有航线：机载广播只有位置/高度/速度/呼号。起降机场得拿呼号去排班库
-// 另查一次，这里用 adsbdb.com。公开数据、请求不带任何凭据，跟 sats.cpp / github.cpp
-// 是同一类，按 README「安全边界」那节用 setInsecure()。它只有 HTTPS（明文会 301），
-// 所以这一页破例吃一次 TLS 握手——但单条响应才 ~700B，且只查当前选中的那一架。
+// 另查一次，这里用 adsbdb.com。公开数据、请求不带任何凭据；HTTPS 证书由 ROZA CA bundle 校验。
+// 因而这一页仍会额外消耗一次 TLS 握手——但单条响应才 ~700B，且只查当前选中的那一架。
 //
 // ⚠️ 排班库是按呼号查的静态表，不是实时航迹：呼号复用/换季会给出完全不搭的航线
 // （实测有架在伦敦上空的飞机被返回成 ORD->LIR）。所以进度一律拿实测位置反算，
