@@ -65,7 +65,7 @@ jobs:
             echo "::endgroup::"
           done
           JSON_INC="-I .pio/libdeps/cardputer-adv/ArduinoJson/src"
-          for test in test alert_test hist_test hosts_test opid_test radar_test; do
+          for test in test alert_test hist_test hosts_test opid_test radar_test config_test; do
             echo "::group::Router/RID $test"
             g++ -std=c++17 $JSON_INC "tools/routertest/$test.cpp" -o "/tmp/roza-$test"
             "/tmp/roza-$test"
@@ -88,6 +88,7 @@ jobs:
 
       - name: Tester les garde-fous de paquetage
         run: |
+          python tools/badapple_pack_test.py
           python tools/package_flash_test.py
 
       - name: Préparer l'image unique à flasher

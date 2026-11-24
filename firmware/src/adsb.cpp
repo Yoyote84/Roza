@@ -135,26 +135,29 @@ static float routeProgress(const Route& r, float lat, float lon, float* remainKm
 }
 
 static void fetchPlanes() {
+  errMsg.reserve(96);
   errMsg = "";
   lastFetchMs = millis();
 
   if (!wifiEnsureConnected()) { errMsg = "wifi not connected"; dirty = true; return; }
+  if (!tlsClockReady()) { errMsg = "waiting for clock (NTP)"; dirty = true; return; }
 
   GeoFix fix;
   if (!geoGet(fix, &errMsg)) { dirty = true; return; }
   fromGps = fix.fromGps;
 
-  // 明文 HTTP：跟地图瓦片同一个道理——公开数据、请求不带任何凭据，
-  // 而 TLS 握手要几百毫秒 + 40KB 连续堆（实测握手期间 largestBlock 从 90KB 掉到 47KB），
-  // 进这一页那"卡顿一秒"主要就是它。实测这个接口明文返回 200 且是 Content-Length
-  // 定长编码（不是 chunked），配下面的 getStream() 流式解析刚好。
+  // ADS-B.lol exige le point d'accès HTTPS. Le certificat est vérifié via le bundle ROZA.
+  // Le canvas de 64,8 KB est libéré pendant TLS pour laisser un bloc contigu au handshake.
   char url[128];
-  snprintf(url, sizeof(url), "http://api.adsb.lol/v2/lat/%.4f/lon/%.4f/dist/%d",
+  snprintf(url, sizeof(url), "https://api.adsb.lol/v2/lat/%.4f/lon/%.4f/dist/%d",
            fix.lat, fix.lon, RADIUS_NM);
 
-  WiFiClient client;
-  // 机场附近这个接口能返回一两百架、几十上百 KB。板子没有 PSRAM，整包 JSON 进堆很危险，
-  // 所以用 filter 边流式解析边扔——只留下面这几个字段，堆占用跟返回大小基本脱钩。
+  WiFiClientSecure client;
+  tlsUseCaBundle(client);
+  client.setHandshakeTimeout(10);
+  CanvasLease lease;
+  // L'API peut renvoyer des dizaines de KB. Le filtre garde seulement les champs utiles ;
+  // on ne désactive jamais TLS pour économiser la RAM.
   JsonDocument filter;
   JsonObject fac = filter["ac"].add<JsonObject>();
   fac["flight"] = true; fac["t"] = true; fac["r"] = true;

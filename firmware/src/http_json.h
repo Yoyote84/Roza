@@ -9,7 +9,30 @@
 // 跟进只是时间问题。而且对这类白嫖来的服务，说清自己是谁本来就是基本礼貌。
 // ⚠️ adsb.lol 明确要"联系方式"。这个项目还没开源，先只放项目名（实测放行）；
 //    将来公开了在括号里补上仓库 URL 或邮箱最好。
-static const char* const HTTP_UA = "cardputer-adv/1.0";
+static const char* const HTTP_UA = "ROZA-Cardputer-ADV/1.0 (+https://github.com/Yoyote84/Roza)";
+
+// Preserve TLS diagnostics when the supplied client exposes lastError().
+template <typename Client>
+static auto httpReadClientError(Client& client, char* out, size_t cap, int)
+    -> decltype(client.lastError(out, cap), void()) {
+  if (!out || cap == 0) return;
+  out[0] = 0;
+  client.lastError(out, cap);
+  out[cap - 1] = 0;
+}
+template <typename Client>
+static void httpReadClientError(Client&, char* out, size_t cap, long) {
+  if (out && cap) out[0] = 0;
+}
+
+template <typename Client>
+static void httpSetFailure(int code, Client& client, String& err) {
+  if (code >= 0) { err = String("http ") + code; return; }
+  err = String("http ") + code + " (" + HTTPClient::errorToString(code) + ")";
+  char detail[96];
+  httpReadClientError(client, detail, sizeof(detail), 0);
+  if (detail[0]) { err += " / tls: "; err += detail; }
+}
 
 struct HttpJsonOptions {
   uint32_t connectTimeoutMs;
@@ -45,6 +68,9 @@ bool fetchJsonHttp(Client& client, const String& url, JsonDocument& doc,
                    String& err) {
   if (!httpPreResolve(url, err)) return false;
   HTTPClient http;
+  // Pas de redirection automatique : ne jamais transférer Authorization vers un autre hôte.
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+  http.setReuse(false);
   http.useHTTP10(true);   // 下面直接对 getStream() 流式解析：不能让服务端回 chunked
   http.setConnectTimeout(options.connectTimeoutMs);
   http.setTimeout(options.timeoutMs);
@@ -65,7 +91,7 @@ bool fetchJsonHttp(Client& client, const String& url, JsonDocument& doc,
 
   int code = http.GET();
   if (code != 200) {
-    err = String("http ") + code;
+    httpSetFailure(code, client, err);
     http.end();
     return false;
   }

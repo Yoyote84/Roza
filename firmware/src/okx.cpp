@@ -105,7 +105,7 @@ static bool parseCoinGecko(JsonDocument& doc, float& outRate, String& err) {
 
 static void fetchOkx() {
   // 错误字符串先备好容量：下面 TLS 那段借走了画布，期间再给它们长内存会落进画布腾出的洞里
-  errMsg.reserve(96);
+  errMsg.reserve(160);
   errMsg = "";
   lastFetchMs = millis();
 
@@ -172,12 +172,10 @@ static void fetchOkx() {
         }
       } else {
         // 两个源均失败，展示更有帮助的错误提示（利用已 reserve 的空间，避免 + 临时 String）
-        if (okxErr.length()) {
-          errMsg = "OKX:";
-          errMsg += okxErr;
-        } else {
-          errMsg = fbErr;
-        }
+        errMsg = "OKX: ";
+        errMsg += okxErr.length() ? okxErr : "no detail";
+        errMsg += " | CoinGecko: ";
+        errMsg += fbErr.length() ? fbErr : "no detail";
       }
     }
   } // lease 析构，画布在这里恢复

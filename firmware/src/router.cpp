@@ -9,6 +9,8 @@
 #include "net_job.h"
 #include "wifi_net.h"
 #include "api_config.h"
+#include "router_config.h"
+#include "net_resolve.h"
 #include "http_json.h"
 
 static const uint32_t POLL_MS = 1500;
@@ -78,17 +80,36 @@ static uint32_t  lastOpenTryMs = 0;
 static int       tick = 0;
 static String    clashErr;
 
+static String clashBaseUrl() {
+  String base(CLASH_BASE);
+  while (base.endsWith("/")) base.remove(base.length() - 1);
+  return base;
+}
+
+static bool clashResolveUrl(const char* url) {
+  char host[64];
+  if (!netUrlHost(url, host, sizeof(host))) { clashErr = "invalid controller URL"; return false; }
+  const NetResolveResult result = netResolve(host, 2500);
+  if (result == NR_OK) return true;
+  if (result == NR_TIMEOUT) clashErr = "dns timeout";
+  else if (result == NR_CANCELLED) clashErr = "dns cancelled";
+  else clashErr = "dns failed";
+  return false;
+}
+
 static bool clashLine(const char* path, String& out, int skipObjects = 0) {
   WiFiClient client;
   HTTPClient http;
   http.setConnectTimeout(2500);
   char url[160];
-  snprintf(url, sizeof(url), "%s%s", CLASH_BASE, path);
+  String base = clashBaseUrl();
+  snprintf(url, sizeof(url), "%s%s", base.c_str(), path);
   clashErr = "";
+  if (!clashResolveUrl(url)) return false;
   if (!http.begin(client, url)) { clashErr = "http begin failed"; return false; }
   if (CLASH_SECRET[0]) http.addHeader("Authorization", String("Bearer ") + CLASH_SECRET);
   int code = http.GET();
-  if (code != 200) { clashErr = String("http ") + code; http.end(); return false; }
+  if (code != 200) { clashErr = String("http ") + code + (code < 0 ? String(" (") + HTTPClient::errorToString(code) + ")" : String("")); http.end(); return false; }
 
   WiFiClient* s = http.getStreamPtr();
   out = "";
@@ -195,7 +216,7 @@ static int clashCountConns() {
   uint32_t started = millis();
   bool limited = false;
   String err;
-  bool ok = fetchJsonStreamArray(client, String(CLASH_BASE) + "/connections",
+  bool ok = fetchJsonStreamArray(client, clashBaseUrl() + "/connections",
       "\"connections\"", &filter, options,
       [&](JsonDocument& item, int) {
         // Check before consuming: only a further item proves the data was truncated.
@@ -234,15 +255,17 @@ static void trafficClose() {
 static bool trafficEnsureOpen() {
   if (trafOpen) return true;
   char url[160];
-  snprintf(url, sizeof(url), "%s/traffic", CLASH_BASE);
+  String base = clashBaseUrl();
+  snprintf(url, sizeof(url), "%s/traffic", base.c_str());
   trafHttp.setConnectTimeout(2500);
   trafHttp.setTimeout(4000);
   trafHttp.setReuse(false);
   clashErr = "";
+  if (!clashResolveUrl(url)) return false;
   if (!trafHttp.begin(trafClient, url)) { clashErr = "http begin failed"; return false; }
   if (CLASH_SECRET[0]) trafHttp.addHeader("Authorization", String("Bearer ") + CLASH_SECRET);
   int code = trafHttp.GET();
-  if (code != 200) { clashErr = String("http ") + code; trafHttp.end(); return false; }
+  if (code != 200) { clashErr = String("http ") + code + (code < 0 ? String(" (") + HTTPClient::errorToString(code) + ")" : String("")); trafHttp.end(); return false; }
   trafOpen = true;
   trafBuf = "";
   return true;
@@ -274,17 +297,18 @@ void routerExit() {
 static void setErrFromClashErr() {
   if (clashErr.startsWith("http 401") || clashErr.startsWith("http 403"))
     errMsg = "auth failed - check CLASH_SECRET";
-  else if (clashErr.startsWith("http "))
+  else if (clashErr.length())
     errMsg = clashErr + " from " + CLASH_BASE;
   else
     errMsg = String("no reply from ") + CLASH_BASE;
 }
 
 static void pumpTraffic() {
-  if (!CLASH_BASE[0]) {
+  RouterBaseConfigStatus configStatus = routerBaseConfigStatus(CLASH_BASE, CLASH_SECRET);
+  if (configStatus != ROUTER_BASE_OK) {
     trafficClose();
     online = false;
-    errMsg = "configure CLASH_BASE";
+    errMsg = routerBaseConfigMessage(configStatus);
     dirty = true;
     return;
   }
@@ -322,8 +346,9 @@ static bool switchProxyNode(const char* target) {
   HTTPClient http;
   http.setConnectTimeout(2000);
   http.setTimeout(2500);
-  String url = String(CLASH_BASE) + "/proxies/" + urlEncode(CLASH_PROXY_GROUP);
-  if (!CLASH_BASE[0] || !CLASH_PROXY_GROUP[0] || !http.begin(client, url)) return false;
+  String url = clashBaseUrl() + "/proxies/" + urlEncode(CLASH_PROXY_GROUP);
+  if (routerBaseConfigStatus(CLASH_BASE, CLASH_SECRET) != ROUTER_BASE_OK || !routerProxyGroupConfigured(CLASH_PROXY_GROUP)) { switchStatus = "configure CLASH_PROXY_GROUP"; switchStatusTime = millis(); return false; }
+  if (!clashResolveUrl(url.c_str()) || !http.begin(client, url)) return false;
   if (CLASH_SECRET[0]) http.addHeader("Authorization", String("Bearer ") + CLASH_SECRET);
   http.addHeader("Content-Type", "application/json");
   JsonDocument bodyDoc;
@@ -342,13 +367,13 @@ static bool switchProxyNode(const char* target) {
     switchStatusTime = millis();
     return true;
   }
-  switchStatus = String("[!] ERR: HTTP ") + code;
+  switchStatus = code < 0 ? String("[!] ERR: ") + HTTPClient::errorToString(code) : String("[!] ERR: HTTP ") + code;
   switchStatusTime = millis();
   return false;
 }
 
 static void testNodeDelay(int idx) {
-  if (!CLASH_BASE[0] || !CLASH_PROXY_GROUP[0] || idx < 0 || idx >= proxyNodeCount) return;
+  if (routerBaseConfigStatus(CLASH_BASE, CLASH_SECRET) != ROUTER_BASE_OK || !routerProxyGroupConfigured(CLASH_PROXY_GROUP) || idx < 0 || idx >= proxyNodeCount) return;
   String dp = String("/proxies/") + urlEncode(proxyNodes[idx].name) +
               "/delay?url=http://www.gstatic.com/generate_204&timeout=1500";
   JsonDocument d;
@@ -376,7 +401,7 @@ static void pollRouter() {
     int c = clashCountConns();
     if (c >= 0) conns = c;
   }
-  if (tick % 6 == 0 && CLASH_PROXY_GROUP[0]) {
+  if (tick % 6 == 0 && routerProxyGroupConfigured(CLASH_PROXY_GROUP)) {
     JsonDocument d;
     String gp = String("/proxies/") + urlEncode(CLASH_PROXY_GROUP);
     if (clashGet(gp.c_str(), d)) {
@@ -726,6 +751,12 @@ static void drawRouterNodes() {
   char rightBuf[32];
   snprintf(rightBuf, sizeof(rightBuf), "GROUP: %s", CLASH_PROXY_GROUP);
   drawPageHeader("Router Nodes", rightBuf, 0xFDA0);
+  if (!routerProxyGroupConfigured(CLASH_PROXY_GROUP)) {
+    cv.setTextDatum(middle_center); cv.setTextSize(1); cv.setTextColor(TFT_ORANGE, TFT_BLACK);
+    cv.drawString("configure CLASH_PROXY_GROUP", SW / 2, 66);
+    cv.setTextDatum(top_left);
+    return;
+  }
 
   // 主节点列表卡片 (y = 15..118, h = 104)
   const int cy = 15, ch = 104;

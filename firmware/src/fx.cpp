@@ -11,6 +11,7 @@
 #include "net_job.h"
 #include "wifi_net.h"
 #include "http_json.h"
+#include "fx_data.h"
 #include "list_sel.h"
 
 // 30 个日历日 ≈ 22 个交易日，90 个 ≈ 64 个。留 70 够两档都装下。
@@ -27,7 +28,7 @@ static const int WINDOW_COUNT = (int)(sizeof(WINDOWS) / sizeof(WINDOWS[0]));
 static int winIdx = 0;
 
 struct FxPt { char date[11]; float rate; };   // "2026-09-02"
-static FxPt* pts = nullptr;
+static FxRatePoint* pts = nullptr;
 static int  ptN = 0;
 static int  selIdx = 0, scrollTop = 0;
 
@@ -68,42 +69,10 @@ static void ymd(char* out, size_t n, time_t t) {
 // 也就是 rates 是一个"日期 -> {币种: 值}"的对象。**还没对过真实响应**，
 // 换源或者字段对不上时，改这一个函数就够了，上面的绘制一行都不用动。
 static bool fxParse(JsonDocument& doc) {
-  JsonObject rates = doc["rates"];
-  if (rates.isNull()) { errMsg = "no 'rates' in reply"; return false; }
-
-  if (!pts) pts = (FxPt*)malloc(sizeof(FxPt) * FX_MAX_PTS);
-  if (!pts) { errMsg = "out of memory"; return false; }
-
   ptN = 0;
-  for (JsonPair kv : rates) {
-    if (ptN >= FX_MAX_PTS) break;
-    // ⚠️ 两种形状都收：
-    //   {"2026-08-04":{"CNY":7.15}}   文档里时间序列的样子
-    //   {"2026-08-04":7.15}           只问一个币种时有些接口会把那层对象省掉
-    // 这不是过度设计——解析器还没对过真实响应（见文件顶上），而这两种是最可能的分歧。
-    // 多认一种的代价是三行；认错了的代价是整页空白，而且从屏幕上看不出是形状问题。
-    float v = 0.0f;
-    JsonVariant val = kv.value();
-    if (val.is<JsonObject>()) v = val["CNY"] | 0.0f;
-    else                      v = val | 0.0f;
-    if (v <= 0) continue;                       // 缺这一天就跳过，不要画成 0
-    strncpy(pts[ptN].date, kv.key().c_str(), sizeof(pts[ptN].date) - 1);
-    pts[ptN].date[sizeof(pts[ptN].date) - 1] = 0;
-    pts[ptN].rate = v;
-    ptN++;
-  }
-  // 走到这儿说明 rates 在、但一个点都没解出来 —— 十有八九是形状跟预期不一样。
-  // 屏幕上直接把下一步写出来，别让人对着一句"没有数据"猜是接口挂了还是解析错了。
-  if (ptN == 0) { errMsg = "rates present but empty - try FXDUMP on serial"; return false; }
-
-  // 按日期升序排一遍。**不假设接口按顺序返回**——JSON 对象本来就没有顺序保证，
-  // 而这里顺序错了不会报错，只会画出一条乱七八糟的折线，很难看出是数据的锅。
-  // YYYY-MM-DD 定长补零，直接字符串比较就是日期序。点数最多 70，插入排序足够。
-  for (int i = 1; i < ptN; i++) {
-    FxPt k = pts[i];
-    int j = i - 1;
-    while (j >= 0 && strcmp(pts[j].date, k.date) > 0) { pts[j + 1] = pts[j]; j--; }
-    pts[j + 1] = k;
+  if (!fxParseFrankfurterV2(doc, pts, FX_MAX_PTS, ptN)) {
+    errMsg = "bad Frankfurter v2 reply (expected date/base/quote/rate array)";
+    return false;
   }
   return true;
 }
@@ -118,7 +87,7 @@ void fxBuildUrl(char* out, size_t n) {
   ymd(from, sizeof(from), now - (time_t)(WINDOWS[winIdx].days + 3) * 86400);
   // ⚠️ 2026-09-03：api.frankfurter.app 已 301 到 api.frankfurter.dev/v1/，而 HTTPClient
   // 默认不跟重定向，于是这一页只会报 "http 301"。响应结构没变，改 URL 就够了。
-  snprintf(out, n, "https://api.frankfurter.dev/v1/%s..%s?from=USD&to=CNY", from, to);
+  snprintf(out, n, "https://api.frankfurter.dev/v2/rates?base=USD&quotes=CNY&from=%s&to=%s", from, to);
 }
 
 static void fetchFx() {
@@ -128,7 +97,7 @@ static void fetchFx() {
   lastFetchMs = millis();
 
   // 接收缓冲必须在进 lease 之前备好：pts 占 ~700B，若在 lease 里 malloc 会钉死画布的洞
-  if (!pts) pts = (FxPt*)malloc(sizeof(FxPt) * FX_MAX_PTS);
+  if (!pts) pts = (FxRatePoint*)malloc(sizeof(FxRatePoint) * FX_MAX_PTS);
   if (!pts) { errMsg = "out of memory"; dirty = true; return; }
 
   if (!wifiEnsureConnected()) { errMsg = "wifi not connected"; dirty = true; return; }
@@ -151,7 +120,12 @@ static void fetchFx() {
   // 一个交易日只有 `"2026-08-04":{"CNY":7.1523},` 二十来个字节，90 天窗口整包也就
   // 1.7KB 左右，配上过滤器进堆的更少。TLS 那 40KB 峰值躲不掉，但至少没有再叠一份大 JSON。
   JsonDocument filter;
-  filter["rates"] = true;
+  JsonArray filterRows = filter.to<JsonArray>();
+  JsonObject filterRow = filterRows.add<JsonObject>();
+  filterRow["date"] = true;
+  filterRow["base"] = true;
+  filterRow["quote"] = true;
+  filterRow["rate"] = true;
 
   JsonDocument doc;
   HttpJsonOptions options(8000, 12000);

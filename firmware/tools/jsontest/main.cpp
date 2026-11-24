@@ -21,6 +21,9 @@ NetResolveResult netResolve(const char* host, uint32_t) {
 }
 
 #include "http_json.h"
+#include "fx_data.h"
+#include "chat_url.h"
+#include "router_config.h"
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -587,6 +590,9 @@ static void testHttpOptionsConfig() {
   CHECK_EQ(g_mockHttp.capturedConnectTimeout, 1234);
   CHECK_EQ(g_mockHttp.capturedTimeout, 5678);
   CHECK(g_mockHttp.useHttp10Called);
+  CHECK(g_mockHttp.reuseCalled);
+  CHECK(!g_mockHttp.reuseValue);
+  CHECK_EQ(g_mockHttp.redirectMode, (int)HTTPC_DISABLE_FOLLOW_REDIRECTS);
 }
 
 // ---- DNS 预解析（net_resolve.h）----
@@ -662,6 +668,51 @@ static void testPreResolveGatesHttp() {
   CHECK(doc["ok"] == 1);
 }
 
+
+static void testAppFixRegressionHelpers() {
+  printf("Test: API app regression helpers...\n");
+  JsonDocument doc;
+  CHECK(!deserializeJson(doc, R"([{"date":"2026-11-20","base":"USD","quote":"CNY","rate":7.12},{"date":"2026-11-19","base":"USD","quote":"CNY","rate":7.11},{"date":"2026-11-20","base":"USD","quote":"EUR","rate":0.9}])"));
+  FxRatePoint points[4]; int count = 0;
+  CHECK(fxParseFrankfurterV2(doc, points, 4, count));
+  CHECK_EQ(count, 2);
+  CHECK_STR_EQ(points[0].date, "2026-11-19");
+  CHECK_STR_EQ(points[1].date, "2026-11-20");
+  CHECK(points[0].rate > 7.10f && points[0].rate < 7.12f);
+  JsonDocument wrong; CHECK(!deserializeJson(wrong, R"({"rates":{}})"));
+  count = 0; CHECK(!fxParseFrankfurterV2(wrong, points, 4, count)); CHECK_EQ(count, 0);
+
+  char url[256];
+  CHECK(chatBuildCompletionsUrl("https://api.openai.com/v1", url, sizeof(url)));
+  CHECK_STR_EQ(url, "https://api.openai.com/v1/chat/completions");
+  CHECK(chatBuildCompletionsUrl("https://host.example", url, sizeof(url)));
+  CHECK_STR_EQ(url, "https://host.example/v1/chat/completions");
+  CHECK(chatBuildCompletionsUrl("https://host.example/v1/chat/completions", url, sizeof(url)));
+  CHECK_STR_EQ(url, "https://host.example/v1/chat/completions");
+  CHECK(!chatBuildCompletionsUrl("http://host.example/v1", url, sizeof(url)));
+  CHECK(!chatBuildCompletionsUrl("https://VOTRE_SERVEUR/v1", url, sizeof(url)));
+  char tiny[12]; CHECK(!chatBuildCompletionsUrl("https://host.example/v1", tiny, sizeof(tiny)));
+
+  CHECK_EQ(routerBaseConfigStatus("", ""), ROUTER_BASE_MISSING);
+  CHECK_EQ(routerBaseConfigStatus("http://ADRESSE_IP_DU_SERVEUR:9090", "secret"), ROUTER_BASE_PLACEHOLDER);
+  CHECK_EQ(routerBaseConfigStatus("https://192.168.1.4:9443", ""), ROUTER_BASE_HTTPS_UNSUPPORTED);
+  CHECK_EQ(routerBaseConfigStatus("ftp://192.168.1.4:9090", ""), ROUTER_BASE_INVALID_SCHEME);
+  CHECK_EQ(routerBaseConfigStatus("http://192.168.1.4:9090", "VOTRE_SECRET_CLASH"), ROUTER_BASE_PLACEHOLDER);
+  CHECK_EQ(routerBaseConfigStatus("http://192.168.1.4:9090/", ""), ROUTER_BASE_OK);
+  CHECK(routerProxyGroupConfigured("Proxy"));
+  CHECK(!routerProxyGroupConfigured("VOTRE_GROUPE_DE_PROXY"));
+  CHECK(!routerProxyGroupConfigured(""));
+}
+
+static void testNegativeHttpErrorDetails() {
+  printf("Test: negative HTTP errors retain root cause...\n");
+  g_mockHttp.reset(); g_mockHttp.httpCode = -1;
+  HttpJsonOptions opt(1000, 1000); JsonDocument doc; String err;
+  CHECK(!fetchJsonHttp(s_dummyClient, String("https://api.example.com/data"), doc, nullptr, opt, err));
+  CHECK_STR_EQ(err.c_str(), "http -1 (connection refused)");
+  CHECK(g_mockHttp.endCalled);
+}
+
 int main() {
   printf("=== Starting jsontest ===\n");
   testStreamArrayNormal();
@@ -679,6 +730,8 @@ int main() {
   testHttpOptionsConfig();
   testNetUrlHost();
   testPreResolveGatesHttp();
+  testAppFixRegressionHelpers();
+  testNegativeHttpErrorDetails();
 
   printf("\n=== jsontest Results: %d passed, %d failed ===\n", g_pass, g_fail);
   return g_fail > 0 ? 1 : 0;

@@ -63,8 +63,14 @@ void badappleEnter() {
 
   if (!sdReady()) { state = ST_ERROR; errMsg = "No SD card"; return; }
 
+  // Compatibilité avec les cartes SD qui utilisent le dossier français accentué.
   vidFile = SD.open(VIDEO_PATH, FILE_READ);
-  if (!vidFile) { state = ST_ERROR; errMsg = "Missing " + String(VIDEO_PATH); return; }
+  if (!vidFile) vidFile = SD.open("/vidéo/badapple.dat", FILE_READ);
+  if (!vidFile) {
+    state = ST_ERROR;
+    errMsg = "Missing SD /video/badapple.dat";
+    return;
+  }
 
   BadAppleHeader hdr;
   if (vidFile.read((uint8_t*)&hdr, sizeof(hdr)) != sizeof(hdr) ||
@@ -76,6 +82,15 @@ void badappleEnter() {
   }
   if (hdr.width != 240 || hdr.height != 135 || hdr.fps == 0 || hdr.frameCount == 0) {
     errMsg = "Unsupported format";
+    closeFile();
+    state = ST_ERROR;
+    return;
+  }
+  const uint32_t expectedFrameBytes = ((uint32_t)hdr.width / 8) * hdr.height;
+  const uint64_t expectedFileSize = sizeof(BadAppleHeader) +
+      (uint64_t)expectedFrameBytes * (uint64_t)hdr.frameCount;
+  if ((uint64_t)vidFile.size() < expectedFileSize) {
+    errMsg = "Truncated BadApple file";
     closeFile();
     state = ST_ERROR;
     return;

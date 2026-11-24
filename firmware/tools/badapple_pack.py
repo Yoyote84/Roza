@@ -34,7 +34,6 @@ import subprocess
 import sys
 import tempfile
 
-import numpy as np
 
 W, H = 240, 135   # Cardputer ADV 的 ST7789 分辨率，横屏 rotation=1 后固定这个数
 
@@ -56,7 +55,16 @@ def extract_gray_raw(video_path: str, raw_path: str, fps: int, content_w: int) -
     subprocess.run(cmd, check=True, capture_output=True)
 
 
+def build_header(fps: int, frame_count: int) -> bytes:
+    if fps < 1 or fps > 120:
+        raise ValueError("fps must be between 1 and 120")
+    if frame_count < 1 or frame_count > 0xFFFFFFFF:
+        raise ValueError("frame_count must be a positive 32-bit value")
+    return struct.pack("<4sHHHHI", b"BAP1", W, H, fps, 0, frame_count)
+
+
 def pack(raw_path: str, out_path: str, fps: int) -> int:
+    import numpy as np
     frame_sz = W * H
     data = np.fromfile(raw_path, dtype=np.uint8)
     n_frames = len(data) // frame_sz
@@ -67,7 +75,7 @@ def pack(raw_path: str, out_path: str, fps: int) -> int:
 
     with open(out_path, "wb") as f:
         # struct BadAppleHeader{ char magic[4]; u16 w,h,fps,reserved; u32 frameCount; } — 见 badapple.cpp
-        f.write(struct.pack("<4sHHHHI", b"BAP1", W, H, fps, 0, n_frames))
+        f.write(build_header(fps, n_frames))
         f.write(packed.tobytes())
     return n_frames
 
