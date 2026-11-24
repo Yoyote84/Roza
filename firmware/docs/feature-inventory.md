@@ -23,8 +23,8 @@ Terminology:
 | **HID** | 3/8 | 5 | BT Keys · BT Media · Ducky | Device acting as keyboard / remote controller to control host (BLE/USB) |
 | **SIG** | 4/8 | 4 | LoRa · GNSS · Map · IR | Other RF transceiver channels (over-the-air signals and positioning) |
 | **SKY** | 6/8 | 2 | Astro · Weather · Planes · Sats · Typhoon · Quake | Skyward observation (astronomy, meteorology, hazards, aerial traffic) |
-| **MORE** | 8/8 | **0** | GitHub · Radio · FX · OKX · Reader · BadApple · Apps · Settings |
-| **RPG** | 1/8 | 7 | Hawkins | Offline role-playing game | Personal dashboards, multimedia, and system configuration |
+| **MORE** | 8/8 | **0** | GitHub · Radio · FX · OKX · Reader · BadApple · Apps · Settings | Personal dashboards, multimedia, and system configuration |
+| **RPG** | 1/8 | 7 | Hawkins | Offline role-playing game |
 
 ⚠️ **Hard limit of 8 apps per group (4×2 grid; each group fits on a single screen without vertical scrolling)**. TOOLS and MORE are currently at full capacity (8/8).
 Total capacity: 64; currently used: 41; spare slots distributed across SCAN (3) / NET (2) / HID (5) / SIG (4) / SKY (2) / RPG (7).
