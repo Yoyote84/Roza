@@ -4,6 +4,7 @@
 #include <esp_heap_caps.h>
 #include "bctrail.h"
 #define US_KEYBOARD
+#include <HIDTypes.h>       // Macros officielles de construction du descripteur HID
 #include <HIDKeyboardTypes.h>
 #include "ui_common.h"
 #include "keyboard_adv.h"

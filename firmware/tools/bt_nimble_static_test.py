@@ -39,6 +39,8 @@ check("class RozaBleScan" in COMPAT and "NimBLEScanCallbacks" in COMPAT,
       "le scanner NimBLE et son pont de callbacks sont présents")
 check("class RozaBleHidDevice" in COMPAT and "NimBLEHIDDevice" in COMPAT,
       "le clavier HID NimBLE est présent")
+check("#include <HIDTypes.h>" in BT_CPP,
+      "les macros HID officielles restent incluses après le remplacement de Bluedroid")
 check("class RozaBleAdvertising" in COMPAT and "NimBLEExtAdvertising" in COMPAT,
       "la publicité BLE legacy/étendue est présente")
 
