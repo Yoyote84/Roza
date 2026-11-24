@@ -29,7 +29,7 @@ typedef int BaseType_t;
 typedef uint8_t StackType_t;
 
 // Le renderer hôte ne lance pas les tâches firmware ; il compile seulement
-// hawkins_app.cpp pour vérifier les signatures et les déclarations.
+// les sources firmware pour vérifier les signatures et les déclarations.
 typedef struct { uint32_t owner; } portMUX_TYPE;
 #ifndef portMUX_INITIALIZER_UNLOCKED
 #define portMUX_INITIALIZER_UNLOCKED {0U}
