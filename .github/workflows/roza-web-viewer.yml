@@ -5,6 +5,21 @@ on:
     branches: [main]
     paths:
       - "firmware/src/**"
+      - "firmware/docs/**"
+      - "docs/HAWKINS_INSTALLATION.md"
+      - ".github/workflows/hawkins-ai-android.yml"
+      - "firmware/tools/hawkinstest/**"
+      - "firmware/tools/hawkinsaitest/**"
+      - "firmware/tools/hawkinsllmtest/**"
+      - "firmware/tools/uisim/**"
+      - "firmware/platformio.ini"
+      - "firmware/partitions_8MB.csv"
+      - ".github/workflows/roza-web-viewer.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "firmware/src/**"
+      - "firmware/docs/**"
       - "docs/HAWKINS_INSTALLATION.md"
       - ".github/workflows/hawkins-ai-android.yml"
       - "firmware/tools/hawkinstest/**"
@@ -299,6 +314,7 @@ jobs:
           path: site
 
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: Publish web viewer and firmware
     environment:
       name: github-pages
