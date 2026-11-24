@@ -340,9 +340,7 @@ static const char* appDesc(AppId id) {
     case APP_FX:        return "Taux de change";
     case APP_OKX:       return "Marches OKX";
     case APP_READER:    return "Lecteur de livres et textes";
-    case APP_SETTINGS:  return "Parametres et veille";
-    case APP_HAWKINS:   return "JDR persistant et monde vivant";
-    default:            return "";
+    case APP_SETTINGS:  return "Parametres et veille";default:            return "";
   }
 }
 
