@@ -27,7 +27,6 @@ static const struct { int days; const char* label; } WINDOWS[] = {
 static const int WINDOW_COUNT = (int)(sizeof(WINDOWS) / sizeof(WINDOWS[0]));
 static int winIdx = 0;
 
-struct FxPt { char date[11]; float rate; };   // "2026-09-02"
 static FxRatePoint* pts = nullptr;
 static int  ptN = 0;
 static int  selIdx = 0, scrollTop = 0;
@@ -63,11 +62,8 @@ static void ymd(char* out, size_t n, time_t t) {
   else                  snprintf(out, n, "1970-01-01");
 }
 
-// ⚠️⚠️ 只有这个函数依赖响应的具体形状。接口文档给的是：
-//   {"amount":1.0,"base":"USD","start_date":"...","end_date":"...",
-//    "rates":{"2026-08-04":{"CNY":7.1523},"2026-08-05":{"CNY":7.1610}, ...}}
-// 也就是 rates 是一个"日期 -> {币种: 值}"的对象。**还没对过真实响应**，
-// 换源或者字段对不上时，改这一个函数就够了，上面的绘制一行都不用动。
+// Le parser partagé attend le format officiel Frankfurter v2 : tableau de lignes
+// {date, base, quote, rate}. Il filtre uniquement USD/CNY.
 static bool fxParse(JsonDocument& doc) {
   ptN = 0;
   if (!fxParseFrankfurterV2(doc, pts, FX_MAX_PTS, ptN)) {
@@ -85,8 +81,7 @@ void fxBuildUrl(char* out, size_t n) {
   char from[12], to[12];
   ymd(to, sizeof(to), now);
   ymd(from, sizeof(from), now - (time_t)(WINDOWS[winIdx].days + 3) * 86400);
-  // ⚠️ 2026-09-03：api.frankfurter.app 已 301 到 api.frankfurter.dev/v1/，而 HTTPClient
-  // 默认不跟重定向，于是这一页只会报 "http 301"。响应结构没变，改 URL 就够了。
+  // Frankfurter v2 utilise /rates et les paramètres base/quotes/from/to.
   snprintf(out, n, "https://api.frankfurter.dev/v2/rates?base=USD&quotes=CNY&from=%s&to=%s", from, to);
 }
 
@@ -144,7 +139,7 @@ static void fetchFx() {
 static DeferredFetch job;
 
 void fxEnter() {
-  if (!pts) pts = (FxPt*)malloc(sizeof(FxPt) * FX_MAX_PTS);
+  if (!pts) pts = (FxRatePoint*)malloc(sizeof(FxRatePoint) * FX_MAX_PTS);
   winIdx = loadUChar("fx", "win", 0);
   if (winIdx >= WINDOW_COUNT) winIdx = 0;   // 存的是 uint8_t，只可能大不可能负
   ptN = 0; selIdx = 0; scrollTop = 0;
@@ -315,7 +310,7 @@ void drawFxDays() {
   for (int r = 0; r < ROWS_VISIBLE; r++) {
     int i = scrollTop + r;
     if (i >= ptN) break;
-    const FxPt& p = pts[ptN - 1 - i];                       // 倒序
+    const FxRatePoint& p = pts[ptN - 1 - i];                       // 倒序
     const float prev = (ptN - 2 - i >= 0) ? pts[ptN - 2 - i].rate : p.rate;
     const float d = p.rate - prev;
     int y = y0 + r * rowH;
