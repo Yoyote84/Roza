@@ -6,11 +6,6 @@ on:
     paths:
       - "firmware/src/**"
       - "firmware/docs/**"
-      - "docs/HAWKINS_INSTALLATION.md"
-      - ".github/workflows/hawkins-ai-android.yml"
-      - "firmware/tools/hawkinstest/**"
-      - "firmware/tools/hawkinsaitest/**"
-      - "firmware/tools/hawkinsllmtest/**"
       - "firmware/tools/uisim/**"
       - "firmware/platformio.ini"
       - "firmware/partitions_8MB.csv"
@@ -20,11 +15,6 @@ on:
     paths:
       - "firmware/src/**"
       - "firmware/docs/**"
-      - "docs/HAWKINS_INSTALLATION.md"
-      - ".github/workflows/hawkins-ai-android.yml"
-      - "firmware/tools/hawkinstest/**"
-      - "firmware/tools/hawkinsaitest/**"
-      - "firmware/tools/hawkinsllmtest/**"
       - "firmware/tools/uisim/**"
       - "firmware/platformio.ini"
       - "firmware/partitions_8MB.csv"
@@ -73,19 +63,6 @@ jobs:
         run: |
           set -euo pipefail
           pio run -e cardputer-adv 2>&1 | tee "$RUNNER_TEMP/platformio-memory-report.txt"
-
-      - name: Verify LLM engine and SIMD kernel are linked
-        working-directory: firmware
-        shell: bash
-        run: |
-          set -euo pipefail
-          ELF=".pio/build/cardputer-adv/firmware.elf"
-          NM="$(find "$HOME/.platformio/packages" -type f -name 'xtensa-esp32s3-elf-nm' -print -quit)"
-          test -s "$ELF"
-          test -n "$NM"
-          "$NM" -C "$ELF" | grep -F "llm_init_embedded("
-          "$NM" -C "$ELF" | grep -F "hawkinsLlmGetApi"
-          "$NM" "$ELF" | grep -F "dot_q4q8_pie"
 
       - name: Assemble flashable Cardputer ADV images
         working-directory: firmware
@@ -146,18 +123,16 @@ jobs:
           # La partition factory commence a 0x10000 ; le binaire fusionne
           # contient bootloader + table + application et se flashe a 0x0000.
           python "$ESPTOOL" --chip esp32s3 merge_bin \
-            --output "$PACKAGE/ROZA-Cardputer-ADV-Hawkins-factory.bin" \
+            --output "$PACKAGE/ROZA-Cardputer-ADV-factory.bin" \
             --flash_mode keep \
             --flash_size 8MB \
             0x0 "$BUILD/bootloader.bin" \
             0x8000 "$BUILD/partitions.bin" \
             0x10000 "$BUILD/firmware.bin"
 
-          cp "$BUILD/firmware.bin" "$PACKAGE/ROZA-Cardputer-ADV-Hawkins-application.bin"
+          cp "$BUILD/firmware.bin" "$PACKAGE/ROZA-Cardputer-ADV-application.bin"
           cp "$BUILD/bootloader.bin" "$PACKAGE/bootloader.bin"
           cp "$BUILD/partitions.bin" "$PACKAGE/partitions.bin"
-          cp src/hawkins_llm/assets/model_manifest.json "$PACKAGE/model_manifest.json"
-          cp src/hawkins_llm/assets/SHA256SUMS.txt "$PACKAGE/MODEL_SHA256SUMS.txt"
 
           export FIRMWARE_BYTES APP_PARTITION_BYTES FLASH_BYTES RAM_LINE FLASH_LINE
           python - <<'PY'
@@ -165,14 +140,11 @@ jobs:
           import os
           from pathlib import Path
 
-          model_manifest = json.loads(
-              Path("src/hawkins_llm/assets/model_manifest.json").read_text(encoding="utf-8")
-          )
           firmware_bytes = int(os.environ["FIRMWARE_BYTES"])
           app_partition_bytes = int(os.environ["APP_PARTITION_BYTES"])
           flash_bytes = int(os.environ["FLASH_BYTES"])
           manifest = {
-              "stage": "5/5",
+              "project": "ROZA",
               "status": "factory_image_built_ci_hardware_test_pending",
               "commit": os.environ["GITHUB_SHA"],
               "workflow_run_id": os.environ["GITHUB_RUN_ID"],
@@ -183,7 +155,7 @@ jobs:
                   "psram": False
               },
               "factory_image": {
-                  "filename": "ROZA-Cardputer-ADV-Hawkins-factory.bin",
+                  "filename": "ROZA-Cardputer-ADV-factory.bin",
                   "flash_address": "0x0000",
                   "application_offset": "0x10000"
               },
@@ -197,58 +169,42 @@ jobs:
                   "ram": os.environ["RAM_LINE"],
                   "flash": os.environ["FLASH_LINE"],
                   "note": "Static/link-time usage from PlatformIO. Not a measurement of free runtime heap."
-              },
-              "runtime_heap_measurement": {
-                  "available_serial_markers": [
-                      "[hawkins-llm] HEAP avant modele",
-                      "[hawkins-llm] HEAP apres poids",
-                      "[hawkins-llm] HEAP IA prete"
-                  ],
-                  "measured_on_physical_cardputer": False
-              },
-              "model": model_manifest
+              }
           }
           Path(os.environ["RUNNER_TEMP"], "roza-firmware-package", "BUILD_MANIFEST.json").write_text(
-              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\\n",
               encoding="utf-8"
           )
           PY
 
           cat > "$PACKAGE/INSTALLATION.txt" <<'EOF'
-          ROZA / HAWKINS — M5Stack Cardputer ADV (ESP32-S3FN8, 8 MB Flash, sans PSRAM)
+          ROZA — M5Stack Cardputer ADV (ESP32-S3FN8, 8 MB Flash, sans PSRAM)
 
           IMAGE COMPLETE RECOMMANDEE
-          ROZA-Cardputer-ADV-Hawkins-factory.bin
+          ROZA-Cardputer-ADV-factory.bin
           Adresse de flash : 0x0000
 
-          APPLICATION SEULE (uniquement si le bootloader et la table ROZA
-          correspondants sont deja installes)
-          ROZA-Cardputer-ADV-Hawkins-application.bin
+          APPLICATION SEULE
+          ROZA-Cardputer-ADV-application.bin
           Adresse de flash : 0x10000
+          A utiliser uniquement avec le bootloader et la table de partitions ROZA correspondants.
 
           Images separees pour diagnostic :
             bootloader.bin : 0x0000
             partitions.bin : 0x8000
             application : 0x10000
 
-          Le manifeste BUILD_MANIFEST.json indique le commit, la cible, la taille
-          de l'image, la capacite de la partition, le resume RAM/Flash PlatformIO
-          et la provenance du modele. ELF_SECTIONS.txt detaille les sections liees.
-          PLATFORMIO_MEMORY.txt contient le resume de memoire du compilateur.
-          MODEL_SHA256SUMS.txt contient les empreintes des poids et du tokenizer.
-          SHA256SUMS.txt verifie tous les fichiers de livraison.
+          Le paquet contient BUILD_MANIFEST.json, ELF_SECTIONS.txt,
+          PLATFORMIO_MEMORY.txt et PLATFORMIO_BUILD_REPORT.txt.
 
-          La carte microSD sert au stockage ; copier un BIN sur la SD ne flashe
+          La microSD sert au stockage ; copier un BIN sur la SD ne flashe
           pas le microcontroleur. Le flash se fait par USB-C avec un outil ESP32-S3.
 
-          Cette image est compilee pour le Cardputer ADV 8 MB, sans PSRAM.
-          La compilation CI ne remplace pas un essai sur la carte reelle.
-          Les lignes serie [hawkins-llm] HEAP mesurent le heap interne au demarrage
-          et apres chargement des poids/tokenizer.
+          La compilation CI ne remplace pas un essai sur le Cardputer ADV reel.
           EOF
 
           (cd "$PACKAGE" && sha256sum \
-            *.bin BUILD_MANIFEST.json model_manifest.json MODEL_SHA256SUMS.txt \
+            *.bin BUILD_MANIFEST.json \
             PLATFORMIO_MEMORY.txt PLATFORMIO_BUILD_REPORT.txt ELF_SECTIONS.txt INSTALLATION.txt \
             > SHA256SUMS.txt)
           (cd "$PACKAGE" && sha256sum -c SHA256SUMS.txt)
@@ -257,22 +213,10 @@ jobs:
       - name: Upload flashable firmware package
         uses: actions/upload-artifact@v4
         with:
-          name: ROZA-Cardputer-ADV-Hawkins-${{ github.sha }}
+          name: ROZA-Cardputer-ADV-${{ github.sha }}
           path: ${{ runner.temp }}/roza-firmware-package/
           if-no-files-found: error
           retention-days: 90
-
-      - name: Run native Hawkins tests
-        working-directory: firmware
-        run: bash tools/hawkinstest/build.sh
-
-      - name: Run native Hawkins AI USB protocol tests
-        working-directory: firmware
-        run: bash tools/hawkinsaitest/build.sh
-
-      - name: Run native Hawkins LLM engine tests
-        working-directory: firmware
-        run: bash tools/hawkinsllmtest/build.sh
 
       - name: Prepare optional simulator-only credentials
         working-directory: firmware
@@ -294,16 +238,14 @@ jobs:
           chmod +x web/build-site.sh
           ./web/build-site.sh "$GITHUB_WORKSPACE/site"
           mkdir -p "$GITHUB_WORKSPACE/site/downloads"
-          cp "$RUNNER_TEMP/roza-firmware-package/ROZA-Cardputer-ADV-Hawkins-factory.bin" \
-            "$GITHUB_WORKSPACE/site/downloads/ROZA-Cardputer-ADV-Hawkins-factory.bin"
+          cp "$RUNNER_TEMP/roza-firmware-package/ROZA-Cardputer-ADV-factory.bin" \
+            "$GITHUB_WORKSPACE/site/downloads/ROZA-Cardputer-ADV-factory.bin"
           cp "$RUNNER_TEMP/roza-firmware-package/INSTALLATION.txt" \
             "$GITHUB_WORKSPACE/site/downloads/INSTALLATION.txt"
           cp "$RUNNER_TEMP/roza-firmware-package/BUILD_MANIFEST.json" \
             "$GITHUB_WORKSPACE/site/downloads/BUILD_MANIFEST.json"
           cp "$RUNNER_TEMP/roza-firmware-package/SHA256SUMS.txt" \
             "$GITHUB_WORKSPACE/site/downloads/SHA256SUMS.txt"
-          cp "$GITHUB_WORKSPACE/docs/HAWKINS_INSTALLATION.md" \
-            "$GITHUB_WORKSPACE/site/downloads/HAWKINS_INSTALLATION.md"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
