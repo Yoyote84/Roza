@@ -78,7 +78,7 @@ static void fetchSats() {
   const uint32_t nowMs = millis();
   if (n2yoHasRequested && nowMs - n2yoLastRequestMs < N2YO_MIN_REQUEST_MS) {
     uint32_t waitSec = (N2YO_MIN_REQUEST_MS - (nowMs - n2yoLastRequestMs) + 999) / 1000;
-    errMsg = String("N2YO cooldown: wait ") + waitSec + "s";
+    errMsg = String("N2YO cooldown: wait ") + String(waitSec) + "s";
     dirty = true;
     return;
   }
