@@ -172,7 +172,7 @@ jobs:
               }
           }
           Path(os.environ["RUNNER_TEMP"], "roza-firmware-package", "BUILD_MANIFEST.json").write_text(
-              json.dumps(manifest, ensure_ascii=False, indent=2) + "\\n",
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
               encoding="utf-8"
           )
           PY
