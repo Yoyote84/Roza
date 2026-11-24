@@ -1,2 +1,0 @@
-99f5b02e550d2de461003aa312dbbaf0e6e4bd2744f082472e8103bd0f91fc45  model_lecarnet_q4.bin
-e707eaa72c56acb1f73ef2a7f6d89327875c22d9301be5e58ebca8eac3168f5b  tokenizer_lecarnet_ctk2.bin

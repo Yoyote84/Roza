@@ -86,8 +86,6 @@ SET_LOOP_TASK_STACK_SIZE(12 * 1024);
 #include "app_store.h"
 #include "ssh_app.h"
 #include "hash_oven.h"
-#include "hawkins_app.h"
-#include "hawkins_runtime.h"
 #include "pcmode.h"
 #include "serial_cmd.h"
 #include "bg_fetch.h"
@@ -265,7 +263,6 @@ void render() {
     case SCREEN_HOTSPOT_PW:  drawHotspotPw(); break;
     case SCREEN_CALC:        drawCalc(); break;
     case SCREEN_LORA:        drawLora(); break;
-    case SCREEN_HAWKINS:     drawHawkinsApp(); break;
     case SCREEN_IR:          drawIr(); break;
     case SCREEN_CONV:        drawConv(); break;
     case SCREEN_PLAYER:      drawPlayer(); break;
@@ -489,7 +486,6 @@ static void handleKeyAction(char k) {
           case APP_READER:   readerEnter(); break;
           case APP_STORE:    screen = SCREEN_APP_STORE; appStoreEnter(); break;
           case APP_SETTINGS: screen = SCREEN_SETTINGS; settingsIndex = 0; break;
-          case APP_HAWKINS: screen = SCREEN_HAWKINS; hawkinsAppEnter(); break;
         }
         dirty = true;
       }
@@ -929,10 +925,6 @@ static void handleKeyAction(char k) {
       else            loraKey(k);
       return;
 
-    case SCREEN_HAWKINS:
-      if (k == '`') { screen = SCREEN_MENU; dirty = true; }
-      else { hawkinsAppKey(k); dirty = true; }
-      return;
 
     case SCREEN_IR:
       if (k == '`') { cleanupApp(SCREEN_IR); screen = SCREEN_MENU; dirty = true; }
@@ -1196,7 +1188,6 @@ void setup() {
   ramMark("serial");        // 到这儿串口才活；上面四枪全靠攒着才看得到（见 ram_profile.h）
 
   tzInit();                             // 时区：从 NVS 恢复并立即应用
-  hawkins::hawkinsRuntimeInit();                  // 恢复 Hawkins 世界快照（双槽 NVS）
   bootMark("timezone-ready");
   clockInit();                          // 时钟表盘风格：从 NVS 恢复
   // 停滞看门狗要付 3KB 常驻栈，所以跟着 Debug 走，不白占（理由见 bctrail.cpp）
@@ -1220,7 +1211,6 @@ void setup() {
 
   // Connexion non bloquante facultative : uniquement les identifiants déjà mémorisés.
   // Sans réseau enregistré, la radio reste inactive. Un délai ou un échec Wi-Fi ne bloque pas ROZA.
-  // Hawkins reste jouable, explorable et sauvegardable sans connexion.
   bootWifiStart();
 
 
@@ -1407,8 +1397,6 @@ void loop() {
 
   // GNSS & IMU & LoRa：串口流式输出（PC 主导模式或其他模式下开启）
   gnssPoll();
-  if (hawkins::hawkinsRuntimeUpdate() && screen == SCREEN_HAWKINS) dirty = true;
-  if (screen == SCREEN_HAWKINS) hawkinsAppUpdate();
   gnssStreamTick();
   imuStreamTick();
   loraSniffTick();

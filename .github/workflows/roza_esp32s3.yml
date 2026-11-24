@@ -61,21 +61,10 @@ jobs:
         run: |
           platformio run -e cardputer-adv
 
-      - name: Vérifier que le moteur LLM et le noyau SIMD sont liés
-        run: |
-          set -euo pipefail
-          ELF=".pio/build/cardputer-adv/firmware.elf"
-          NM="$(find "$HOME/.platformio/packages" -type f -name 'xtensa-esp32s3-elf-nm' -print -quit)"
-          test -s "$ELF"
-          test -n "$NM"
-          "$NM" -C "$ELF" | grep -F "llm_init_embedded"
-          "$NM" -C "$ELF" | grep -F "hawkinsLlmGetApi"
-          "$NM" "$ELF" | grep -F "dot_q4q8_pie"
-
       - name: Exécuter les tests logiciels hors matériel
         run: |
           set -euo pipefail
-          for suite in irtest loratest odidtest gnsstest jsontest oventest powertest ramtest astrotest calctest clocktest hawkinstest hawkinsaitest hawkinsllmtest; do
+          for suite in irtest loratest odidtest gnsstest jsontest oventest powertest ramtest astrotest calctest clocktest; do
             echo "::group::Suite $suite"
             bash "tools/$suite/build.sh"
             echo "::endgroup::"
