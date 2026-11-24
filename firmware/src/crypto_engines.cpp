@@ -465,11 +465,7 @@ bool md5_crypt_calc(const char* key, const char* salt, char* outBuf, size_t outB
   if (!key || !salt || !outBuf || outBufMax < 40) return false;
   if (strncmp(salt, "$1$", 3) == 0) salt += 3;
   size_t saltLen = 0;
-  while (salt[saltLen] && salt[saltLen] != '
-#undef B64_24BIT
-
-} // namespace crypto
- && saltLen < 8) saltLen++;
+  while (salt[saltLen] && salt[saltLen] != '$' && saltLen < 8) saltLen++;
   size_t keyLen = strlen(key);
   if (keyLen > 128) keyLen = 128;
 
