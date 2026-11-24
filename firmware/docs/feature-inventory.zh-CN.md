@@ -3,7 +3,7 @@
 # 功能清单（Cardputer ADV 固件）
 
 从代码里逐个扒出来的，不是从 README 抄的。口径：
-**41 个 app / 8 个分组**（以 `firmware/src/globals.cpp` 中的 `APPS[]` 和 `GROUPS[]` 为准）。
+**40 个 app / 7 个分组**（以 `firmware/src/globals.cpp` 中的 `APPS[]` 和 `GROUPS[]` 为准）。
 
 读法：
 - **子页** = 在 `pages.cpp` 的翻页链里，用 `.`/`/` 前后翻，底部有页码点
@@ -24,10 +24,9 @@
 | **SIG** | 4/8 | 4 | LoRa · GNSS · Map · IR | 其它收发通道（隔空信号与定位） |
 | **SKY** | 6/8 | 2 | Astro · Weather · Planes · Sats · Typhoon · Quake | 抬头看天（天文/气象/天灾/空中交通） |
 | **MORE** | 8/8 | **0** | GitHub · Radio · FX · OKX · Reader · BadApple · Apps · Settings | 个人服务仪表盘、多媒体与系统设置 |
-| **RPG** | 1/8 | 7 | Hawkins | 离线角色扮演游戏 |
 
 ⚠️ **每组硬上限 8（4×2 网格，每组正好一屏，不做上下滚动）**。TOOLS 和 MORE 已经满员（8/8）。
-总容量 64、已用 41，余量分布在 SCAN(3) / NET(2) / HID(5) / SIG(4) / SKY(2) / RPG(7)。
+总容量 56、已用 40，余量分布在 SCAN(3) / NET(2) / HID(5) / SIG(4) / SKY(2)。
 
 ---
 
