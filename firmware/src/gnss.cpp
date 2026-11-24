@@ -1,3 +1,4 @@
+#include <HTTPClient.h> // Active les extensions Stream de M5GFX avant M5Unified.
 #include "gnss.h"
 #include <TinyGPS++.h>
 #include <ctime>
@@ -5,7 +6,6 @@
 #include <cstring>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include <HTTPClient.h>
 #include <cmath>
 #include <esp_heap_caps.h>
 #include "ui_common.h"
@@ -816,7 +816,7 @@ void gnssPrintDiag() {
                 (unsigned long)gps.charsProcessed(), (unsigned long)gps.sentencesWithFix(),
                 (unsigned long)gps.passedChecksum(), (unsigned long)gps.failedChecksum());
   Serial.printf("[gps] fix=%d sats=%d(list %d) hdop=%.1f lat=%.6f lon=%.6f age=%lums\n",
-                gps.location.isValid(), gps.satellites.isValid() ? gps.satellites.value() : -1,
+                gps.location.isValid(), gps.satellites.isValid() ? static_cast<int>(gps.satellites.value()) : -1,
                 satCount, gps.hdop.isValid() ? gps.hdop.hdop() : -1.0,
                 gps.location.lat(), gps.location.lng(), (unsigned long)gps.location.age());
 }
@@ -2378,6 +2378,15 @@ static bool loadTileFromSd(int z, int tx, int ty, int dx, int dy) {
   return ok;
 }
 
+// Sélectionne un sous-domaine sans modulo par zéro lorsque la liste est vide.
+static bool mapTileSubdomainAt(int round, const char* subs, size_t count, char& result) {
+  if (!subs || count == 0) return false;
+  int index = round % static_cast<int>(count);
+  if (index < 0) index += static_cast<int>(count);
+  result = subs[index];
+  return true;
+}
+
 // 把 config.h 的 CFG_MAP_TILE_URL 模板展开成真正的 URL：{s} 子域、{x}{y}{z} 瓦片坐标
 static void buildTileUrl(char* out, size_t n, int subRound, int tx, int ty, int z) {
   static const char SUBS[] = CFG_MAP_TILE_SUBS;
@@ -2388,7 +2397,7 @@ static void buildTileUrl(char* out, size_t n, int subRound, int tx, int ty, int 
     if (t[0] == '{' && t[1] && t[2] == '}') {
       char tmp[12]; tmp[0] = 0;
       switch (t[1]) {
-        case 's': if (nsub) { tmp[0] = SUBS[subRound % nsub]; tmp[1] = 0; } break;
+        case 's': if (mapTileSubdomainAt(subRound, SUBS, nsub, tmp[0])) tmp[1] = 0; break;
         case 'x': snprintf(tmp, sizeof(tmp), "%d", tx); break;
         case 'y': snprintf(tmp, sizeof(tmp), "%d", ty); break;
         case 'z': snprintf(tmp, sizeof(tmp), "%d", z);  break;

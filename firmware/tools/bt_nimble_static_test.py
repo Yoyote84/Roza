@@ -13,6 +13,7 @@ PLATFORM = (ROOT / "platformio.ini").read_text(encoding="utf-8")
 BT_CPP = (ROOT / "src" / "bt.cpp").read_text(encoding="utf-8")
 BT_H = (ROOT / "src" / "bt.h").read_text(encoding="utf-8")
 CRYPTO_CPP = (ROOT / "src" / "crypto_engines.cpp").read_text(encoding="utf-8")
+GNSS_CPP = (ROOT / "src" / "gnss.cpp").read_text(encoding="utf-8")
 BLE_CONFIG = (ROOT / "src" / "roza_nimble_config.h").read_text(encoding="utf-8")
 COMPAT = (ROOT / "src" / "bt_nimble_compat.h").read_text(encoding="utf-8")
 
@@ -46,6 +47,13 @@ check("#include <HIDTypes.h>" in BT_CPP,
 check("class RozaBleAdvertising" in COMPAT and "NimBLEExtAdvertising" in COMPAT,
       "la publicité BLE legacy/étendue est présente")
 
+
+check(GNSS_CPP.find("#include <HTTPClient.h>") >= 0 and
+      GNSS_CPP.find("#include <HTTPClient.h>") < GNSS_CPP.find('#include "gnss.h"'),
+      "HTTPClient est inclus avant M5Unified pour exposer drawJpg(Stream*) dans M5GFX 0.3.0")
+check("static bool mapTileSubdomainAt(" in GNSS_CPP and
+      "mapTileSubdomainAt(subRound, SUBS, nsub, tmp[0])" in GNSS_CPP,
+      "les modèles de tuiles sans sous-domaines ne provoquent plus de modulo par zéro")
 
 check("-include src/roza_nimble_config.h" in PLATFORM,
       "la configuration d'événements HCI est injectée dans toutes les unités compilées")
