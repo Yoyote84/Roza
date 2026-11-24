@@ -125,6 +125,8 @@ bool fetchJsonStreamArray(Client& client, const String& url, const char* arrayKe
                           ItemCallback onItem, String& err, int maxItems = 1000) {
   if (!httpPreResolve(url, err)) return false;
   HTTPClient http;
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+  http.setReuse(false);
   http.useHTTP10(true);   // 下面直接对 getStream() 流式解析：不能让服务端回 chunked
   http.setConnectTimeout(options.connectTimeoutMs);
   http.setTimeout(options.timeoutMs);
@@ -137,7 +139,7 @@ bool fetchJsonStreamArray(Client& client, const String& url, const char* arrayKe
 
   int code = http.GET();
   if (code != 200) {
-    err = String("http ") + code;
+    httpSetFailure(code, client, err);
     http.end();
     return false;
   }

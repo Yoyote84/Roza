@@ -711,6 +711,20 @@ static void testNegativeHttpErrorDetails() {
   CHECK(!fetchJsonHttp(s_dummyClient, String("https://api.example.com/data"), doc, nullptr, opt, err));
   CHECK_STR_EQ(err.c_str(), "http -1 (connection refused)");
   CHECK(g_mockHttp.endCalled);
+  CHECK(g_mockHttp.reuseCalled);
+  CHECK(!g_mockHttp.reuseValue);
+  CHECK_EQ(g_mockHttp.redirectMode, (int)HTTPC_DISABLE_FOLLOW_REDIRECTS);
+
+  g_mockHttp.reset(); g_mockHttp.httpCode = -1;
+  err = "";
+  bool streamOk = fetchJsonStreamArray(s_dummyClient, String("https://api.example.com/list"), "", nullptr,
+      opt, [](JsonDocument&, int) { return true; }, err);
+  CHECK(!streamOk);
+  CHECK_STR_EQ(err.c_str(), "http -1 (connection refused)");
+  CHECK(g_mockHttp.endCalled);
+  CHECK(g_mockHttp.reuseCalled);
+  CHECK(!g_mockHttp.reuseValue);
+  CHECK_EQ(g_mockHttp.redirectMode, (int)HTTPC_DISABLE_FOLLOW_REDIRECTS);
 }
 
 int main() {

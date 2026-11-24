@@ -100,6 +100,8 @@ static bool clashResolveUrl(const char* url) {
 static bool clashLine(const char* path, String& out, int skipObjects = 0) {
   WiFiClient client;
   HTTPClient http;
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+  http.setReuse(false);
   http.setConnectTimeout(2500);
   char url[160];
   String base = clashBaseUrl();
@@ -259,6 +261,7 @@ static bool trafficEnsureOpen() {
   snprintf(url, sizeof(url), "%s/traffic", base.c_str());
   trafHttp.setConnectTimeout(2500);
   trafHttp.setTimeout(4000);
+  trafHttp.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
   trafHttp.setReuse(false);
   clashErr = "";
   if (!clashResolveUrl(url)) return false;
@@ -344,6 +347,8 @@ static void pumpTraffic() {
 static bool switchProxyNode(const char* target) {
   WiFiClient client;
   HTTPClient http;
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+  http.setReuse(false);
   http.setConnectTimeout(2000);
   http.setTimeout(2500);
   String url = clashBaseUrl() + "/proxies/" + urlEncode(CLASH_PROXY_GROUP);

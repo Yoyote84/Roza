@@ -240,6 +240,8 @@ static void chatWorkerBody() {
   else tlsUseCaBundle(client);
 
   HTTPClient http;
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+  http.setReuse(false);
   http.setConnectTimeout(15000);   // TCP 连接超时，默认只有 5000ms，实机路由到这个域名经常不够
   http.setTimeout(60000);          // 这个是收数据的超时，HTTPClient::setTimeout 是 uint16_t，最大只能到 ~65s
   // 走 HTTP/1.0：服务端（尤其反代/网关）就不能回 chunked 分块编码，
