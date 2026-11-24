@@ -2,6 +2,18 @@
 #include <mbedtls/aes.h>
 #include <mbedtls/md5.h>
 #include <mbedtls/sha256.h>
+#include <mbedtls/version.h>
+
+// Mbed TLS 3 a renommé les fonctions de hachage en supprimant le suffixe _ret.
+// Conserver les noms historiques dans ce fichier permet aussi de compiler avec Mbed TLS 2.
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+#define mbedtls_md5_starts_ret  mbedtls_md5_starts
+#define mbedtls_md5_update_ret  mbedtls_md5_update
+#define mbedtls_md5_finish_ret  mbedtls_md5_finish
+#define mbedtls_sha256_starts_ret mbedtls_sha256_starts
+#define mbedtls_sha256_update_ret mbedtls_sha256_update
+#define mbedtls_sha256_finish_ret mbedtls_sha256_finish
+#endif
 #include <cstring>
 #include <cstdio>
 #include <cctype>
@@ -26,14 +38,21 @@ static const unsigned char FIXED_IV[16] = {
 };
 
 // 通过 MD5 将任意长度的字符串 Key 散列为 16 字节（128 位）AES 密钥
-static void derive128Key(const char* key, unsigned char outKey[16]) {
+static bool derive128Key(const char* key, unsigned char outKey[16]) {
   size_t len = strlen(key);
   mbedtls_md5_context ctx;
   mbedtls_md5_init(&ctx);
-  mbedtls_md5_starts_ret(&ctx);
-  mbedtls_md5_update_ret(&ctx, (const unsigned char*)key, len);
-  mbedtls_md5_finish_ret(&ctx, outKey);
+
+  int ret = mbedtls_md5_starts_ret(&ctx);
+  if (ret == 0) ret = mbedtls_md5_update_ret(&ctx, (const unsigned char*)key, len);
+  if (ret == 0) ret = mbedtls_md5_finish_ret(&ctx, outKey);
   mbedtls_md5_free(&ctx);
+
+  if (ret != 0) {
+    memset(outKey, 0, 16);
+    return false;
+  }
+  return true;
 }
 
 } // namespace
@@ -53,17 +72,19 @@ bool aes128_cbc_encrypt(const char* key, const char* plaintext, char* outHex, si
   memset(buf + plainLen, (unsigned char)padLen, padLen);
 
   unsigned char key128[16];
-  derive128Key(key, key128);
+  if (!derive128Key(key, key128)) return false;
 
   unsigned char iv[16];
   memcpy(iv, FIXED_IV, 16);
 
   mbedtls_aes_context aes;
   mbedtls_aes_init(&aes);
-  mbedtls_aes_setkey_enc(&aes, key128, 128);
+  int ret = mbedtls_aes_setkey_enc(&aes, key128, 128);
 
   unsigned char cipher[144];
-  int ret = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, totalLen, iv, buf, cipher);
+  if (ret == 0) {
+    ret = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, totalLen, iv, buf, cipher);
+  }
   mbedtls_aes_free(&aes);
   if (ret != 0) return false;
 
@@ -91,17 +112,19 @@ bool aes128_cbc_decrypt(const char* key, const char* hexCipher, char* outPlain, 
   }
 
   unsigned char key128[16];
-  derive128Key(key, key128);
+  if (!derive128Key(key, key128)) return false;
 
   unsigned char iv[16];
   memcpy(iv, FIXED_IV, 16);
 
   mbedtls_aes_context aes;
   mbedtls_aes_init(&aes);
-  mbedtls_aes_setkey_dec(&aes, key128, 128);
+  int ret = mbedtls_aes_setkey_dec(&aes, key128, 128);
 
   unsigned char plain[144];
-  int ret = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, cipherLen, iv, cipher, plain);
+  if (ret == 0) {
+    ret = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, cipherLen, iv, cipher, plain);
+  }
   mbedtls_aes_free(&aes);
   if (ret != 0) return false;
 
@@ -386,11 +409,16 @@ void md5_hex(const char* inStr, char* outHex33) {
   unsigned char digest[16];
   mbedtls_md5_context ctx;
   mbedtls_md5_init(&ctx);
-  mbedtls_md5_starts_ret(&ctx);
-  mbedtls_md5_update_ret(&ctx, (const unsigned char*)inStr, strlen(inStr));
-  mbedtls_md5_finish_ret(&ctx, digest);
+  int ret = mbedtls_md5_starts_ret(&ctx);
+  if (ret == 0) ret = mbedtls_md5_update_ret(&ctx, (const unsigned char*)inStr, strlen(inStr));
+  if (ret == 0) ret = mbedtls_md5_finish_ret(&ctx, digest);
   mbedtls_md5_free(&ctx);
 
+  if (ret != 0) {
+    memset(outHex33, '0', 32);
+    outHex33[32] = '\0';
+    return;
+  }
   for (int i = 0; i < 16; i++) {
     outHex33[i * 2]     = HEX_CHARS[(digest[i] >> 4) & 0x0F];
     outHex33[i * 2 + 1] = HEX_CHARS[digest[i] & 0x0F];
@@ -403,11 +431,16 @@ void sha256_hex(const char* inStr, char* outHex65) {
   unsigned char digest[32];
   mbedtls_sha256_context ctx;
   mbedtls_sha256_init(&ctx);
-  mbedtls_sha256_starts_ret(&ctx, 0); // 0 = SHA-256
-  mbedtls_sha256_update_ret(&ctx, (const unsigned char*)inStr, strlen(inStr));
-  mbedtls_sha256_finish_ret(&ctx, digest);
+  int ret = mbedtls_sha256_starts_ret(&ctx, 0); // 0 = SHA-256
+  if (ret == 0) ret = mbedtls_sha256_update_ret(&ctx, (const unsigned char*)inStr, strlen(inStr));
+  if (ret == 0) ret = mbedtls_sha256_finish_ret(&ctx, digest);
   mbedtls_sha256_free(&ctx);
 
+  if (ret != 0) {
+    memset(outHex65, '0', 64);
+    outHex65[64] = '\0';
+    return;
+  }
   for (int i = 0; i < 32; i++) {
     outHex65[i * 2]     = HEX_CHARS[(digest[i] >> 4) & 0x0F];
     outHex65[i * 2 + 1] = HEX_CHARS[digest[i] & 0x0F];
@@ -432,59 +465,74 @@ bool md5_crypt_calc(const char* key, const char* salt, char* outBuf, size_t outB
   if (!key || !salt || !outBuf || outBufMax < 40) return false;
   if (strncmp(salt, "$1$", 3) == 0) salt += 3;
   size_t saltLen = 0;
-  while (salt[saltLen] && salt[saltLen] != '$' && saltLen < 8) saltLen++;
+  while (salt[saltLen] && salt[saltLen] != '
+#undef B64_24BIT
+
+} // namespace crypto
+ && saltLen < 8) saltLen++;
   size_t keyLen = strlen(key);
   if (keyLen > 128) keyLen = 128;
 
   unsigned char alt[16];
   mbedtls_md5_context ctx1, ctx2;
+  bool ctx1Active = false;
+  bool ctx2Active = false;
+  char* cp = outBuf;
+
+#define ROZA_MD5_CHECK(call) do { if ((call) != 0) goto md5_crypt_error; } while (0)
 
   mbedtls_md5_init(&ctx1);
-  mbedtls_md5_starts_ret(&ctx1);
-  mbedtls_md5_update_ret(&ctx1, (const unsigned char*)key, keyLen);
-  mbedtls_md5_update_ret(&ctx1, (const unsigned char*)"$1$", 3);
-  mbedtls_md5_update_ret(&ctx1, (const unsigned char*)salt, saltLen);
-
+  ctx1Active = true;
   mbedtls_md5_init(&ctx2);
-  mbedtls_md5_starts_ret(&ctx2);
-  mbedtls_md5_update_ret(&ctx2, (const unsigned char*)key, keyLen);
-  mbedtls_md5_update_ret(&ctx2, (const unsigned char*)salt, saltLen);
-  mbedtls_md5_update_ret(&ctx2, (const unsigned char*)key, keyLen);
-  mbedtls_md5_finish_ret(&ctx2, alt);
-  mbedtls_md5_free(&ctx2);
+  ctx2Active = true;
+  ROZA_MD5_CHECK(mbedtls_md5_starts_ret(&ctx1));
+  ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx1, (const unsigned char*)key, keyLen));
+  ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx1, (const unsigned char*)"$1$", 3));
+  ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx1, (const unsigned char*)salt, saltLen));
+
+  ROZA_MD5_CHECK(mbedtls_md5_starts_ret(&ctx2));
+  ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx2, (const unsigned char*)key, keyLen));
+  ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx2, (const unsigned char*)salt, saltLen));
+  ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx2, (const unsigned char*)key, keyLen));
+  ROZA_MD5_CHECK(mbedtls_md5_finish_ret(&ctx2, alt));
 
   for (size_t i = keyLen; i > 0; i = (i > 16) ? i - 16 : 0) {
-    mbedtls_md5_update_ret(&ctx1, alt, (i > 16) ? 16 : i);
+    ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx1, alt, (i > 16) ? 16 : i));
   }
 
   for (size_t i = keyLen; i > 0; i >>= 1) {
     if (i & 1) {
       unsigned char z = 0;
-      mbedtls_md5_update_ret(&ctx1, &z, 1);
+      ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx1, &z, 1));
     } else {
-      mbedtls_md5_update_ret(&ctx1, (const unsigned char*)key, 1);
+      ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx1, (const unsigned char*)key, 1));
     }
   }
-  mbedtls_md5_finish_ret(&ctx1, alt);
+  ROZA_MD5_CHECK(mbedtls_md5_finish_ret(&ctx1, alt));
   mbedtls_md5_free(&ctx1);
+  ctx1Active = false;
 
   for (int cnt = 0; cnt < 1000; ++cnt) {
     mbedtls_md5_init(&ctx1);
-    mbedtls_md5_starts_ret(&ctx1);
-    if (cnt & 1) mbedtls_md5_update_ret(&ctx1, (const unsigned char*)key, keyLen);
-    else mbedtls_md5_update_ret(&ctx1, alt, 16);
+    ctx1Active = true;
+    ROZA_MD5_CHECK(mbedtls_md5_starts_ret(&ctx1));
+    if (cnt & 1) ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx1, (const unsigned char*)key, keyLen));
+    else ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx1, alt, 16));
 
-    if (cnt % 3) mbedtls_md5_update_ret(&ctx1, (const unsigned char*)salt, saltLen);
-    if (cnt % 7) mbedtls_md5_update_ret(&ctx1, (const unsigned char*)key, keyLen);
+    if (cnt % 3) ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx1, (const unsigned char*)salt, saltLen));
+    if (cnt % 7) ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx1, (const unsigned char*)key, keyLen));
 
-    if (cnt & 1) mbedtls_md5_update_ret(&ctx1, alt, 16);
-    else mbedtls_md5_update_ret(&ctx1, (const unsigned char*)key, keyLen);
+    if (cnt & 1) ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx1, alt, 16));
+    else ROZA_MD5_CHECK(mbedtls_md5_update_ret(&ctx1, (const unsigned char*)key, keyLen));
 
-    mbedtls_md5_finish_ret(&ctx1, alt);
+    ROZA_MD5_CHECK(mbedtls_md5_finish_ret(&ctx1, alt));
     mbedtls_md5_free(&ctx1);
+    ctx1Active = false;
   }
 
-  char* cp = outBuf;
+  mbedtls_md5_free(&ctx2);
+  ctx2Active = false;
+
   cp += snprintf(cp, outBufMax, "$1$%.*s$", (int)saltLen, salt);
   B64_24BIT(alt[0], alt[6], alt[12], 4);
   B64_24BIT(alt[1], alt[7], alt[13], 4);
@@ -493,7 +541,15 @@ bool md5_crypt_calc(const char* key, const char* salt, char* outBuf, size_t outB
   B64_24BIT(alt[4], alt[10], alt[5], 4);
   B64_24BIT(0, 0, alt[11], 2);
   *cp = '\0';
+#undef ROZA_MD5_CHECK
   return true;
+
+md5_crypt_error:
+  if (ctx1Active) mbedtls_md5_free(&ctx1);
+  if (ctx2Active) mbedtls_md5_free(&ctx2);
+  outBuf[0] = '\0';
+#undef ROZA_MD5_CHECK
+  return false;
 }
 #undef B64_24BIT
 

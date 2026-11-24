@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PLATFORM = (ROOT / "platformio.ini").read_text(encoding="utf-8")
 BT_CPP = (ROOT / "src" / "bt.cpp").read_text(encoding="utf-8")
 BT_H = (ROOT / "src" / "bt.h").read_text(encoding="utf-8")
+CRYPTO_CPP = (ROOT / "src" / "crypto_engines.cpp").read_text(encoding="utf-8")
+BLE_CONFIG = (ROOT / "src" / "roza_nimble_config.h").read_text(encoding="utf-8")
 COMPAT = (ROOT / "src" / "bt_nimble_compat.h").read_text(encoding="utf-8")
 
 
@@ -43,6 +45,30 @@ check("#include <HIDTypes.h>" in BT_CPP,
       "les macros HID officielles restent incluses après le remplacement de Bluedroid")
 check("class RozaBleAdvertising" in COMPAT and "NimBLEExtAdvertising" in COMPAT,
       "la publicité BLE legacy/étendue est présente")
+
+
+check("-include src/roza_nimble_config.h" in PLATFORM,
+      "la configuration d'événements HCI est injectée dans toutes les unités compilées")
+check("#include <sdkconfig.h>" in BLE_CONFIG and
+      "#define CONFIG_BT_NIMBLE_TRANSPORT_EVT_SIZE 257" in BLE_CONFIG,
+      "la taille des événements HCI est alignée à 257 octets pour BLE étendu")
+check("#include <mbedtls/version.h>" in CRYPTO_CPP and
+      "#if MBEDTLS_VERSION_NUMBER >= 0x03000000" in CRYPTO_CPP,
+      "la couche crypto détecte Mbed TLS 3")
+for old_name, new_name in (
+    ("mbedtls_md5_starts_ret", "mbedtls_md5_starts"),
+    ("mbedtls_md5_update_ret", "mbedtls_md5_update"),
+    ("mbedtls_md5_finish_ret", "mbedtls_md5_finish"),
+    ("mbedtls_sha256_starts_ret", "mbedtls_sha256_starts"),
+    ("mbedtls_sha256_update_ret", "mbedtls_sha256_update"),
+    ("mbedtls_sha256_finish_ret", "mbedtls_sha256_finish"),
+):
+    check(f"#define {old_name} {new_name}" in CRYPTO_CPP,
+          f"compatibilité API Mbed TLS : {old_name} → {new_name}")
+check("static bool derive128Key(" in CRYPTO_CPP and "if (!derive128Key(key, key128)) return false;" in CRYPTO_CPP,
+      "les dérivations AES vérifient les erreurs MD5")
+check("md5_crypt_error:" in CRYPTO_CPP and "ROZA_MD5_CHECK" in CRYPTO_CPP,
+      "MD5-crypt vérifie les retours et libère les contextes en cas d'erreur")
 
 # Les anciennes fonctions publiques du module doivent toujours être définies.
 public_functions = (

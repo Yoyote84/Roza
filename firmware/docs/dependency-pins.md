@@ -19,6 +19,8 @@ La base active visée pour le Cardputer ADV est désormais :
 - M5Unified **0.3.0** et M5GFX **0.3.0**, obligatoirement synchronisés ;
 - NimBLE-Arduino **2.5.2** pour la pile BLE et le scan étendu 1M/Coded PHY ;
 - PlatformIO Core **6.2.0** dans la CI.
+- Les fonctions de hachage MD5/SHA-256 utilisent une couche de compatibilité Mbed TLS 2/3 ; les codes de retour sont contrôlés.
+- Le scan BLE étendu configure les événements HCI à **257 octets**, requis par NimBLE 2.5.2 pour EXT_ADV ; la valeur générique de 70 octets du SDK est harmonisée avant la compilation des bibliothèques.
 
 La sélection 8.0.0 reste volontairement plus conservatrice que la branche Arduino 4.0 / ESP-IDF 6.1.1. Les dépendances non indispensables au portage restent épinglées à leurs versions précédentes : elles seront mises à niveau séparément uniquement si un conflit de compilation ou un besoin concret l'exige.
 
