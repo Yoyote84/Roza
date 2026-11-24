@@ -90,6 +90,9 @@ jobs:
           echo "::group::Autotest du balayage mémoire (sans matériel)"
           python tools/memsweep.py --selftest
           echo "::endgroup::"
+          echo "::group::Vérification structurelle de la migration BLE NimBLE"
+          python tools/bt_nimble_static_test.py
+          echo "::endgroup::"
 
       - name: Vérifier la génération des binaires
         run: |

@@ -71,23 +71,19 @@ void btRadarUpdate();                 // 每帧调：采样进历史曲线 + 驱
 void btRadarToggleBeep();
 void drawBtRadar();
 
-// 退出蓝牙功能：彻底关掉 BLE 控制器并释放。离开所有蓝牙子屏回主菜单时调用——
-// 否则 BLE 栈会常驻到重启，还会挡着之后要开 WiFi 的 app（Wi-Fi/BT 共存容易崩重启）。
+// Sortie du mode Bluetooth : arrête les scans et publicités, puis libère la pile NimBLE et les services GATT.
+// Le prochain accès recrée le serveur HID ; les autres applications récupèrent la mémoire.
 void btExit();
 
-// 离开蓝牙进了别的 app 时调（loop 里判断）。btExit 只是把 BLE 挂起——对象全留着，
-// 再进蓝牙零开销、零泄漏；但挂起状态下内存不够 WiFi 用，所以真去用别的 app 时
-// 必须在这儿彻底释放。这一步会付一次库泄漏，因此故意拖到最后一刻才做。
+// Compatibilité avec les anciens appelants : applique le même nettoyage complet que btExit.
+// L'appel est idempotent ; aucune pile GATT ne reste réservée pendant l'utilisation du Wi-Fi.
 void btReleaseForOtherApps();
 
-// BLE 协议栈现在还占着堆吗（init 过、且还没 deinit——挂起状态也算，disable 不还内存）。
-// 给 Wi-Fi 看门狗用：这时候去拉 STA 是注定失败的，见 main.cpp 那段实测。
+// Indique si la pile NimBLE a été initialisée et n'a pas encore été libérée.
 bool btHoldsHeap();
 
-// 内存余量提示。每次蓝牙↔其它 app 来回都会永久漏掉一套 GATT 对象树（库没有拆除路径），
-// 漏到一定程度 BLEDevice::deinit() 会永久阻塞、整机卡死。修库的尝试见分支
-// wip/ble-destructor-leak-fix（内存能修好，但 deinit 的阻塞没解决，故未合入）。
-// 这几个函数用来在蓝牙菜单上提前警告，别让人在卡死时莫名其妙。
+// Mesures dynamiques de mémoire utilisées par les avertissements du menu Bluetooth.
+// btAlternations compte les cycles complets d'initialisation/libération, pas des fuites supposées.
 int  btAlternations();
 bool btMemoryLow();
 bool btMemoryCritical();
@@ -96,9 +92,8 @@ bool btMemoryCritical();
 // 原样打到串口。屏幕一次只看得到一个设备，横扫一片时用这个。
 void btDumpRun(int seconds);
 
-// BLE 扩展广播取样（串口 BTEXT 指令）：Arduino 的 BLEScan 只扫 legacy/1M PHY，
-// 而 ASTM F3411 的 Bluetooth 那条走 BT5 Long Range + 扩展广播（Coded PHY）。
-// 这条直接调 Bluedroid 的 ext scan，1M 和 Coded 一起收。
+// Capture BLE étendue (commande série BTEXT) : écoute les annonces Bluetooth 5 en PHY 1M et Coded,
+// nécessaires à la portée longue distance utilisée pour OpenDroneID.
 void btExtScanRun(int seconds);
 
 // ---- PC 主导模式 BLE 流（BLE ON / BLE OFF，协议 §8.6）----

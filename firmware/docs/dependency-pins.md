@@ -17,6 +17,7 @@ La base active visée pour le Cardputer ADV est désormais :
 - PlatformIO Espressif32 **8.0.0** ;
 - Arduino-ESP32 **3.3.12**, basé sur ESP-IDF **5.5.5** ;
 - M5Unified **0.3.0** et M5GFX **0.3.0**, obligatoirement synchronisés ;
+- NimBLE-Arduino **2.5.2** pour la pile BLE et le scan étendu 1M/Coded PHY ;
 - PlatformIO Core **6.2.0** dans la CI.
 
 La sélection 8.0.0 reste volontairement plus conservatrice que la branche Arduino 4.0 / ESP-IDF 6.1.1. Les dépendances non indispensables au portage restent épinglées à leurs versions précédentes : elles seront mises à niveau séparément uniquement si un conflit de compilation ou un besoin concret l'exige.
@@ -35,12 +36,13 @@ M5Unified/M5GFX 0.3.0 change la sémantique des rotations absolues : sur Cardput
 | `framework-arduinoespressif32` | Résolu par la plateforme 8.0.0 | Arduino 3.3.12 / ESP-IDF 5.5.5 |
 | M5Unified | 0.3.0 | À synchroniser avec M5GFX 0.3.0 |
 | M5GFX | 0.3.0 | Épinglé explicitement avec M5Unified 0.3.0 |
-| FastLED | 3.10.3 | **Do not upgrade**; see details below |
+| NimBLE-Arduino | 2.5.2 | Nouvelle pile BLE sans Bluedroid direct; BLE scan/HID, annonces étendues et PHY Coded |
+| FastLED | 3.10.3 | Maintenu pour isoler cette migration ; revalider la version récente sous IDF 5.5.5 |
 | ArduinoJson | 7.4.3 | |
 | RadioLib | 7.7.1 | |
 | TinyGPSPlus | 1.1.0 | |
 | LibSSH-ESP32 | 5.9.0 | |
-| ESP8266Audio | 1.9.9 (git tag) | Conservé pour isoler la migration; compatibilité IDF 5.5.5 à confirmer par le build |
+| ESP8266Audio | 1.9.9 (git tag) | Conservé pour isoler la migration ; compatibilité IDF 5.5.5 à confirmer par la CI |
 
 ---
 
@@ -67,7 +69,7 @@ Measured via `pio run` in an isolated test environment, upgrading each library i
 | Only FastLED → 3.10.5 | 117,308 | 4,006,213 | **RAM +6.3KB, Flash +375KB** |
 | Upgrade all dependencies | 117,444 | 4,019,265 | RAM +6.5KB, Flash +388KB |
 
-### FastLED 3.10.5 : ne pas mettre à niveau dans cette migration
+### FastLED 3.10.5 : benchmark historique sous Arduino 2.0.17 / IDF 4.4.7
 
 - Newly added audio/FFT compilation units (`fl.audio+.cpp.o`, unused by this project) introduce references to `std::ios_base::Init`. The linker pulls in libstdc++'s complete iostream and locale machinery (`std::locale::_Impl`, `time_get`/`money_get`/`num_get`, wide character formatting, etc.). Memory impact: `.flash.rodata` +227KB, `.flash.text` +147KB, `.dram0.bss` +6KB, IRAM +1KB.
 - Driver architecture changed: 3.10.3 uses RMT hardware for GPIO21 (`ClocklessController<21, SK6812>`), whereas 3.10.5 falls back to `ClocklessBlockingGeneric` on this IDF 4 core, toggling pins via busy-waiting CPU cycles. LED effect modes update every 30ms, which would contend for CPU cycles against I2S audio and Wi-Fi processing.
@@ -95,15 +97,15 @@ Trade-offs:
 
 ### Historique — décision PlatformIO antérieure au 24/11/2026 (remplacée)
 
-Cette conclusion décrivait la base 7.1.x antérieure. Elle est remplacée par la migration vers PlatformIO 8.0.0, qui fournit Arduino-ESP32 3.3.12 / ESP-IDF 5.5.5. ESP8266Audio 1.9.9 reste conservé uniquement pour isoler les changements et doit être vérifié sous ce nouveau core.
+Cette conclusion décrivait la base 7.1.x antérieure. Elle est remplacée par PlatformIO 8.0.0, qui fournit Arduino-ESP32 3.3.12 / ESP-IDF 5.5.5. ESP8266Audio 1.9.9 reste conservé uniquement pour isoler les changements et doit être vérifié sous ce nouveau core.
 
 ---
 
 ## Procedure for Upgrading Dependencies in the Future
 
-1. Create a dedicated branch modifying only the **single** targeted dependency version in `platformio.ini` (except M5Unified and M5GFX, which must be updated together).
+1. Sur `main`, modifier une seule dépendance à la fois dans `platformio.ini` (M5Unified et M5GFX doivent être testés ensemble), conformément à `AGENTS.md`.
 2. Delete `.pio/libdeps` to force a clean fetch, and verify the resolved version in the Dependency Graph emitted by `pio run`.
 3. Record RAM and Flash usage against the baseline above. If static RAM increases by more than 1KB, diagnose root causes before proceeding.
 4. Review changelogs and commits between the two versions, paying close attention to display, audio, I2C/SPI, RMT, and power management changes.
-5. Perform regression testing on hardware covering: boot sequence, spectrum analyzer (microphone), player/radio (speaker), RGB LED modes, Chat (TLS handshake, highest heap demand), GNSS map (48KB tile cache), and BadApple (frame rate). Monitor serial `STAT` for regressions in `heap`, `largest`, and `minEver`.
+5. Après compilation CI, effectuer sur Cardputer ADV les tests de non-régression suivants : boot sequence, spectrum analyzer (microphone), player/radio (speaker), RGB LED modes, Chat (TLS handshake, highest heap demand), GNSS map (48KB tile cache), and BadApple (frame rate). Monitor serial `STAT` for regressions in `heap`, `largest`, and `minEver`.
 6. Merge once verified, and update the version table and benchmark data in this document.

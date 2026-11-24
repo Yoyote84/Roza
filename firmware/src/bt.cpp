@@ -1,13 +1,6 @@
 #include "bt.h"
 #include <WiFi.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLEHIDDevice.h>
-#include <BLE2902.h>
-#include <BLESecurity.h>
-#include <esp_bt.h>        // esp_bt_controller_enable/disable
-#include <esp_bt_main.h>   // esp_bluedroid_enable/disable
+#include "bt_nimble_compat.h"
 #include <esp_heap_caps.h>
 #include "bctrail.h"
 #define US_KEYBOARD
@@ -17,60 +10,27 @@
 #include "icons.h"
 #include "gbk_table.h"
 
-// BLE 的生命周期：init 一次，之后只在 enable/disable 之间切，**永不 deinit**。
-//
-// 为什么不能 deinit 了重建：Arduino 的 BLE 库根本没有拆除路径——BLEServer 连析构函数
-// 都没声明，BLEService 也没有，BLECharacteristic::~ 的 body 是被注释掉的 free，
-// BLEHIDDevice::~ 是空的。于是每走一轮 btHidSetup() 就把一整套 server+3 个 service+
-// 十几个 characteristic 永久漏在堆里。实测每轮吃掉约 13KB 最大连续块
-// （42996→25588→15348→8180），第 4 轮直接崩溃重启。
-//
-// 而 disable 不销毁任何对象，句柄和 GATT 注册全都留着，再 enable 回来就能直接用，
-// 一次都不用重建 = 零泄漏。
-static bool bleInited = false;      // BLEDevice::init() 这辈子只做一次
-static bool bleSuspended = false;   // 已 disable（对象都还在，enable 就能回来）
-
-// 蓝牙 ↔ 其它 app 每来回一次，btReleaseForOtherApps() 就要 deinit 一次，而 Arduino 的
-// BLE 库没有拆除路径（BLEServer 连析构都没有，createServer 直接覆盖上一个），
-// 于是每来回一次就永久漏掉一整套 GATT 对象树。实测最大连续块：
-//     63476 → 23540 → 18420 → 17396 → 10740 → 之后卡死
-// 卡死点实测在 BLEDevice::deinit() 内部（用 RTC 面包屑抓到的，见 wip 分支）。
-//
-// 修库的尝试见分支 wip/ble-destructor-leak-fix：内存确实能修好（收敛在 18KB 不再跌），
-// 但 deinit 本身仍会偶发永久阻塞，所以没有合入。
-// 在那之前，这里能做的是**别让人在卡死时莫名其妙**——提前把余量摆出来。
+// Cycle de vie BLE : initialisation paresseuse ; deinit(true) libère proprement
+// contrôleur, scanner, serveur HID et publicités avant de rendre la RAM aux autres applications.
+static bool bleInited = false;
 static int btReleaseCount = 0;
-
-// 直接看真实的最大连续块，不是数来回次数：不同使用路径消耗速度不一样，计数会失真。
-int  btAlternations() { return btReleaseCount; }
-
-// bleInited 而非 bleSuspended：disable 一个字节都不还，所以只要 init 过又没 deinit，
-// 那 ~64KB 就一直占着。挂起与否只影响射频，不影响堆。
+int btAlternations() { return btReleaseCount; }
 bool btHoldsHeap() { return bleInited; }
-bool btMemoryLow()    { return heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < 20 * 1024; }
-bool btMemoryCritical(){ return heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < 13 * 1024; }
+bool btMemoryLow() { return heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < 20 * 1024; }
+bool btMemoryCritical() { return heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < 13 * 1024; }
 
-static void btEnsureInit(bool quiet = false) {
-  // 开机自动连 Wi-Fi 失败时（比如密码错/信号不好），WiFi 会一直卡在半连接的 STA
-  // 状态没关掉——这时候硬开 BLE 控制器，ESP32 的 Wi-Fi/BT 共存机制很容易直接崩溃
-  // 重启。先强制关掉 Wi-Fi，让 BLE controller 在干净状态下初始化。
-  if (!bleInited || bleSuspended) {
+static bool btEnsureInit(bool quiet = false) {
+  if (!NimBLEDevice::isInitialized()) {
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
+    if (!quiet) centerMsg(bleInited ? "resuming bluetooth..." : "starting bluetooth...", TFT_YELLOW);
+    if (!RozaBleDevice::init("Cardputer ADV")) {
+      log_w("NimBLE initialization failed");
+      return false;
+    }
   }
-  if (!bleInited) {
-    if (!quiet) centerMsg("starting bluetooth...", TFT_YELLOW);
-    BLEDevice::init("Cardputer ADV");
-    bleInited = true;
-    bleSuspended = false;
-    return;
-  }
-  if (bleSuspended) {
-    if (!quiet) centerMsg("resuming bluetooth...", TFT_YELLOW);
-    esp_bt_controller_enable(ESP_BT_MODE_BLE);
-    esp_bluedroid_enable();
-    bleSuspended = false;
-  }
+  bleInited = true;
+  return true;
 }
 
 // =============================================================================
@@ -179,8 +139,8 @@ static String hexDump(const std::string& raw, int maxBytes) {
   return out;
 }
 
-class BtScanCallbacks : public BLEAdvertisedDeviceCallbacks {
-  void onResult(BLEAdvertisedDevice d) override {
+class BtScanCallbacks : public RozaBleAdvertisedDeviceCallbacks {
+  void onResult(RozaBleAdvertisedDevice d) override {
     if (!btDevList) return;
     String addr = String(d.getAddress().toString().c_str());
     int idx = -1;
@@ -237,7 +197,7 @@ class BtScanCallbacks : public BLEAdvertisedDeviceCallbacks {
 static BtScanCallbacks btScanCallbacks;
 
 void btScan() {
-  btEnsureInit();
+  if (!btEnsureInit()) return;
   cv.fillScreen(TFT_BLACK);
   drawPageHeader("BLE Scan", "scanning...", TFT_YELLOW);
   icoBt(SW / 2, SH / 2 - 10, 12, ACCENT);
@@ -250,7 +210,7 @@ void btScan() {
 
   if (!btDevList) btDevList = new BtDevice[BT_SCAN_MAX];
   btDevCount = 0;
-  BLEScan* scan = BLEDevice::getScan();
+  RozaBleScan* scan = RozaBleDevice::getScan();
   scan->setAdvertisedDeviceCallbacks(&btScanCallbacks, true /* wantDuplicates */);
   scan->setActiveScan(true);
   scan->start(3, false);   // 阻塞 3s；结果通过上面的回调直接填 btDevList
@@ -543,9 +503,9 @@ void drawBtDeviceDetail() {
 // 复用 kbd.cpp 同款布局（US 键盘），键位映射表来自 arduino-esp32 自带的
 // HIDKeyboardTypes.h（跟主流 ESP32-BLE-Keyboard 库用的是同一份）。
 // =============================================================================
-static BLEHIDDevice* hid = nullptr;
-static BLECharacteristic* inputKB = nullptr;
-static BLECharacteristic* inputMedia = nullptr;
+static RozaBleHidDevice* hid = nullptr;
+static NimBLECharacteristic* inputKB = nullptr;
+static NimBLECharacteristic* inputMedia = nullptr;
 static bool hidStarted = false;
 // 键盘和媒体键共用一个 HID 设备、一次配对，靠 report ID 区分。
 // ⚠️ 改了报表描述符之后，之前配过对的主机可能还缓存着旧的那份（GATT caching），
@@ -553,9 +513,12 @@ static bool hidStarted = false;
 #define REPORT_ID_MEDIA 2
 static volatile bool btConnected = false;   // BLE 回调里翻转、主 loop 每帧读，需 volatile 防编译器缓存
 
-class BtServerCallbacks : public BLEServerCallbacks {
-  void onConnect(BLEServer* s) override { btConnected = true; }
-  void onDisconnect(BLEServer* s) override { btConnected = false; BLEDevice::startAdvertising(); }
+class BtServerCallbacks : public NimBLEServerCallbacks {
+  void onConnect(NimBLEServer* s, NimBLEConnInfo& info) override { btConnected = true; }
+  void onDisconnect(NimBLEServer* s, NimBLEConnInfo& info, int reason) override {
+    btConnected = false;
+    RozaBleDevice::startAdvertising();
+  }
 };
 static BtServerCallbacks btServerCallbacks;
 
@@ -609,147 +572,108 @@ static const uint8_t KB_REPORT_MAP[] = {
   END_COLLECTION(0)
 };
 
-static void btHidSetup() {
-  if (hidStarted) return;
+static bool btHidSetup() {
+  if (hidStarted) return true;
 
-  BLEServer* server = BLEDevice::createServer();
-  server->setCallbacks(&btServerCallbacks);
+  NimBLEServer* server = RozaBleDevice::createServer();
+  if (!server) { log_w("NimBLE server allocation failed"); return false; }
+  server->setCallbacks(&btServerCallbacks, false);
 
-  hid = new BLEHIDDevice(server);
+  hid = new (std::nothrow) RozaBleHidDevice(server);
+  if (!hid || !hid->isValid()) {
+    log_w("NimBLE HID allocation failed");
+    delete hid; hid = nullptr;
+    return false;
+  }
   inputKB = hid->inputReport(REPORT_ID_KEYBOARD);
   inputMedia = hid->inputReport(REPORT_ID_MEDIA);
+  if (!inputKB || !inputMedia) {
+    log_w("NimBLE HID reports unavailable");
+    delete hid; hid = nullptr; inputKB = nullptr; inputMedia = nullptr;
+    return false;
+  }
   // 注意：BLEHIDDevice::manufacturer(string) 这个重载假设特征值已经存在，
   // 但它从来不会自己创建——直接调用它等于往一个没初始化的指针里 setValue()，
   // 100% crash（LoadProhibited）。得先用无参版本 manufacturer() 建出特征值。
-  hid->manufacturer()->setValue("Cardputer ADV");
+  if (!hid->setManufacturer("Cardputer ADV")) {
+    log_w("NimBLE HID manufacturer characteristic failed");
+    delete hid; hid = nullptr; inputKB = nullptr; inputMedia = nullptr;
+    return false;
+  }
   hid->pnp(0x02, 0xe502, 0xa111, 0x0210);
   hid->hidInfo(0x00, 0x01);
   hid->reportMap((uint8_t*)KB_REPORT_MAP, sizeof(KB_REPORT_MAP));
-  hid->startServices();
+  if (!hid->startServices()) {
+    log_w("NimBLE GATT service registration failed");
+    delete hid; hid = nullptr; inputKB = nullptr; inputMedia = nullptr;
+    return false;
+  }
   hid->setBatteryLevel(100);
 
-  BLEAdvertising* adv = server->getAdvertising();
-  adv->setAppearance(HID_KEYBOARD);
-  adv->addServiceUUID(hid->hidService()->getUUID());
-  adv->setScanResponse(true);
+  RozaBleAdvertising* adv = RozaBleDevice::getAdvertising();
+  adv->clearData();
+  if (!adv->setAppearance(HID_KEYBOARD) || !adv->addServiceUUID(hid->hidService()->getUUID()) || !adv->setScanResponse(true)) {
+    log_w("NimBLE HID advertisement setup failed"); delete hid; hid = nullptr; inputKB = nullptr; inputMedia = nullptr; return false;
+  }
 
-  // HID 报表特征要求加密连接才能读写（BLEHIDDevice 内部权限就是这么设的），
-  // 不配这几项主机大多会配对失败或者收不到按键 notify。
-  // ⚠️ 栈对象，不是 new。BLESecurity 本身不持有任何东西——三个 setter 各自直接调
-  // esp_ble_gap_set_security_param()，配置进的是协议栈，对象本体用完就没用了。
-  // Arduino 的示例一律写成 `new BLESecurity()` 且从不 delete，于是每次
-  // btHidSetup() 漏十几个字节。数量上跟这一带那笔 ~13KB 的 deinit 库泄漏没法比
-  // （见 btReleaseForOtherApps 的注释），但白漏没有任何理由。
-  BLESecurity security;
-  security.setAuthenticationMode(ESP_LE_AUTH_BOND);
-  security.setCapability(ESP_IO_CAP_NONE);
-  security.setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+  // Chiffrement et association pour les rapports HID, selon la politique précédente.
+  NimBLEDevice::setSecurityAuth(true, false, false);
+  NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
+  NimBLEDevice::setSecurityInitKey(BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID);
+  NimBLEDevice::setSecurityRespKey(BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID);
 
   hidStarted = true;
+  return true;
 }
 
 void btKeyboardStart() {
-  btEnsureInit();
-  btHidSetup();
-  BLEDevice::startAdvertising();
+  if (!btEnsureInit()) return;
+  if (!btHidSetup()) { btExit(); return; }
+  if (!RozaBleDevice::startAdvertising()) log_w("NimBLE keyboard advertising failed");
 }
 void btKeyboardStop() {
-  if (hidStarted) BLEDevice::stopAdvertising();
+  if (hidStarted) RozaBleDevice::stopAdvertising();
 }
 
 void btExit() {
+  // Un flux PC peut exister en dehors d'un écran BLE ; le terminer avant de
+  // détruire la pile garantit que son callback ne touche plus à la file FreeRTOS.
+  if (btStreamIsActive()) { btStreamStop(); return; }
   if (btDevList) {
     delete[] btDevList;
     btDevList = nullptr;
     btDevCount = 0;
   }
-  if (!bleInited) return;
-  btRadarStop();                       // 雷达可能还开着持续扫描，先停
-  if (hidStarted) BLEDevice::stopAdvertising();
+  if (!bleInited && !NimBLEDevice::isInitialized() && !hid) return;
 
-
-  if (bleSuspended) return;
-
-  // 只 disable，不 deinit（原因见文件顶上 bleInited 那段）。这样 BLEServer /
-  // BLEHIDDevice / 那堆 characteristic 一个都不销毁、也一个都不重建——零泄漏。
-  //
-  // ⚠️ 历史：这里先后是 deinit(true) → deinit(false) → 现在的 disable。
-  //   deinit(true)   一个 boot 只能用一次蓝牙，第二次进去整机卡死。因为 Arduino 的
-  //                  BLEDevice::deinit() 在 release_memory=true 那条分支忘了把
-  //                  initialized 置回 false（BLEDevice.cpp:656-662），协议栈已经拆了
-  //                  库却仍以为活着，下次 init() 整段跳过，后面对着死栈调用卡在信号量上。
-  //                  何况 esp_bt_controller_mem_release() 是永久释放，改对 flag 也白搭。
-  //   deinit(false)  不卡在第 2 轮了，但每轮重建一套 HID 对象漏 ~13KB，第 4 轮崩溃重启。
-  //   干脆不关       WiFi 彻底起不来（esp_wifi_init 返回 257 = ESP_ERR_NO_MEM）。
-  esp_bluedroid_disable();
-  esp_bt_controller_disable();
-  bleSuspended = true;
-  btConnected = false;
-  // ⚠️ hidStarted 必须保持 true，hid/inputKB/inputMedia 也不能置空——btHidSetup() 靠
-  // hidStarted 判断"已经建过了，直接返回"。一旦在这儿清掉，下次进来就会重建一整套，
-  // 泄漏原样回来。这几个对象跨 disable/enable 一直有效，这正是这套做法成立的前提。
-}
-
-// 彻底释放 BLE，把内存还给 WiFi。
-//
-// 只 disable 是不够的：实测挂起状态下堆只有 33.7KB / 最大块 19.4KB，而 WiFi 协议栈要
-// ~36KB，esp_wifi_init 直接返回 ESP_ERR_NO_MEM。这块板子没 PSRAM，BLE HID 和 WiFi
-// 就是不可能同时存在的——必须真的 deinit。
-//
-// 而 deinit 一次就要付一次库泄漏（~13KB 最大连续块，见上面那段），所以这一步要尽量晚做：
-// 在蓝牙里进进出出一直是零开销的 disable/enable，只有当人真的去用别的 app 时才在这儿
-// 付一次。代价从"每进一次蓝牙"降到"每次蓝牙↔其它 app 的来回"。
-void btReleaseForOtherApps() {
-  if (btDevList) {
-    delete[] btDevList;
-    btDevList = nullptr;
-    btDevCount = 0;
+  if (NimBLEDevice::isInitialized()) {
+    btRadarStop();
+    NimBLEDevice::getScan()->stop();
+    if (hidStarted) RozaBleDevice::stopAdvertising();
   }
-  if (!bleInited || !bleSuspended) return;
 
-  // ⚠️ 拆除顺序必须是 IDF 规定的：bluedroid disable → bluedroid deinit → controller
-  // disable → controller deinit（BLEDevice::deinit 自己也是这个顺序，BLEDevice.cpp:652-655）。
-  // 但走到这里时 btExit() 已经把 **controller 也 disable 了**，于是以前直接调
-  // BLEDevice::deinit(false) 的实际顺序变成：
-  //     bluedroid disable → controller disable →（稍后）bluedroid deinit → controller deinit
-  // 也就是在 controller 已停的状态下拆 host 栈。esp_bluedroid_deinit() 是同步的：把
-  // BTC_MAIN_ACT_DEINIT 丢给 BTC 任务，然后 future_await() **无限期**等它回话
-  // （IDF v4.4.7 esp_bt_main.c:203 → future.c:78 OSI_SEM_MAX_TIMEOUT）。BTC 任务那边
-  // btc_deinit_bluetooth() 要依次拆 HCI/BTU 线程，每个线程 join 只等 1 秒、超时就
-  // vTaskDelete 硬杀（osi/thread.c:197-201）；被硬杀的线程若恰好持着 alarm_mutex 之类
-  // 的锁，后面 osi_alarm_deinit() 的 OSI_MUTEX_MAX_TIMEOUT 就永远拿不到（alarm.c:102），
-  // future 永不 ready，主循环永久阻塞——跟 wip 分支面包屑"停在 deinit 前、deinit 后从未
-  // 出现"、Saved PC 落在 idle 的 waiti 完全吻合。这条链是**推断**，没在机器上坐实；
-  // 所以下面每一步都埋了面包屑（0xB0..0xB5），再挂一次就能直接读出是哪一步。
-  //
-  // 修法：先把 controller 重新 enable 回来（内存本来就占着，这一步不申请新堆；此时
-  // Wi-Fi 由看门狗按 btHoldsHeap() 压着没起，不存在共存问题），让 bluedroid deinit
-  // 在 controller 活着时跑，恢复成 IDF 规定的顺序。
-  bcMark(0xB0);                                       // release: 开始
-  esp_err_t e = esp_bt_controller_enable(ESP_BT_MODE_BLE);
-  if (e != ESP_OK) { bcMark(0xBE); bcMark((uint8_t)e); log_w("bt ctrl re-enable: %d", (int)e); }
-  bcMark(0xB1);                                       // controller 已重新 enable
-  e = esp_bluedroid_deinit();
-  if (e != ESP_OK) { bcMark(0xBE); bcMark((uint8_t)e); log_w("bluedroid deinit: %d", (int)e); }
-  bcMark(0xB2);                                       // bluedroid deinit 返回（嫌疑最大的一步）
-  e = esp_bt_controller_disable();
-  if (e != ESP_OK) { bcMark(0xBE); bcMark((uint8_t)e); log_w("bt ctrl disable: %d", (int)e); }
-  bcMark(0xB3);
-  e = esp_bt_controller_deinit();
-  if (e != ESP_OK) { bcMark(0xBE); bcMark((uint8_t)e); log_w("bt ctrl deinit: %d", (int)e); }
-  bcMark(0xB4);
-  // 协议栈已经拆完，这里只为把库里的 initialized 清回 false（下次 init 才会真做）。
-  // 它内部那四个 IDF 调用此刻全部立即返回 ESP_ERR_INVALID_STATE，不会再碰协议栈。
-  BLEDevice::deinit(false);   // ⚠️ 必须 false，true 会让下次 init 整段跳过（见上）
-  bcMark(0xB5);                                       // release: 完成
-  bleInited = false;
-  bleSuspended = false;
-  hidStarted = false;
-  btConnected = false;
-  hid = nullptr;              // 底层已失效，置空，下次进蓝牙重建一套
+  // NimBLE peut détruire proprement le serveur et ses services. Contrairement à
+  // l'ancien wrapper Bluedroid, garder un GATT server après deinit(false) n'est
+  // pas sûr : son état interne "started" survivrait à la destruction du host.
+  // deinit(true) reconstruit donc un serveur propre à la prochaine entrée BLE.
+  delete hid;
+  hid = nullptr;
   inputKB = nullptr;
   inputMedia = nullptr;
+  hidStarted = false;
+  btConnected = false;
+  const bool released = RozaBleDevice::deinit(true);
+  RozaBleDevice::getAdvertising()->clearData();
+  if (!released) log_w("NimBLE deinit(true) failed");
+  bleInited = false;
   btReleaseCount++;
+}
+
+// Libération complète de la pile BLE avant de lancer une application gourmande en RAM.
+void btReleaseForOtherApps() {
+  // Alias conservé pour les autres applications ROZA : la pile BLE est déjà
+  // arrêtée proprement par btExit(), cet appel est idempotent.
+  btExit();
 }
 
 void btKeyboardSendRaw(uint8_t modifier, uint8_t keycode) {
@@ -978,9 +902,9 @@ void drawBtKeyboard() {
 // 跟键盘是同一个 HID 设备、同一次配对，只是走 REPORT_ID_MEDIA 这个报表。
 // =============================================================================
 void btMediaStart() {
-  btEnsureInit();
-  btHidSetup();
-  BLEDevice::startAdvertising();
+  if (!btEnsureInit()) return;
+  if (!btHidSetup()) { btExit(); return; }
+  if (!RozaBleDevice::startAdvertising()) log_w("NimBLE media advertising failed");
 }
 
 void btMediaSend(BtMediaKey k) {
@@ -1044,7 +968,7 @@ void drawBtMedia() {
 static const int  RADAR_N = 112;         // 历史点数，画图时一点占 2px
 static int8_t     radarHist[RADAR_N];
 static int        radarHistN = 0;
-static BLEAddress radarTargetAddr("00:00:00:00:00:00");
+static NimBLEAddress radarTargetAddr(std::string("00:00:00:00:00:00"), 0);
 static bool       radarActive = false;
 static bool       radarBeep = true;
 static String     radarName;
@@ -1061,8 +985,8 @@ static uint32_t   radarLastSampleMs = 0, radarLastBeepMs = 0;
 static const uint32_t RADAR_SAMPLE_MS = 150;
 static const uint32_t RADAR_LOST_MS   = 4000;
 
-class BtRadarCallbacks : public BLEAdvertisedDeviceCallbacks {
-  void onResult(BLEAdvertisedDevice d) override {
+class BtRadarCallbacks : public RozaBleAdvertisedDeviceCallbacks {
+  void onResult(RozaBleAdvertisedDevice d) override {
     if (d.getAddress() != radarTargetAddr) return;
     radarRssiRaw = d.getRSSI();
     radarLastSeenMs = millis();
@@ -1073,7 +997,7 @@ static BtRadarCallbacks btRadarCallbacks;
 void btRadarStart(int devIndex) {
   if (!btDevList || devIndex < 0 || devIndex >= btDevCount) return;
   BtDevice& d = btDevList[devIndex];
-  radarTargetAddr = BLEAddress(d.addr.c_str());
+  radarTargetAddr = NimBLEAddress(std::string(d.addr.c_str()), d.addrType);
   radarName = d.name;
   radarTxRef = d.haveTXPower ? (int8_t)(d.txPower - 59) : (int8_t)-59;
   radarHistN = 0;
@@ -1082,8 +1006,8 @@ void btRadarStart(int devIndex) {
   radarLastSeenMs = 0;
   radarLastSampleMs = radarLastBeepMs = millis();
 
-  btEnsureInit();
-  BLEScan* scan = BLEDevice::getScan();
+  if (!btEnsureInit()) return;
+  RozaBleScan* scan = RozaBleDevice::getScan();
   scan->setAdvertisedDeviceCallbacks(&btRadarCallbacks, true /* wantDuplicates：要的就是重复包，每个包一次 RSSI */);
   scan->setActiveScan(true);
   scan->setInterval(100);
@@ -1094,7 +1018,7 @@ void btRadarStart(int devIndex) {
 
 void btRadarStop() {
   if (!radarActive) return;
-  BLEScan* scan = BLEDevice::getScan();
+  RozaBleScan* scan = RozaBleDevice::getScan();
   scan->stop();
   scan->clearResults();
   // 回调对象是本文件的静态实例，扫描停了之后不再被调用；但下次普通扫描会重新
@@ -1322,11 +1246,11 @@ void drawBtRadar() {
 // Remote ID 走 BLE 的话特征是：svcUUID 含 fffa、Service Data 首字节 0x0D。
 // =============================================================================
 void btDumpRun(int seconds) {
-  btEnsureInit();
+  if (!btEnsureInit()) { Serial.println("[btdump] NimBLE initialization failed"); return; }
   if (!btDevList) btDevList = new BtDevice[BT_SCAN_MAX];
   btDevCount = 0;
   Serial.printf("[btdump] scanning %ds...\n", seconds);
-  BLEScan* scan = BLEDevice::getScan();
+  RozaBleScan* scan = RozaBleDevice::getScan();
   scan->setAdvertisedDeviceCallbacks(&btScanCallbacks, true);
   scan->setActiveScan(true);
   scan->start(seconds, false);
@@ -1375,143 +1299,91 @@ void btDumpRun(int seconds) {
 }
 
 // =============================================================================
-// BLE 扩展广播取样（串口 BTEXT [秒]）
-//
-// 为什么必须单独写一套：Arduino 那个 BLEScan 只扫 **legacy 广播、1M PHY**。
-// 而 ASTM F3411 里 Bluetooth 那条用的是 **BT5 Long Range + 扩展广播（Coded PHY）**——
-// 用 BTDUMP 扫不到不等于 BLE 上没有，只是那套 API 根本看不见。
-// 这里直接调 Bluedroid 的 ext scan：1M 和 Coded 两个 PHY 一起收。
-//
-// ⚠️ 回调必须用 BLEDevice::setCustomGapHandler() 挂，**不能**用
-// esp_ble_gap_register_callback()。后者只能注册一个，会把 BLEDevice 自己装的顶掉；
-// 而 BLEDevice 的 gapEventHandler 末尾是**无条件**转发给自定义回调的
-// （BLEDevice.cpp 里的 m_customGapHandler），走这条两边都收得到。
-//
-// 这里踩过一次，而且是自己挖的坑：原来用的就是 esp_ble_gap_register_callback，
-// 靠"跑完 deinit、下次 BLEDevice::init 把回调装回来"收拾。后来 BLE 生命周期改成
-// 永不 deinit（见文件顶部那段），这个前提就没了——于是跑过一次 BTEXT 之后，
-// BTDUMP / 扫描 / HID 全部静默失效直到复位。实测撞到过：BTDUMP 一行不回、零报错。
-// =============================================================================
-#include <esp_gap_ble_api.h>
-
 static volatile bool btExtStarted = false;
 static volatile int  btExtSeen = 0, btExtOdid = 0;
-
-static void btExtGapCb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* param) {
-  if (event == ESP_GAP_BLE_SET_EXT_SCAN_PARAMS_COMPLETE_EVT) {
-    esp_ble_gap_start_ext_scan(0, 0);      // duration=0 一直扫，靠我们自己停
-    btExtStarted = true;
-    return;
-  }
-  if (event != ESP_GAP_BLE_EXT_ADV_REPORT_EVT) return;
-  const esp_ble_gap_ext_adv_reprot_t& r = param->ext_adv_report.params;
-  btExtSeen++;
-
-  // 走一遍 AD 结构，专门找 Service Data(0x16) 里的 16-bit UUID 0xFFFA
-  bool odid = false;
-  OdidResult rid;
-  bool ridOk = false;
-  for (int i = 0; i + 1 < r.adv_data_len; ) {
-    uint8_t l = r.adv_data[i];
-    if (l == 0 || i + 1 + l > r.adv_data_len) break;
-    uint8_t t = r.adv_data[i + 1];
-    // AD 结构：[len][type][UUID 小端 2 字节][应用码 0x0D][计数器][25 字节消息]
-    // len 覆盖 type + UUID + 载荷，所以载荷长度是 l-3、从 i+4 开始。
-    if (t == 0x16 && l >= 3 && r.adv_data[i + 2] == 0xFA && r.adv_data[i + 3] == 0xFF) {
-      odid = true;
-      // 跳过应用码 0x0D，从计数字节交给解码器
-      if (l >= 5 && r.adv_data[i + 4] == 0x0D)
-        ridOk = ridDecode(&r.adv_data[i + 5], l - 4, rid);
+class BtExtScanCallbacks final : public NimBLEScanCallbacks {
+  void onResult(const NimBLEAdvertisedDevice* device) override {
+    if (!device) return;
+    btExtSeen++;
+    const auto& payload = device->getPayload();
+    const uint8_t* address = device->getAddress().getVal();
+    const int dataLen = (int)payload.size();
+    bool odid = false;
+    OdidResult rid;
+    bool ridOk = false;
+    for (int i = 0; i + 1 < dataLen; ) {
+      const uint8_t l = payload[i];
+      if (l == 0 || i + 1 + l > dataLen) break;
+      const uint8_t type = payload[i + 1];
+      if (type == 0x16 && l >= 3 && payload[i + 2] == 0xFA && payload[i + 3] == 0xFF) {
+        odid = true;
+        if (l >= 5 && payload[i + 4] == 0x0D)
+          ridOk = ridDecode(payload.data() + i + 5, l - 4, rid);
+      }
+      i += 1 + l;
     }
-    i += 1 + l;
-  }
-  if (odid) btExtOdid++;
-
-  // PHY 编号：1=1M 2=2M 3=Coded。primary 是 Coded 就说明真的是 Long Range 广播。
-  Serial.printf("[btext] %02X:%02X:%02X:%02X:%02X:%02X rssi=%d phy=%d/%d sid=%u len=%u%s\n",
-                r.addr[0], r.addr[1], r.addr[2], r.addr[3], r.addr[4], r.addr[5],
-                r.rssi, (int)r.primary_phy, (int)r.secondly_phy, r.sid, r.adv_data_len,
-                odid ? "  <== OpenDroneID (fffa)" : "");
-  Serial.print("[btext]   ");
-  for (int i = 0; i < r.adv_data_len && i < 40; i++) Serial.printf("%02X ", r.adv_data[i]);
-  Serial.println();
-
-  // 这里不做跨包合并：ext scan 是一条报告一行地打，合并需要按地址建表，而 BT5 的
-  // Remote ID 多数用随机地址、还会轮换。要凑齐字段看多打几行即可，原始 hex 就在上面。
-  if (ridOk) {
-    if (rid.haveBasic)
-      Serial.printf("[btext]   RID id  : %s  (%s / %s)\n", rid.uasId,
-                    odidIdTypeName(rid.idType), odidUaTypeName(rid.uaType));
-    if (rid.haveLoc) {
-      Serial.printf("[btext]   RID pos : %.7f, %.7f", rid.lat, rid.lon);
-      if (rid.haveHeight) Serial.printf("  agl=%.1fm", rid.height);
-      if (rid.haveSpeed)  Serial.printf("  spd=%.1fm/s", rid.speed);
-      if (rid.heading >= 0) Serial.printf("  hdg=%d", rid.heading);
-      Serial.println();
+    if (odid) btExtOdid++;
+    Serial.printf("[btext] %02X:%02X:%02X:%02X:%02X:%02X rssi=%d phy=%d/%d sid=%u len=%u%s\n",
+                  address[0], address[1], address[2], address[3], address[4], address[5],
+                  device->getRSSI(), (int)device->getPrimaryPhy(), (int)device->getSecondaryPhy(),
+                  device->getSetId(), dataLen, odid ? "  <== OpenDroneID (fffa)" : "");
+    Serial.print("[btext]   ");
+    for (int i = 0; i < dataLen && i < 40; i++) Serial.printf("%02X ", payload[i]);
+    Serial.println();
+    if (ridOk) {
+      if (rid.haveBasic)
+        Serial.printf("[btext]   RID id  : %s  (%s / %s)\n", rid.uasId,
+                      odidIdTypeName(rid.idType), odidUaTypeName(rid.uaType));
+      if (rid.haveLoc) {
+        Serial.printf("[btext]   RID pos : %.7f, %.7f", rid.lat, rid.lon);
+        if (rid.haveSpeed) Serial.printf("  spd=%.1fm/s", rid.speed);
+        if (rid.heading >= 0) Serial.printf("  hdg=%d", rid.heading);
+        Serial.println();
+      }
+      if (rid.haveSys)
+        Serial.printf("[btext]   RID plt : %.7f, %.7f  (%s)\n",
+                      rid.pilotLat, rid.pilotLon, odidPilotLocName(rid.pilotLocType));
+      if (rid.haveSelfId) Serial.printf("[btext]   RID desc: %s\n", rid.selfId);
+      if (rid.haveOperatorId) Serial.printf("[btext]   RID oper: %s\n", rid.operatorId);
     }
-    if (rid.haveSys)
-      Serial.printf("[btext]   RID plt : %.7f, %.7f  (%s)\n",
-                    rid.pilotLat, rid.pilotLon, odidPilotLocName(rid.pilotLocType));
-    if (rid.haveSelfId)     Serial.printf("[btext]   RID desc: %s\n", rid.selfId);
-    if (rid.haveOperatorId) Serial.printf("[btext]   RID oper: %s\n", rid.operatorId);
   }
-}
+};
+static BtExtScanCallbacks btExtScanCallbacks;
 
 void btExtScanRun(int seconds) {
-  // ⚠️ 每次都先彻底拆掉再重建。上一轮结束时 deinit 过、下一轮 BLEDevice::init 回来之后，
-  // 控制器状态不干净，实测第二次跑会 reports=0 完全收不到东西——而且没有任何报错，
-  // 极容易被误读成"目标没在播"。强制走一遍干净的 init 是唯一稳的做法。
   btExit();
-  btEnsureInit();                       // 借 BLEDevice 把控制器和 Bluedroid 拉起来
+  if (!btEnsureInit()) { Serial.println("[btext] NimBLE initialization failed"); return; }
   btExtSeen = btExtOdid = 0;
   btExtStarted = false;
-
-  BLEDevice::setCustomGapHandler(btExtGapCb);   // 挂在 BLEDevice 的回调之后，不顶掉它
-
-  esp_ble_ext_scan_params_t sp = {};
-  // ⚠️ 这里不能填 RANDOM：没先调 esp_ble_gap_set_rand_addr 的话控制器会报
-  // "No random address yet" 然后 LE UpdateOwnType 失败，表现是这一轮 reports=0
-  // 完全收不到东西——而且是间歇性的，很容易误判成"目标没在播"。
-  sp.own_addr_type   = BLE_ADDR_TYPE_PUBLIC;
-  sp.filter_policy   = BLE_SCAN_FILTER_ALLOW_ALL;
-  sp.scan_duplicate  = BLE_SCAN_DUPLICATE_DISABLE;   // 要看重复包，别去重
-  sp.cfg_mask        = (esp_ble_ext_scan_cfg_mask_t)
-                       (ESP_BLE_GAP_EXT_SCAN_CFG_UNCODE_MASK | ESP_BLE_GAP_EXT_SCAN_CFG_CODE_MASK);
-  sp.uncoded_cfg     = { BLE_SCAN_TYPE_ACTIVE, 80, 80 };   // interval/window 单位 0.625ms，等于连续收
-  sp.coded_cfg       = { BLE_SCAN_TYPE_ACTIVE, 80, 80 };
-
+  NimBLEScan* scan = NimBLEDevice::getScan();
+  scan->setScanCallbacks(&btExtScanCallbacks, true);
+  scan->setActiveScan(true);
+  scan->setDuplicateFilter(0);
+  scan->setPhy(NimBLEScan::SCAN_ALL);
+  scan->setInterval(50);
+  scan->setWindow(50);
   Serial.printf("[btext] ext scan %ds (1M + Coded PHY)...\n", seconds);
-  esp_err_t e = esp_ble_gap_set_ext_scan_params(&sp);
-  if (e != ESP_OK) { Serial.printf("[btext] set_ext_scan_params failed: %d\n", (int)e); }
-
-  uint32_t end = millis() + (uint32_t)seconds * 1000;
-  while ((int32_t)(end - millis()) > 0) delay(20);
-
-  esp_ble_gap_stop_ext_scan();
-  // 把"扫描根本没起来"和"起来了但没收到"区分开——这两种情况的结论完全相反
-  if (!btExtStarted) Serial.println("[btext] ⚠️ 扫描没启动（没收到 SET_EXT_SCAN_PARAMS_COMPLETE），本轮结果无效");
+  btExtStarted = scan->start((uint32_t)seconds * 1000U, false, true);
+  if (btExtStarted) {
+    const uint32_t end = millis() + (uint32_t)seconds * 1000U;
+    while ((int32_t)(end - millis()) > 0 && scan->isScanning()) delay(20);
+  } else {
+    Serial.println("[btext] extended scan did not start; this capture is invalid");
+  }
+  scan->stop();
+  scan->setScanCallbacks(nullptr, false);
   Serial.printf("[btext] done. started=%d reports=%d  with fffa=%d\n",
                 (int)btExtStarted, btExtSeen, btExtOdid);
-  // 摘掉自定义回调，别让它继续截事件。以前这里靠 deinit 顺带复位，现在不 deinit 了，必须显式摘。
-  BLEDevice::setCustomGapHandler(nullptr);
-  btExit();                              // 只是挂起 BLE，对象和 GATT 注册都留着
-  if (!isBleScreen(screen)) {
-    btReleaseForOtherApps();
-  }
+  btExit();
+  if (!isBleScreen(screen)) btReleaseForOtherApps();
 }
 
 
 // =============================================================================
-// PC 主导模式 BLE 流（协议 §8.6）：BLE ON / BLE OFF
-//
-// 用 ext scan（1M + Coded PHY 一起收，legacy 广播也在内），不用 Arduino 的 BLEScan——
-// 后者只看得见 legacy/1M，而且每包都要建 BLEAdvertisedDevice（堆分配）。
-// 回调跑在蓝牙任务里，只把原始报告塞队列；AD 解析、ODID 解码、按地址限频、出 JSON
-// 全在主循环 btStreamPump() 里做，回调里不碰 Serial 也不分配。
-//
-// BLE 生命周期沿用上面的规矩：init 一次、之后只 enable/disable。停流只是 btExit()（挂起），
-// 不 deinit——在 PC MODE 里反复开关 BLE 零泄漏。真要用 Wi-Fi 时（SCAN WIFI / RID ON）
-// 由那边先调 btReleaseForOtherApps() 付一次库泄漏。
+// PC 主导模式 BLE 流// =============================================================================
+// PC mode : les rapports BLE bruts vont dans la file ; le parsing AD / OpenDroneID,
+ // l'assemblage par adresse et l'émission JSON restent dans btStreamPump().
+ // Le scan NimBLE utilise 1M + Coded PHY ; aucune allocation/écriture série dans le callback.
 // =============================================================================
 #include <freertos/queue.h>
 #include "ridapp.h"
@@ -1553,32 +1425,26 @@ bool btStreamIsActive() { return btsOn; }
 int  btStreamDevCount() { return btsOn ? btsDevs : 0; }
 uint32_t btStreamPktCount() { return btsPkts; }
 
-static void btsGapCb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* param) {
-  if (!btsOn) return;
-  if (event == ESP_GAP_BLE_SET_EXT_SCAN_PARAMS_COMPLETE_EVT) {
-    esp_ble_gap_start_ext_scan(0, 0);   // duration=0 一直扫，靠 BLE OFF 停
-    return;
+class BtsScanCallbacks final : public NimBLEScanCallbacks {
+  void onResult(const NimBLEAdvertisedDevice* device) override {
+    if (!btsOn || !device) return;
+    btsPkts++;
+    QueueHandle_t q = btsQ;
+    if (!q || !btsOn) return;
+    const auto& payload = device->getPayload();
+    BtRawAdv report{};
+    memcpy(report.addr, device->getAddress().getVal(), sizeof(report.addr));
+    report.atype = device->getAddressType();
+    report.rssi = device->getRSSI();
+    report.phy = device->getPrimaryPhy();
+    report.len = payload.size() > sizeof(report.data) ? sizeof(report.data) : (uint8_t)payload.size();
+    if (report.len) memcpy(report.data, payload.data(), report.len);
+    if (xQueueSend(q, &report, 0) != pdTRUE) btsDrop++;
   }
-  if (event == ESP_GAP_BLE_EXT_SCAN_START_COMPLETE_EVT) {
-    btsStarted = (param->ext_scan_start.status == ESP_BT_STATUS_SUCCESS);
-    return;
-  }
-  if (event != ESP_GAP_BLE_EXT_ADV_REPORT_EVT) return;
-  const esp_ble_gap_ext_adv_reprot_t& r = param->ext_adv_report.params;
-  btsPkts = btsPkts + 1;
-  QueueHandle_t q = btsQ;
-  if (!q || !btsOn) return;
-  BtRawAdv a;
-  memcpy(a.addr, r.addr, 6);
-  a.atype = (uint8_t)r.addr_type;
-  a.rssi = (int8_t)r.rssi;
-  a.phy = (uint8_t)r.primary_phy;
-  a.len = r.adv_data_len > sizeof(a.data) ? sizeof(a.data) : r.adv_data_len;
-  memcpy(a.data, r.adv_data, a.len);
-  if (xQueueSend(q, &a, 0) != pdTRUE) btsDrop = btsDrop + 1;
-}
+};
+static BtsScanCallbacks btsScanCallbacks;
 
-// 一条广播里我们关心的 AD 字段
+// 一条广播里我们关心的 AD 字段// 一条广播里我们关心的 AD 字段
 struct BtsAd {
   char name[25];
   uint8_t mfg[12]; int mfgLen;
@@ -1748,23 +1614,24 @@ void btStreamStart() {
   }
   btsPkts = 0; btsDrop = 0; btsDevs = 0; btsStarted = false;
 
-  // 跟 BTEXT 一样先挂起再 init：不然第二次开扫描会静默收不到东西（见 btExtScanRun）
   btExit();
-  btEnsureInit(true);   // quiet：PC MODE 里画布已释放，不能走 centerMsg 之外的绘制，这里干脆不画
+  if (!btEnsureInit(true)) {
+    if (btsQ) { vQueueDelete(btsQ); btsQ = nullptr; }
+    if (btsTab) { free(btsTab); btsTab = nullptr; }
+    Serial.println("BLE {\"t\":\"err\",\"msg\":\"initialization failed\"}");
+    return;
+  }
   btsOn = true;
   btsStartMs = millis();
-  BLEDevice::setCustomGapHandler(btsGapCb);
-
-  esp_ble_ext_scan_params_t sp = {};
-  sp.own_addr_type   = BLE_ADDR_TYPE_PUBLIC;   // 不能填 RANDOM，见 btExtScanRun
-  sp.filter_policy   = BLE_SCAN_FILTER_ALLOW_ALL;
-  sp.scan_duplicate  = BLE_SCAN_DUPLICATE_DISABLE;
-  sp.cfg_mask        = (esp_ble_ext_scan_cfg_mask_t)
-                       (ESP_BLE_GAP_EXT_SCAN_CFG_UNCODE_MASK | ESP_BLE_GAP_EXT_SCAN_CFG_CODE_MASK);
-  sp.uncoded_cfg     = { BLE_SCAN_TYPE_ACTIVE, 80, 80 };
-  sp.coded_cfg       = { BLE_SCAN_TYPE_ACTIVE, 80, 80 };
-  const esp_err_t e = esp_ble_gap_set_ext_scan_params(&sp);
-  if (e != ESP_OK) {
+  NimBLEScan* scan = NimBLEDevice::getScan();
+  scan->setScanCallbacks(&btsScanCallbacks, true);
+  scan->setActiveScan(true);
+  scan->setDuplicateFilter(0);
+  scan->setPhy(NimBLEScan::SCAN_ALL);
+  scan->setInterval(50);
+  scan->setWindow(50);
+  btsStarted = scan->start(0, false, true);
+  if (!btsStarted) {
     Serial.println("BLE {\"t\":\"err\",\"msg\":\"scan failed to start\"}");
     btStreamStop();
     return;
@@ -1776,8 +1643,9 @@ void btStreamStop() {
   // 幂等：没开也回 end，PC 端发 BLE OFF 总能拿到确定的答复
   if (btsOn) {
     btsOn = false;   // 回调先看到这个就不再入队
-    esp_ble_gap_stop_ext_scan();
-    BLEDevice::setCustomGapHandler(nullptr);
+    NimBLEScan* scan = NimBLEDevice::getScan();
+    scan->stop();
+    scan->setScanCallbacks(nullptr, false);
     vTaskDelay(pdMS_TO_TICKS(50));   // 等在途回调退场再释放队列
     QueueHandle_t q = btsQ;
     btsQ = nullptr;
