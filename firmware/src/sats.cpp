@@ -21,7 +21,10 @@ static const int MAX_SATS = 60;
 // 共 18330 字节，其中绝大多数在地平线以下、进来就被 `el < 0` 扔掉，纯属白下载。
 // 而这一页还背着 TLS，17KB 的响应直接把堆挤到 6.2KB，body 读不完，报 json: IncompleteInput。
 // 收到贴合各自地平线的半径之后：Starlink 4 颗 680 字节，GPS 11 颗 1842 字节。
-static const uint32_t AUTO_MS = 90000;  // N2YO /above : 100 transactions par heure au maximum\nstatic const uint32_t N2YO_MIN_REQUEST_MS = 90000;\nstatic uint32_t n2yoLastRequestMs = 0;\nstatic bool n2yoHasRequested = false;
+static const uint32_t AUTO_MS = 90000;  // N2YO /above : 100 transactions par heure au maximum
+static const uint32_t N2YO_MIN_REQUEST_MS = 90000;
+static uint32_t n2yoLastRequestMs = 0;
+static bool n2yoHasRequested = false;
 
 struct SatCat { const char* name; int id; int radiusDeg; };
 static const SatCat CATS[] = { {"STARLINK", 52, 25}, {"GPS", 20, 90} };
