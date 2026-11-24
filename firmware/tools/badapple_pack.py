@@ -47,11 +47,17 @@ def probe_duration(video_path: str) -> float:
     return float(json.loads(out.stdout)["format"]["duration"])
 
 
-def extract_gray_raw(video_path: str, raw_path: str, fps: int, content_w: int) -> None:
-    pad_x = (W - content_w) // 2
-    vf = f"fps={fps},scale={content_w}:{H}:flags=lanczos,pad={W}:{H}:{pad_x}:0:black,format=gray"
-    cmd = ["ffmpeg", "-y", "-i", video_path, "-vf", vf, "-pix_fmt", "gray",
-           "-f", "rawvideo", raw_path]
+def build_video_filter(fps: int) -> str:
+    # Fit portrait and landscape clips inside 240x135 without stretching or cropping.
+    return (f"fps={fps},scale={W}:{H}:force_original_aspect_ratio=decrease:flags=lanczos,"
+            f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:black,format=gray")
+
+
+def extract_gray_raw(video_path: str, raw_path: str, fps: int) -> None:
+    vf = build_video_filter(fps)
+    # Use only the first video stream; audio/subtitles are intentionally not encoded.
+    cmd = ["ffmpeg", "-y", "-i", video_path, "-map", "0:v:0", "-an", "-sn",
+           "-vf", vf, "-pix_fmt", "gray", "-f", "rawvideo", raw_path]
     subprocess.run(cmd, check=True, capture_output=True)
 
 
@@ -86,17 +92,17 @@ def main():
     ap.add_argument("video", help="源视频（ffmpeg 能读的格式都行）")
     ap.add_argument("-o", "--out", default="badapple.dat", help="输出文件路径")
     ap.add_argument("--fps", type=int, default=30, help="目标帧率（默认 30；SPI 推屏跟不上就降这个）")
-    ap.add_argument("--content-width", type=int, default=180,
-                     help="pillarbox 内容宽度（默认 180=4:3 内容配 135 高，两边各留 30px 黑边）")
     args = ap.parse_args()
+    if not 1 <= args.fps <= 120:
+        ap.error("--fps must be between 1 and 120")
 
     dur = probe_duration(args.video)
     print(f"source: {args.video} ({dur:.1f}s)")
 
     with tempfile.TemporaryDirectory() as tmp:
         raw_path = os.path.join(tmp, "gray.raw")
-        print(f"ffmpeg: extracting {args.fps}fps grayscale, pillarboxed to {W}x{H}...")
-        extract_gray_raw(args.video, raw_path, args.fps, args.content_width)
+        print(f"ffmpeg: fitting video to {W}x{H} at {args.fps}fps, grayscale...")
+        extract_gray_raw(args.video, raw_path, args.fps)
         raw_sz = os.path.getsize(raw_path)
         print(f"  {raw_sz} bytes raw gray ({raw_sz // (W*H)} frames)")
 
