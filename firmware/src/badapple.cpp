@@ -89,6 +89,17 @@ void badappleEnter() {
   headerSize    = sizeof(BadAppleHeader);
   frameIdx      = 0;
 
+  // Valider la longueur complète du flux avant toute allocation/lecture d'image.
+  // La microSD est ouverte en lecture seule et n'est jamais modifiée ici.
+  const uint64_t requiredBytes = (uint64_t)headerSize +
+                                 (uint64_t)vidFrameBytes * (uint64_t)vidFrameCount;
+  if ((uint64_t)vidFile.size() < requiredBytes) {
+    errMsg = "Truncated video data";
+    closeFile();
+    state = ST_ERROR;
+    return;
+  }
+
   // ⚠️ 调色板存储是 createSprite() 内部才分配的（成功拿到 buffer 才建），createSprite()
   // 之前调 setPaletteColor() 会被它自己的 `if (!_palette) return;` 静默吃掉——现在能显示
   // 对黑白纯属巧合：createSprite() 内部会自动套一次灰阶默认调色板，2 级灰阶正好算出
