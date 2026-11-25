@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-time USB migration from the old factory layout to A/B OTA.
 set -euo pipefail
-PORT="$1"
+PORT="${1:-}"
 PACKAGE_DIR="."
 if [[ "$#" -ge 2 ]]; then PACKAGE_DIR="$2"; fi
 if [[ -z "$PORT" ]]; then echo "Usage: $0 <serial-port> [package-directory]" >&2; exit 2; fi
