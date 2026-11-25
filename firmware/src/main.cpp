@@ -53,6 +53,7 @@ SET_LOOP_TASK_STACK_SIZE(12 * 1024);
 #include "gnss.h"
 #include "imu.h"
 #include "settings_ui.h"
+#include "ota_update.h"
 #include "bt.h"
 #include "chat.h"
 #include "spectrum.h"
@@ -239,6 +240,7 @@ void render() {
     case SCREEN_BATTERY:    drawBatteryDetail(); break;
     case SCREEN_FORMAT:     drawFormat(); break;
     case SCREEN_ABOUT:      drawAbout(); break;
+    case SCREEN_OTA:         drawOta(); break;
     case SCREEN_COMPASS:    drawCompass(); break;
     case SCREEN_COMPASS_DETAIL: drawImuDetail(); break;
     case SCREEN_FILES:      drawFiles(); break;
@@ -527,6 +529,7 @@ static void handleKeyAction(char k) {
           case SET_BATTERY: screen = SCREEN_BATTERY; break;
           case SET_FORMAT: screen = SCREEN_FORMAT; formatStep = 0; break;
           case SET_ABOUT:  screen = SCREEN_ABOUT; aboutPage = 0; aboutRamReset(); break;
+          case SET_OTA:     otaEnter(); screen = SCREEN_OTA; break;
         }
         dirty = true;
       }
@@ -989,6 +992,10 @@ static void handleKeyAction(char k) {
       if (k == '`') { screen = SCREEN_SETTINGS; dirty = true; }
       return;
 
+    case SCREEN_OTA:
+      otaKey(k);
+      return;
+
     case SCREEN_ABOUT:
       if (k == '`') { screen = SCREEN_SETTINGS; dirty = true; }
       else if (aboutPage == 2 && (k == '[' || k == '{')) { aboutRamScrollMove(-1); dirty = true; }
@@ -1206,6 +1213,7 @@ void setup() {
   ramMark("gnss");
 
   bootSelfTest();                        // 开机自检：屏上打硬件检测日志（动画之后、联网之前）
+  otaConfirmBoot();                       // Confirm pending OTA only after startup self-test.
   bootMark("post-complete");
   ramMark("selftest");
 
@@ -1313,6 +1321,7 @@ void loop() {
   M5.update();
   bootWifiUpdate();   // 推进开机后台连网/对时状态机；连完/超时后自动变 no-op
   if (bgFetchService()) bgReplay();   // 后台拉取刚结束：画布已要回来，补上忙时攒下的按键
+  otaUpdate();                         // Restart only after the OTA worker exits.
 
   // 后台拉取进行中：按键先攒着、串口指令先留在接收缓冲里（见 bg_fetch.h 的线程边界）
   if (bgFetchBusy()) {
