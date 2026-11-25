@@ -195,7 +195,10 @@ The table above is reconciled with the actual APPS[] and GROUPS[] arrays in firm
 ### Weather — 5 Subpages
 1. **Current Conditions** 2. **Next 24h Hourly Curve** 3. **Wind & Atmospheric Data** 4. **Air Quality Index (AQI)** 5. **5-Day Extended Forecast**
 - All five subpages share `r` and `Enter` for refresh
+- Open-Meteo forecast and air-quality endpoints use verified HTTPS, no API key, and bounded TLS handshake timeouts
+- Chunked JSON responses stay on `getString()` so HTTPClient dechunks them; the 64.8KB display canvas is leased during TLS to protect internal RAM
 - Metric vs Imperial units selectable in Settings; solar daylight view separated into Astro
+- IP fallback geolocation uses verified HTTPS (ipwho.is); recent GNSS fixes and the once-daily cached position remain preferred/offline paths
 
 ### Planes — 1 Screen
 - ADS-B aircraft radar; `;`/`.` selects aircraft, `r` refreshes (clearing route cache)
@@ -257,7 +260,9 @@ The table above is reconciled with the actual APPS[] and GROUPS[] arrays in firm
 - Standalone TXT ebook bookshelf: Scans MicroSD for text files, supports font size adjustments, reading progress memory, and fast page seeking
 
 ### BadApple — 1 Screen
-- ASCII animation and audio playback: Automatically seeks ahead when playback lags by >1 frame to maintain strict synchronization with audio
+- Silent 1-bit monochrome video playback from `/video/badapple.dat`; this is not an MP4 decoder and the firmware does not bundle a copyrighted video file
+- `tools/badapple_pack.py` converts a user-provided video using ffmpeg/ffprobe and NumPy into the Cardputer's 240×135 frame format
+- Playback uses the microSD directly and seeks to the target frame when late, with no full-video buffer in internal RAM
 
 ### Apps — SD Package Manager
 - Loads the ROZA catalogue from GitHub Raw over HTTPS with certificate verification

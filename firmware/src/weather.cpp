@@ -1,6 +1,7 @@
 #include "weather.h"
 #include "bg_fetch.h"
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <cmath>
 #include "ui_common.h"
@@ -8,6 +9,7 @@
 #include "wifi_net.h"
 #include "geoloc.h"
 #include "http_json.h"
+#include "tls_ca.h"
 
 // ---- 数据 ----
 static const int FC_DAYS = 5;
@@ -151,33 +153,42 @@ static void drawWxIcon(int cx, int cy, int r, int code, bool isDay) {
   }
 }
 
-// 空气质量：另一个免 key 端点，同样支持明文 HTTP。拉不到就把 aqi 置 -1，
-// 那一页显示 n/a，不影响别的页面——所以这里所有失败都是静默 return。
+// Qualité de l'air : Open-Meteo propose aussi HTTPS sans clé. Le lecteur reste
+// en getString() (stream=false), car cet endpoint renvoie du chunked. Le canvas
+// est libéré pendant TLS sur l'ESP32-S3 sans PSRAM.
 static void fetchAirQuality(const GeoFix& fix) {
   aqi = pm25 = pm10v = o3v = -1;
   char url[220];
   snprintf(url, sizeof(url),
-           "http://air-quality-api.open-meteo.com/v1/air-quality"
+           "https://air-quality-api.open-meteo.com/v1/air-quality"
            "?latitude=%.4f&longitude=%.4f&current=pm10,pm2_5,us_aqi,ozone",
            fix.lat, fix.lon);
 
-  WiFiClient client;
-  JsonDocument doc;
+  if (!tlsClockReady()) return;
+  WiFiClientSecure client;
+  tlsUseCaBundle(client);
+  client.setHandshakeTimeout(10);
   String ignored;
-  HttpJsonOptions options(8000, 10000);
-  options.stream = false;
-  options.jsonError = nullptr;
-  if (!fetchJsonHttp(client, url, doc, nullptr, options, ignored)) return;
-  JsonObject c = doc["current"];
-  if (c.isNull()) return;
-  aqi   = (int)lroundf(c["us_aqi"] | -1.0f);
-  pm25  = (int)lroundf(c["pm2_5"]  | -1.0f);
-  pm10v = (int)lroundf(c["pm10"]   | -1.0f);
-  o3v   = (int)lroundf(c["ozone"]  | -1.0f);
+  ignored.reserve(64);
+  {
+    CanvasLease lease;
+    JsonDocument doc;
+    HttpJsonOptions options(8000, 10000);
+    options.stream = false;
+    options.jsonError = nullptr;
+    if (!fetchJsonHttp(client, url, doc, nullptr, options, ignored)) return;
+    JsonObject c = doc["current"];
+    if (c.isNull()) return;
+    aqi   = (int)lroundf(c["us_aqi"] | -1.0f);
+    pm25  = (int)lroundf(c["pm2_5"]  | -1.0f);
+    pm10v = (int)lroundf(c["pm10"]   | -1.0f);
+    o3v   = (int)lroundf(c["ozone"]  | -1.0f);
+  }
 }
 
 // ---- 拉数据 ----
 static void weatherFetch() {
+  errMsg.reserve(96);
   errMsg = "";
   if (!wifiEnsureConnected()) { errMsg = "wifi not connected"; dirty = true; return; }
 
@@ -188,6 +199,7 @@ static void weatherFetch() {
   curLat = fix.lat; curLon = fix.lon;
 
   bgFetchStatus("fetching");
+  if (!tlsClockReady()) { errMsg = "waiting for clock (NTP)"; dirty = true; return; }
 
   // timezone=auto 让日出日落直接是当地时间，不用自己换算时区
   // ⚠️ 512 不是随手写的：公制拼出来 416~418 字节，英制那截后缀再加 48 字节 = 464~466。
@@ -197,7 +209,7 @@ static void weatherFetch() {
   // 再乘一次 1.60934，风力等级虚高 1.6 倍。往这条 URL 里加参数前先重算这个数。
   char url[512];
   snprintf(url, sizeof(url),
-           "http://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
+           "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
            "&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,"
            "weather_code,wind_speed_10m,wind_direction_10m,pressure_msl"
            "&hourly=temperature_2m,precipitation_probability&forecast_hours=24"
@@ -207,63 +219,70 @@ static void weatherFetch() {
            fix.lat, fix.lon, FC_DAYS,
            weatherImperial ? "&temperature_unit=fahrenheit&wind_speed_unit=mph" : "");
 
-  // 明文 HTTP：只读公开天气数据、请求不带任何凭据，没必要为它付 TLS 那几百毫秒 + 40KB 连续堆。
-  // ⚠️ 这个接口回的是 Transfer-Encoding: chunked，但下面用的是 getString()，
-  // HTTPClient 会自己解块——要是改成 getStream() 直接喂解析器就会把块头当数据，记住这条。
-  WiFiClient client;
-  JsonDocument doc;
-  HttpJsonOptions options(15000, 20000);
-  options.stream = false;
-  options.jsonError = "bad json";
-  options.includeJsonDetail = false;
-  if (!fetchJsonHttp(client, url, doc, nullptr, options, errMsg)) { dirty = true; return; }
+  // HTTPS avec validation racine ; getString() est conservé car l'API renvoie
+  // Transfer-Encoding: chunked et HTTPClient se charge du déblocage des chunks.
+  // CanvasLease rend le grand bloc contigu nécessaire au TLS à la connexion mbedTLS.
+  WiFiClientSecure client;
+  tlsUseCaBundle(client);
+  client.setHandshakeTimeout(10);
+  {
+    CanvasLease lease;
+    JsonDocument doc;
+    HttpJsonOptions options(15000, 20000);
+    options.stream = false;
+    options.jsonError = "bad json";
+    options.includeJsonDetail = false;
+    if (!fetchJsonHttp(client, url, doc, nullptr, options, errMsg)) { dirty = true; return; }
 
-  JsonObject cur = doc["current"];
-  if (cur.isNull()) { errMsg = "no current data"; dirty = true; return; }
-  curTemp     = cur["temperature_2m"]       | 0.0f;
-  curFeels    = cur["apparent_temperature"] | 0.0f;
-  curHum      = cur["relative_humidity_2m"] | 0;
-  curWind     = cur["wind_speed_10m"]       | 0.0f;
-  curWindDir  = (int)lroundf(cur["wind_direction_10m"] | 0.0f);
-  curPressure = (int)lroundf(cur["pressure_msl"]       | 0.0f);
-  curCode     = cur["weather_code"]         | 0;
-  curIsDay    = (int)(cur["is_day"] | 1) != 0;
+    JsonObject cur = doc["current"];
+    if (cur.isNull()) { errMsg = "no current data"; dirty = true; return; }
+    curTemp     = cur["temperature_2m"]       | 0.0f;
+    curFeels    = cur["apparent_temperature"] | 0.0f;
+    curHum      = cur["relative_humidity_2m"] | 0;
+    curWind     = cur["wind_speed_10m"]       | 0.0f;
+    curWindDir  = (int)lroundf(cur["wind_direction_10m"] | 0.0f);
+    curPressure = (int)lroundf(cur["pressure_msl"]       | 0.0f);
+    curCode     = cur["weather_code"]         | 0;
+    curIsDay    = (int)(cur["is_day"] | 1) != 0;
 
-  JsonObject daily = doc["daily"];
-  uvMax  = (int)lroundf(daily["uv_index_max"][0] | 0.0f);
-  popMax = daily["precipitation_probability_max"][0] | 0;
-  // "2026-07-30T05:12" —— 只要后面 5 个字符的 HH:MM
+    JsonObject daily = doc["daily"];
+    uvMax  = (int)lroundf(daily["uv_index_max"][0] | 0.0f);
+    popMax = daily["precipitation_probability_max"][0] | 0;
+    // "2026-07-30T05:12" —— 只要后面 5 个字符的 HH:MM
 
-  dayCount = 0;
-  JsonArray dCode = daily["weather_code"];
-  JsonArray dMax  = daily["temperature_2m_max"];
-  JsonArray dMin  = daily["temperature_2m_min"];
-  JsonArray dTime = daily["time"];
-  for (int i = 0; i < FC_DAYS && i < (int)dCode.size(); i++) {
-    days[i].code = dCode[i] | 0;
-    days[i].tmax = dMax[i]  | 0.0f;
-    days[i].tmin = dMin[i]  | 0.0f;
-    // 日期串是 "YYYY-MM-DD"，标签只留 MM-DD；第一条固定叫 today
-    const char* t = dTime[i] | "";
-    if (i == 0) snprintf(days[i].label, sizeof(days[i].label), "today");
-    else if (strlen(t) >= 10) snprintf(days[i].label, sizeof(days[i].label), "%s", t + 5);
-    else snprintf(days[i].label, sizeof(days[i].label), "d+%d", i);
-    dayCount++;
+    dayCount = 0;
+    JsonArray dCode = daily["weather_code"];
+    JsonArray dMax  = daily["temperature_2m_max"];
+    JsonArray dMin  = daily["temperature_2m_min"];
+    JsonArray dTime = daily["time"];
+    for (int i = 0; i < FC_DAYS && i < (int)dCode.size(); i++) {
+      days[i].code = dCode[i] | 0;
+      days[i].tmax = dMax[i]  | 0.0f;
+      days[i].tmin = dMin[i]  | 0.0f;
+      // 日期串是 "YYYY-MM-DD"，标签只留 MM-DD；第一条固定叫 today
+      const char* t = dTime[i] | "";
+      if (i == 0) snprintf(days[i].label, sizeof(days[i].label), "today");
+      else if (strlen(t) >= 10) snprintf(days[i].label, sizeof(days[i].label), "%s", t + 5);
+      else snprintf(days[i].label, sizeof(days[i].label), "d+%d", i);
+      dayCount++;
+    }
+
+    // 未来 24 小时
+    hourCount = 0;
+    JsonObject hr = doc["hourly"];
+    JsonArray hT = hr["temperature_2m"], hP = hr["precipitation_probability"];
+    const char* h0 = hr["time"][0] | "";
+    hourStartH = (strlen(h0) >= 13) ? atoi(h0 + 11) : 0;   // "2026-07-30T15:00" 取 HH
+    for (int i = 0; i < 24 && i < (int)hT.size(); i++) {
+      hourTemp[i] = hT[i] | 0.0f;
+      hourPop[i]  = (uint8_t)constrain((int)(hP[i] | 0), 0, 100);
+      hourCount++;
+    }
+
+
   }
 
-  // 未来 24 小时
-  hourCount = 0;
-  JsonObject hr = doc["hourly"];
-  JsonArray hT = hr["temperature_2m"], hP = hr["precipitation_probability"];
-  const char* h0 = hr["time"][0] | "";
-  hourStartH = (strlen(h0) >= 13) ? atoi(h0 + 11) : 0;   // "2026-07-30T15:00" 取 HH
-  for (int i = 0; i < 24 && i < (int)hT.size(); i++) {
-    hourTemp[i] = hT[i] | 0.0f;
-    hourPop[i]  = (uint8_t)constrain((int)(hP[i] | 0), 0, 100);
-    hourCount++;
-  }
-
-  fetchAirQuality(fix);   // 单独一个端点，失败不影响其它页
+  fetchAirQuality(fix);   // endpoint séparé : si l'air échoue, les prévisions restent disponibles
 
   haveData = true;
   everFetched = true;

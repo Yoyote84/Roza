@@ -1,11 +1,14 @@
 #include "geoloc.h"
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include "gnss.h"
 #include <ctime>
 #include "wifi_net.h"
 #include "net_resolve.h"
+#include "ui_common.h"
+#include "tls_ca.h"
 
 static GeoFix cached;   // 只缓存 IP 定位的结果；GPS 每次现读
 static int32_t cachedDay = -1;
@@ -80,32 +83,60 @@ bool geoGet(GeoFix& out, String* err) {
 
   if (!wifiEnsureConnected()) { if (err) *err = "wifi not connected"; return false; }
 
-  // 先有上限地解析域名（见 net_resolve.h）：有信号没网时别在框架里白等 15 秒，后台拉取被取消时也能立刻放弃
-  NetResolveResult nr = netResolve("ip-api.com");
+  // ipwho.is propose une API gratuite sans clé et compatible HTTPS. L'ancienne
+  // API ip-api.com gratuite est limitée à HTTP : on évite désormais de transmettre
+  // des coordonnées de localisation en clair.
+  if (!tlsClockReady()) { if (err) *err = "waiting for clock (NTP)"; return false; }
+  NetResolveResult nr = netResolve("ipwho.is");
   if (nr != NR_OK) { if (err) *err = String("geo ") + netResolveErrText(nr); return false; }
 
-  // 明文 HTTP 是有意的：只要个大概坐标，没必要为它多做一次 TLS 握手（S3 上很贵）
-  WiFiClient client;
-  HTTPClient http;
-  http.setConnectTimeout(8000);
-  http.setTimeout(8000);
-  if (!http.begin(client, "http://ip-api.com/json/?fields=status,city,regionName,lat,lon")) {
-    if (err) *err = "geo begin failed";
-    return false;
+  if (err) err->reserve(64);
+  cached.name.reserve(48);
+  double latitude = 0.0, longitude = 0.0;
+  String locationName;
+  locationName.reserve(48);
+
+  WiFiClientSecure client;
+  tlsUseCaBundle(client);
+  client.setHandshakeTimeout(10);
+  String body;
+  body.reserve(512);
+  {
+    CanvasLease lease;
+    HTTPClient http;
+    http.setConnectTimeout(8000);
+    http.setTimeout(8000);
+    http.useHTTP10(true);
+    if (!http.begin(client, "https://ipwho.is/?fields=success,message,city,region,latitude,longitude")) {
+      if (err) *err = "geo begin failed";
+      return false;
+    }
+    int code = http.GET();
+    if (code != 200) {
+      if (err) *err = String("geo https ") + code;
+      http.end();
+      return false;
+    }
+    body = http.getString();
+    http.end();
+
+    JsonDocument doc;
+    if (deserializeJson(doc, body)) { if (err) *err = "geo bad json"; return false; }
+    if (!(doc["success"] | false)) {
+      const char* message = doc["message"] | "lookup failed";
+      if (err) *err = String("geo ") + message;
+      return false;
+    }
+    latitude = doc["latitude"] | 0.0;
+    longitude = doc["longitude"] | 0.0;
+    const char* city = doc["city"] | "";
+    const char* region = doc["region"] | "unknown";
+    locationName = (city && city[0]) ? city : region;
   }
-  int code = http.GET();
-  if (code != 200) { if (err) *err = String("geo http ") + code; http.end(); return false; }
-  String body = http.getString();
-  http.end();
 
-  JsonDocument doc;
-  if (deserializeJson(doc, body)) { if (err) *err = "geo bad json"; return false; }
-  if (String(doc["status"] | "") != "success") { if (err) *err = "geo lookup failed"; return false; }
-
-  cached.lat = doc["lat"] | 0.0;
-  cached.lon = doc["lon"] | 0.0;
-  cached.name = String(doc["city"] | "");
-  if (cached.name.length() == 0) cached.name = String(doc["regionName"] | "unknown");
+  cached.lat = latitude;
+  cached.lon = longitude;
+  cached.name = locationName;
   cached.fromGps = false;
   cached.valid = true;
   cachedDay = todayIndex();

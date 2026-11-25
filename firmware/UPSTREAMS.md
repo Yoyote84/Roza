@@ -13,9 +13,9 @@ Cette provenance explique l'origine du code, mais les versions listées dans la 
 ## Chaîne de compilation active vérifiée sur main le 25 novembre 2026
 
 - Outil : PlatformIO Core 6.2.0
-- Plateforme : `espressif32@8.0.0`
-- Framework : Arduino-ESP32 3.3.12
-- Base ESP-IDF : 5.5.5
+- Plateforme : pioarduino `55.03.313` (communautaire, release épinglée)
+- Framework : Arduino-ESP32 3.3.13
+- Base ESP-IDF : 5.5.6
 - Environnement : `cardputer-adv`
 - Carte PlatformIO : `esp32-s3-devkitc-1`, Flash 8 Mo
 - Table active : `firmware/partitions_8MB.csv`
@@ -33,7 +33,7 @@ Le firmware actif est un projet PlatformIO + Arduino-ESP32. Les anciens fichiers
 | NimBLE-Arduino | 2.5.2 |
 | TinyGPSPlus | 1.1.0 déclarée dans PlatformIO |
 | ArduinoJson | 7.4.3 |
-| RadioLib | 7.7.1 |
+| RadioLib | 8.0.0 |
 | FastLED | 3.10.3 |
 | ESP8266Audio | tag Git 2.4.3 |
 | LibSSH-ESP32 | 5.9.0 |
@@ -42,13 +42,16 @@ Les versions actuellement épinglées sont définies par `firmware/platformio.in
 
 ## État de validation CI au 25 novembre 2026
 
-Commit de référence : https://github.com/Yoyote84/Roza/commit/71cd1ff0216ec426f8d073153c838373181da5b9
+Commit validé : https://github.com/Yoyote84/Roza/commit/65da622c427d224be117d946ebf589c3bde85a93
 
-Exécution CI : https://github.com/Yoyote84/Roza/actions/runs/45518114744
+Exécution CI complète : https://github.com/Yoyote84/Roza/actions/runs/45672057329
 
-Le test de nettoyage des anciens composants du jeu retiré réussit. La compilation firmware échoue ensuite dans `firmware/src/wardrive.cpp` sur l'identifiant interne `STA_STARTED_BIT` qui n'est plus exposé par le core actuel. Les étapes de génération des images et de publication des artefacts sont donc ignorées. Aucun nouveau binaire final ni mesure de mémoire liée au commit de référence n'est disponible.
+Sur ce commit, la compilation avec RadioLib 8.0.0, les suites de régression, l'assemblage des images flashables, le rendu du simulateur et le déploiement GitHub Pages réussissent. Mesures de la compilation :
+- RAM statique : 110 684 / 327 680 octets (33,8 %).
+- Flash : 3 521 495 / 8 257 536 octets (42,6 %).
+- Paquet application/factory : environ 3,5 Mo ; SHA-256 de tous les fichiers du paquet vérifiés.
 
-Un ancien succès CI ou une mesure mémoire sous Arduino 2.0.17 / ESP-IDF 4.4.7 ne valide pas le commit courant.
+La CI valide la compilation et les tests logiciels, pas le fonctionnement physique du Cap LoRa-1262, de l'écran, du microphone, du haut-parleur, du clavier ADV ou de la microSD. Ces essais restent explicitement réservés à l'étape 5.
 
 ## Provenance, licences et règles de conservation
 

@@ -1,6 +1,6 @@
 **English** | [简体中文](dependency-pins.zh-CN.md)
 
-# Verrouillage des versions des dépendances (mise à jour du 24/11/2026)
+# Verrouillage des versions des dépendances (mise à jour du 25/11/2026)
 
     Summary up front: **The platform, Arduino core, and all libraries are strictly pinned to exact versions**.
     Any upgrade must be performed and tested individually following the procedure at the end of this document.
@@ -10,12 +10,12 @@
 
 ---
 
-## Migration du socle — décision du 24/11/2026
+## Migration du socle — palier incrémental du 25/11/2026
 
 La base active visée pour le Cardputer ADV est désormais :
 
-- PlatformIO Espressif32 **8.0.0** ;
-- Arduino-ESP32 **3.3.12**, basé sur ESP-IDF **5.5.5** ;
+- Plateforme communautaire pioarduino **55.03.313** (release publiée le 17/11/2026) ;
+- Arduino-ESP32 **3.3.13**, basé sur ESP-IDF **5.5.6** ;
 - M5Unified **0.3.0** et M5GFX **0.3.0**, obligatoirement synchronisés ;
 - NimBLE-Arduino **2.5.2** pour la pile BLE et le scan étendu 1M/Coded PHY ;
 - PlatformIO Core **6.2.0** dans la CI.
@@ -24,7 +24,7 @@ La base active visée pour le Cardputer ADV est désormais :
 - La sélection du sous-domaine des tuiles gère explicitement une liste vide, configuration hors ligne par défaut.
 - Le scan BLE étendu configure les événements HCI à **257 octets**, requis par NimBLE 2.5.2 pour EXT_ADV ; la valeur générique de 70 octets du SDK est harmonisée avant la compilation des bibliothèques.
 
-La sélection 8.0.0 reste volontairement plus conservatrice que la branche Arduino 4.0 / ESP-IDF 6.1.1. Les dépendances non indispensables au portage restent épinglées à leurs versions précédentes : elles seront mises à niveau séparément uniquement si un conflit de compilation ou un besoin concret l'exige.
+Le palier 55.03.313 est un saut incrémental par rapport à la base 3.3.12 / 5.5.5. La branche Arduino 4.0 / ESP-IDF 6.1.1 reste un saut majeur distinct et n'est pas adoptée sans validation séparée. Les dépendances non indispensables au portage restent épinglées à leurs versions précédentes : elles seront mises à niveau séparément uniquement si un conflit de compilation ou un besoin concret l'exige.
 
 **Attention :** les mesures RAM/Flash de la section benchmark ci-dessous ont été obtenues sous Arduino 2.0.17 / ESP-IDF 4.4.7. Elles sont un point de comparaison historique, pas une mesure de la nouvelle base. La compilation et la CI doivent fournir de nouvelles mesures avant de déclarer la migration validée.
 
@@ -36,12 +36,12 @@ M5Unified/M5GFX 0.3.0 change la sémantique des rotations absolues : sur Cardput
 
 | Dependency | Version | Notes |
 |---|---|---|
-| platform `espressif32` | 8.0.0 | Arduino 3.3.12 / IDF 5.5.5 |
-| `framework-arduinoespressif32` | Résolu par la plateforme 8.0.0 | Arduino 3.3.12 / ESP-IDF 5.5.5 |
+| plateforme pioarduino | 55.03.313 | Plateforme communautaire épinglée ; Arduino 3.3.13 / IDF 5.5.6 |
+| `framework-arduinoespressif32` | Résolu par pioarduino 55.03.313 | Arduino 3.3.13 / ESP-IDF 5.5.6 |
 | M5Unified | 0.3.0 | À synchroniser avec M5GFX 0.3.0 |
 | M5GFX | 0.3.0 | Épinglé explicitement avec M5Unified 0.3.0 |
 | NimBLE-Arduino | 2.5.2 | Nouvelle pile BLE sans Bluedroid direct; BLE scan/HID, annonces étendues et PHY Coded |
-| FastLED | 3.10.3 | Maintenu pour isoler cette migration ; revalider la version récente sous IDF 5.5.5 |
+| FastLED | 3.10.3 | Maintenu pour isoler cette migration ; revalider la version récente sous IDF 5.5.6 |
 | ArduinoJson | 7.4.3 | |
 | RadioLib | 8.0.0 | |
 | TinyGPSPlus | 1.1.0 | |
@@ -101,7 +101,7 @@ Trade-offs:
 
 ### Historique — décision PlatformIO antérieure au 24/11/2026 (remplacée)
 
-Cette conclusion décrivait la base 7.1.x antérieure. Elle est remplacée par PlatformIO 8.0.0, qui fournit Arduino-ESP32 3.3.12 / ESP-IDF 5.5.5. ESP8266Audio 2.4.3 est maintenant épinglé ; la CI doit confirmer le filtrage du pilote ULP sur ESP32-S3 et le fonctionnement du flux MP3 préalloué.
+Cette conclusion décrivait la base 7.1.x antérieure. Elle est remplacée par pioarduino 55.03.313, qui fournit Arduino-ESP32 3.3.13 / ESP-IDF 5.5.6. ESP8266Audio 2.4.3 et RadioLib 8.0.0 sont épinglés ; les tests CI vérifient désormais la compilation du firmware et les régressions logicielles. Les fonctions qui dépendent du matériel réel restent à tester à l'étape 5.
 
 ---
 
