@@ -93,5 +93,53 @@ class OtaSecurityTests(unittest.TestCase):
         self.assertIn("CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y",
                       (ROOT / "sdkconfig.defaults").read_text())
 
+    def test_manifest_parser_fails_closed_and_pins_binary_url(self):
+        source = (ROOT / "src" / "ota_update.cpp").read_text()
+        self.assertIn('strcmp(url,FIRMWARE_URL)!=0', source)
+        self.assertIn('!verifySignature(m)', source)
+        self.assertIn('m.size>0x3F0000UL', source)
+        self.assertIn('m.size<4096', source)
+        self.assertIn('hexValue(commit,40)', source)
+        self.assertIn('hexValue(digest,64)', source)
+
+    def test_installer_revalidates_manifest_before_writing(self):
+        source = (ROOT / "src" / "ota_update.cpp").read_text()
+        self.assertIn('fetchManifest(fresh,err,sizeof(err))', source)
+        self.assertIn('fresh.build!=manifest.build', source)
+        self.assertIn('strcmp(fresh.sha256,manifest.sha256)', source)
+        self.assertIn('Update.setSHA256(fresh.sha256)', source)
+        self.assertIn('Update.abort()', source)
+        self.assertIn('Update.end(false)', source)
+
+    def test_update_requires_https_and_certificate_validation(self):
+        source = (ROOT / "src" / "ota_update.cpp").read_text()
+        self.assertIn('MANIFEST_URL[]="https://', source)
+        self.assertIn('FIRMWARE_URL[]="https://', source)
+        self.assertIn('tlsUseCaBundle(client)', source)
+        self.assertNotIn('setInsecure()', source)
+
+    def test_migration_never_chip_erases_and_requires_confirmation(self):
+        script = (ROOT / "tools" / "migrate_to_ota.sh").read_text()
+        self.assertIn('MIGRATE-ROZA', script)
+        self.assertIn('erase-region 0xF000 0x2000', script)
+        self.assertNotIn('erase-flash', script)
+        self.assertNotIn('erase_flash', script)
+        self.assertNotIn('chip erase', script.lower())
+
+    def test_migration_preserves_nvs_phy_and_sd(self):
+        script = (ROOT / "tools" / "migrate_to_ota.sh").read_text()
+        doc = (ROOT / "docs" / "UPDATE_SAFETY.md").read_text()
+        self.assertIn('0xF000 0x2000', script)
+        self.assertIn('NVS', doc)
+        self.assertIn('PHY', doc)
+        self.assertIn('microSD', doc)
+
+    def test_build_number_is_monotonic_and_confirmation_records_it(self):
+        source = (ROOT / "src" / "ota_update.cpp").read_text()
+        self.assertIn('m.build>(stored>current?stored:current)', source)
+        self.assertIn('saveUInt("ota","highest",current)', source)
+        self.assertIn('esp_ota_mark_app_valid_cancel_rollback()', source)
+        self.assertIn('esp_ota_mark_app_invalid_rollback_and_reboot()', source)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
