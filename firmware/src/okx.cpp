@@ -19,7 +19,7 @@ static const uint32_t AUTO_MS = 5UL * 60 * 1000;
 enum OkxSource {
   SOURCE_NONE = 0,
   SOURCE_OKX_C2C,
-  SOURCE_COINGECKO
+  SOURCE_COINPAPRIKA
 };
 
 static float     rate = 0.0f;          // 1 USDT 折多少人民币
@@ -34,7 +34,11 @@ void okxBuildUrl(char* out, size_t n) {
 }
 
 void okxBuildFallbackUrl(char* out, size_t n) {
-  snprintf(out, n, "https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=cny");
+  snprintf(out, n, "https://api.coinpaprika.com/v1/tickers/usdt-tether");
+}
+
+static void okxBuildUsdCnyUrl(char* out, size_t n) {
+  snprintf(out, n, "https://api.frankfurter.dev/v2/rate/usd/cny");
 }
 
 // 解析 OKX C2C 行情接口：
@@ -85,21 +89,27 @@ static bool parseOkxC2C(JsonDocument& doc, float& outRate, String& err) {
   return true;
 }
 
-// 解析 CoinGecko 接口：
-// {"tether":{"cny":7.27}}
-static bool parseCoinGecko(JsonDocument& doc, float& outRate, String& err) {
-  JsonVariantConst cny = doc["tether"]["cny"];
-  float val = 0.0f;
-  if (cny.is<float>())        val = cny.as<float>();
-  else if (cny.is<double>())  val = (float)cny.as<double>();
-  else if (cny.is<const char*>()) val = atof(cny.as<const char*>());
-
-  if (val <= 0.0f) {
-    err = "no 'tether.cny' in CoinGecko";
+// CoinPaprika fournit le prix USDT/USD ; Frankfurter fournit le taux de référence USD/CNY.
+// Le produit est une estimation croisée, pas une cotation C2C ni un prix de trading garanti.
+static bool parseCoinPaprikaUsd(JsonDocument& doc, float& outRate, String& err) {
+  JsonVariantConst price = doc["quotes"]["USD"]["price"];
+  const double value = price.as<double>();
+  if (price.isNull() || !isfinite(value) || value <= 0.0) {
+    err = "no valid quotes.USD.price in CoinPaprika";
     return false;
   }
+  outRate = static_cast<float>(value);
+  return true;
+}
 
-  outRate = val;
+static bool parseUsdCny(JsonDocument& doc, float& outRate, String& err) {
+  JsonVariantConst rateValue = doc["rate"];
+  const double value = rateValue.as<double>();
+  if (rateValue.isNull() || !isfinite(value) || value <= 0.0) {
+    err = "no valid rate in Frankfurter";
+    return false;
+  }
+  outRate = static_cast<float>(value);
   return true;
 }
 
@@ -147,6 +157,8 @@ static void fetchOkx() {
       // 紧凑超时设置：若遇 GFW 拦截丢包，快速转入 Fallback，避免阻塞整机 UI
       HttpJsonOptions options(4500, 6000);
       options.stream = false;
+      options.http10 = false;
+      options.maxBodyBytes = 8192;
       if (fetchJsonHttp(client, url, doc, nullptr, options, okxErr)) {
         if (parseOkxC2C(doc, newRate, okxErr)) {
           newSource = SOURCE_OKX_C2C;
@@ -154,29 +166,56 @@ static void fetchOkx() {
       }
     }
 
-    // 2. OKX 失败（超时/GFW封锁/解析失败）时自动 Fallback 到 CoinGecko
+    // 2. OKX 失败时，使用免密钥的 CoinPaprika（USDT/USD）+ Frankfurter（USD/CNY）。
+    // CoinPaprika 免费端点限个人用途；页面在回退时显示要求的数据来源署名。
     if (newSource == SOURCE_NONE) {
-      client.stop(); // 彻底关闭上一次失败连接并释放 mbedTLS 瞬态缓冲
-      char url[96];
+      client.stop();
+      client.setHandshakeTimeout(8);
+      char url[112];
       okxBuildFallbackUrl(url, sizeof(url));
-      client.setHandshakeTimeout(7); // 同上：fallback 也不能再挂 120s
-
-      JsonDocument doc;
-      HttpJsonOptions options(5000, 8000);
-      options.stream = false;
-      if (fetchJsonHttp(client, url, doc, nullptr, options, fbErr)) {
-        if (parseCoinGecko(doc, newRate, fbErr)) {
-          newSource = SOURCE_COINGECKO;
-        } else {
-          errMsg = fbErr;
+      float usdtUsd = 0.0f;
+      float usdCny = 0.0f;
+      bool fallbackOk = false;
+      String paprikaErr = "";
+      String fxErr = "";
+      paprikaErr.reserve(72);
+      fxErr.reserve(72);
+      {
+        JsonDocument filter;
+        filter["quotes"]["USD"]["price"] = true;
+        JsonDocument doc;
+        HttpJsonOptions options(5000, 8000);
+        options.stream = false;
+        options.http10 = false;
+        options.maxBodyBytes = 8192;
+        if (fetchJsonHttp(client, url, doc, &filter, options, paprikaErr) &&
+            parseCoinPaprikaUsd(doc, usdtUsd, paprikaErr)) {
+          client.stop();
+          char fxUrl[80];
+          okxBuildUsdCnyUrl(fxUrl, sizeof(fxUrl));
+          JsonDocument fxFilter;
+          fxFilter["rate"] = true;
+          JsonDocument fxDoc;
+          HttpJsonOptions fxOptions(5000, 8000);
+          fxOptions.stream = false;
+          fxOptions.http10 = false;
+          fxOptions.maxBodyBytes = 2048;
+          if (fetchJsonHttp(client, fxUrl, fxDoc, &fxFilter, fxOptions, fxErr) &&
+              parseUsdCny(fxDoc, usdCny, fxErr)) {
+            newRate = usdtUsd * usdCny;
+            fallbackOk = isfinite(newRate) && newRate > 0.0f;
+            if (!fallbackOk) fxErr = "invalid USDT/CNY cross rate";
+          }
         }
+      }
+      if (fallbackOk) {
+        newSource = SOURCE_COINPAPRIKA;
       } else {
-        // 两个源均失败，展示更有帮助的错误提示（利用已 reserve 的空间，避免 + 临时 String）
-        if (okxErr.length()) {
+        errMsg = "CoinPaprika/FX: ";
+        errMsg += paprikaErr.length() ? paprikaErr : fxErr;
+        if (errMsg.length() < 20 && okxErr.length()) {
           errMsg = "OKX:";
           errMsg += okxErr;
-        } else {
-          errMsg = fbErr;
         }
       }
     }
@@ -229,8 +268,8 @@ void drawOkx() {
   cv.fillScreen(TFT_BLACK);
 
   // 顶部状态栏：标明当前数据源状态（OKX C2C 显青色，Fallback 显黄色）
-  const char* rightHdr = (activeSource == SOURCE_COINGECKO) ? "CoinGecko" : "OKX C2C";
-  uint16_t rightCol = (activeSource == SOURCE_COINGECKO) ? TFT_YELLOW : ACCENT;
+  const char* rightHdr = (activeSource == SOURCE_COINPAPRIKA) ? "CoinPaprika" : "OKX C2C";
+  uint16_t rightCol = (activeSource == SOURCE_COINPAPRIKA) ? TFT_YELLOW : ACCENT;
   drawPageHeader("OKX", rate > 0 ? rightHdr : "USDT/CNY", rate > 0 ? rightCol : ICON_DIM);
 
   if (rate <= 0) {
@@ -248,7 +287,7 @@ void drawOkx() {
   }
 
   // 左边放 OKX 的标记（备选源时使用低调浅灰），右边放数
-  icoOkx(28, 56, 18, (activeSource == SOURCE_COINGECKO) ? 0x9CD3 : TFT_WHITE);
+  icoOkx(28, 56, 18, (activeSource == SOURCE_COINPAPRIKA) ? 0x9CD3 : TFT_WHITE);
 
   char b[32];
   // 主角：1 USDT 值多少人民币
@@ -273,9 +312,11 @@ void drawOkx() {
 
   // 数据源清晰标注行
   cv.setTextDatum(top_left);
-  if (activeSource == SOURCE_COINGECKO) {
+  if (activeSource == SOURCE_COINPAPRIKA) {
     cv.setTextColor(TFT_YELLOW, TFT_BLACK);
-    cv.drawString("CoinGecko (OKX fallback)", 6, 96);
+    cv.drawString("CoinPaprika ref. + daily FX", 6, 96);
+    cv.setTextColor(ICON_DIM, TFT_BLACK);
+    cv.drawString("Powered by CoinPaprika", 6, 107);
   } else {
     cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
     cv.drawString("OKX C2C real-time market price", 6, 96);
@@ -284,8 +325,8 @@ void drawOkx() {
   cv.setTextDatum(top_left);
   cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
   snprintf(b, sizeof(b), "updated %s", rateAt);
-  cv.drawString(b, 6, SH - 20);
+  cv.drawString(b, 6, SH - 12);
   cv.setTextDatum(top_right);
-  cv.drawString("r  refresh", SW - 6, SH - 20);
+  cv.drawString("r  refresh", SW - 6, SH - 12);
 }
 
