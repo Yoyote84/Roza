@@ -127,9 +127,7 @@ static void fetchOkx() {
   float newRate = 0.0f;
   OkxSource newSource = SOURCE_NONE;
   String okxErr = "";
-  String fbErr = "";
   okxErr.reserve(64);
-  fbErr.reserve(64);
 
   // client 和证书包要在 lease 之前建：tlsUseCaBundle() 每次都会重新 calloc 一块永不释放的
   // 证书索引（~484B），放进 lease 里它会落在画布腾出的洞里把画布钉死。
@@ -144,7 +142,7 @@ static void fetchOkx() {
   //    中间把画布还回来又立马借出去没有任何视觉意义；
   // 2. 两次借还凭空多一次 64.8KB 的 free/malloc，如果 OKX 失败留在堆上的瞬态碎片未清理，
   //    中间恢复画布甚至可能失败；
-  // 3. 保持 lease 覆盖整个过程，正好把 64.8KB 大洞持续让给回退的 CoinGecko 握手（也需 ~33KB 缓冲）；
+  // 3. Keep one canvas lease across both fallback HTTPS requests to avoid repeated 64.8KB allocations.
   // 4. client 复用同一个实例并在回退前 client.stop()，避免两次 tlsUseCaBundle() 重复分配证书索引。
   {
     CanvasLease lease;
