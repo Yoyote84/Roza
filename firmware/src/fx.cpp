@@ -156,6 +156,8 @@ static void fetchFx() {
   JsonDocument doc;
   HttpJsonOptions options(8000, 12000);
   options.stream = false;                  // 响应小，getString() 顺带把 chunked 解掉
+  options.http10 = false;                  // frankfurter.dev 要求现代 HTTP/1.1 传输
+  options.maxBodyBytes = 8192;
   if (!fetchJsonHttp(client, url, doc, &filter, options, errMsg)) { dirty = true; return; }
 
   if (!fxParse(doc)) { ptN = 0; dirty = true; return; }
