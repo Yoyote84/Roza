@@ -73,7 +73,6 @@ static void startScan() {
   WiFi.mode(scanMode);
   uint32_t t0 = millis();
   while (WiFi.getMode() != scanMode && (millis() - t0 < 300)) delay(10);
-  WiFiGenericClass::waitStatusBits(STA_STARTED_BIT, 300);
   delay(30);
 
   if (WiFiGenericClass::getStatusBits() & WIFI_SCANNING_BIT) {
