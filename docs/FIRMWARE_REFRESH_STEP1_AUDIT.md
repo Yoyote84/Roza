@@ -2,10 +2,10 @@
 
 **Date de l'audit :** 25 novembre 2026  
 **Dépôt :** https://github.com/Yoyote84/Roza  
-**Branche examinée :** \`main\` uniquement  
-**Commit de référence :** \`71cd1ff0216ec426f8d073153c838373181da5b9\`  
+**Branche examinée :** `main` uniquement  
+**Commit de référence :** `71cd1ff0216ec426f8d073153c838373181da5b9`  
 **Matériel cible :** M5Stack Cardputer ADV + Cap LoRa-1262  
-**Périmètre :** firmware actif de \`firmware/\`, ses applications, ses dépendances, ses services et sa chaîne de livraison.
+**Périmètre :** firmware actif de `firmware/`, ses applications, ses dépendances, ses services et sa chaîne de livraison.
 
 > Ce dossier est l'état de référence documentaire de l'étape 1. Il distingue les faits observés dans le dépôt, les informations amont officielles, les recommandations de migration et les validations qui ne peuvent être réalisées qu'aux étapes suivantes. Il ne prétend ni que le firmware compile actuellement, ni que les périphériques ont été testés sur la carte physique.
 
@@ -25,26 +25,26 @@ La cible proposée est un socle Arduino-ESP32 moderne, sans basculer le firmware
 
 ### 2.1 Dépôt et règles de travail
 
-- Le firmware actif est exclusivement dans \`firmware/\`.
-- La compilation de référence est PlatformIO, environnement \`cardputer-adv\`.
-- La commande de référence est \`cd firmware && pio run -e cardputer-adv\`.
-- Les fichiers racine \`CMakeLists.txt\`, \`main/\`, \`partitions.csv\` et \`sdkconfig.defaults\` sont historiques. Ils ne définissent pas la compilation active.
-- Le projet actif utilise la branche \`main\`. Les branches de travail et les pull requests non intégrées ne constituent pas l'état livré.
-- Deux pull requests restent ouvertes au moment de l'audit : la PR #3 sur le découplage du jeu séparé et la PR #1 de test de mise à jour 105. Elles ne sont pas considérées comme intégrées à \`main\` et ne doivent pas être fusionnées sans examen de leur différence avec l'état courant.
-- Le test CI de nettoyage des anciens composants du jeu retiré passe sur le commit examiné. Aucun fichier ou symbole Hawkins n'a été observé dans le menu actif de \`globals.cpp\`. Le jeu Hawkins ne fait donc pas partie du périmètre de ROZA à reconstruire ou à réintroduire.
+- Le firmware actif est exclusivement dans `firmware/`.
+- La compilation de référence est PlatformIO, environnement `cardputer-adv`.
+- La commande de référence est `cd firmware && pio run -e cardputer-adv`.
+- Les fichiers racine `CMakeLists.txt`, `main/`, `partitions.csv` et `sdkconfig.defaults` sont historiques. Ils ne définissent pas la compilation active.
+- Le projet actif utilise la branche `main`. Les branches de travail et les pull requests non intégrées ne constituent pas l'état livré.
+- Deux pull requests restent ouvertes au moment de l'audit : la PR #3 sur le découplage du jeu séparé et la PR #1 de test de mise à jour 105. Elles ne sont pas considérées comme intégrées à `main` et ne doivent pas être fusionnées sans examen de leur différence avec l'état courant.
+- Le test CI de nettoyage des anciens composants du jeu retiré passe sur le commit examiné. Aucun fichier ou symbole Hawkins n'a été observé dans le menu actif de `globals.cpp`. Le jeu Hawkins ne fait donc pas partie du périmètre de ROZA à reconstruire ou à réintroduire.
 
 ### 2.2 Chaîne de compilation active
 
 | Élément | État réel dans le dépôt |
 |---|---|
-| Plateforme PlatformIO | \`espressif32@8.0.0\` |
+| Plateforme PlatformIO | `espressif32@8.0.0` |
 | Framework | Arduino-ESP32 3.3.12 |
 | Base ESP-IDF du framework | 5.5.5 |
 | PlatformIO Core en CI | 6.2.0 |
-| Carte PlatformIO | \`esp32-s3-devkitc-1\`, configurée pour 8 Mo |
-| Environnement | \`cardputer-adv\` |
-| Table active | \`firmware/partitions_8MB.csv\` |
-| Workflow CI | \`.github/workflows/roza_esp32s3.yml\` |
+| Carte PlatformIO | `esp32-s3-devkitc-1`, configurée pour 8 Mo |
+| Environnement | `cardputer-adv` |
+| Table active | `firmware/partitions_8MB.csv` |
+| Workflow CI | `.github/workflows/roza_esp32s3.yml` |
 
 Le dépôt n'est pas un firmware ESP-IDF natif. Une éventuelle adoption d'un niveau ESP-IDF plus récent doit être effectuée au travers d'une plateforme PlatformIO compatible avec Arduino-ESP32, puis vérifiée sur le projet complet.
 
@@ -56,16 +56,16 @@ Exécution associée au commit de référence :
 - Run : https://github.com/Yoyote84/Roza/actions/runs/45518114744
 - Job de compilation : https://github.com/Yoyote84/Roza/actions/runs/45518114744/job/138882744067
 - Conclusion : échec.
-- Étape fautive : compilation de \`src/wardrive.cpp\`.
-- Erreur : \`STA_STARTED_BIT was not declared in this scope\`, à l'appel \`WiFiGenericClass::waitStatusBits(STA_STARTED_BIT, 300)\`.
+- Étape fautive : compilation de `src/wardrive.cpp`.
+- Erreur : `STA_STARTED_BIT was not declared in this scope`, à l'appel `WiFiGenericClass::waitStatusBits(STA_STARTED_BIT, 300)`.
 - La production des images de flash, la génération de l'artefact Web et les étapes qui suivent la compilation ont été ignorées.
 
-Le correctif du point d'accès dans \`hotspot.cpp\` n'est plus l'erreur bloquante de ce commit. Il utilise déjà l'API publique ESP-NETIF \`esp_netif_dhcps_get_clients_by_mac\`. Les anciens rapports qui désignent encore \`hotspot.cpp\` comme erreur courante sont obsolètes.
+Le correctif du point d'accès dans `hotspot.cpp` n'est plus l'erreur bloquante de ce commit. Il utilise déjà l'API publique ESP-NETIF `esp_netif_dhcps_get_clients_by_mac`. Les anciens rapports qui désignent encore `hotspot.cpp` comme erreur courante sont obsolètes.
 
 Avertissements secondaires observés dans la même sortie :
-- \`skyview.cpp\` : possible troncature du texte formaté dans un tampon de six octets ;
-- \`typhoon.cpp\` : référence potentiellement pendante vers un \`JsonArray\` temporaire ;
-- \`wardrive.cpp\` : format \`%u\` utilisé avec un \`uint32_t\` qui correspond à \`%lu\` sur cette cible.
+- `skyview.cpp` : possible troncature du texte formaté dans un tampon de six octets ;
+- `typhoon.cpp` : référence potentiellement pendante vers un `JsonArray` temporaire ;
+- `wardrive.cpp` : format `%u` utilisé avec un `uint32_t` qui correspond à `%lu` sur cette cible.
 
 La CI actuelle exécute aussi les suites IR, LoRa, Drone ID, GNSS, JSON, Hash Oven, batterie, RAM, Astro, calculatrice, horloge, tests routeur/RID, balayage mémoire, test statique NimBLE, tests de paquetage et création des images. Le test de nettoyage des anciens composants Hawkins est réussi sur ce commit. La compilation échouant avant l'édition de liens, aucun nouveau rapport RAM/Flash ni binaire complet n'est disponible pour le SHA de référence.
 
@@ -73,7 +73,7 @@ La CI actuelle exécute aussi les suites IR, LoRa, Drone ID, GNSS, JSON, Hash Ov
 
 ### 2.4 Inventaire exact du menu
 
-Le tableau \`APPS[]\` de \`firmware/src/globals.cpp\` contient **40 entrées**, réparties en **7 groupes**. Les contrôles statiques du même fichier vérifient que les plages des groupes se suivent, couvrent toutes les entrées et ne dépassent pas quatre colonnes sur deux lignes.
+Le tableau `APPS[]` de `firmware/src/globals.cpp` contient **40 entrées**, réparties en **7 groupes**. Les contrôles statiques du même fichier vérifient que les plages des groupes se suivent, couvrent toutes les entrées et ne dépassent pas quatre colonnes sur deux lignes.
 
 | Groupe | Entrées visibles dans le menu | Nombre |
 |---|---|---:|
@@ -86,7 +86,7 @@ Le tableau \`APPS[]\` de \`firmware/src/globals.cpp\` contient **40 entrées**, 
 | MORE | GitHub, Radio, FX, OKX, Reader, BadApple, Apps, Settings | 8 |
 | **Total** | **40 entrées / 7 groupes** | **40** |
 
-Le fichier historique \`firmware/docs/feature-inventory.md\` décrit encore une organisation amont différente et annonce 34 applications. Il ne doit plus servir de référence au nombre d'entrées du menu ROZA. La table \`APPS[]\` de \`globals.cpp\` est la source de vérité pour le menu courant. Les écrans et sous-modes d'une entrée ne doivent pas être comptés comme des applications supplémentaires.
+Le fichier historique `firmware/docs/feature-inventory.md` décrit encore une organisation amont différente et annonce 34 applications. Il ne doit plus servir de référence au nombre d'entrées du menu ROZA. La table `APPS[]` de `globals.cpp` est la source de vérité pour le menu courant. Les écrans et sous-modes d'une entrée ne doivent pas être comptés comme des applications supplémentaires.
 
 Le menu Paramètres contient actuellement 15 choix : Wi-Fi, PC MODE, GNSS Config, Brightness, Volume, Boot sound, LED, Theme, Screen off, Date/heure, Units, Battery, Debug bar, Format SD et About.
 
@@ -130,7 +130,7 @@ La documentation officielle M5Stack du Cap LoRa-1262 confirme :
 - LoRa : NSS GPIO5, RESET GPIO3, IRQ GPIO4, BUSY GPIO6, SCK GPIO40, MOSI GPIO14 et MISO GPIO39 ;
 - I²C du Cap sur GPIO8/GPIO9, adresse d'expandeur utilisée par le code : 0x43.
 
-Le code actuel de \`lora.cpp\` réutilise le même objet SPI global que \`sd_files.cpp\`. Cette réutilisation est nécessaire : la microSD et le SX1262 partagent physiquement SCK/MISO/MOSI et ont deux lignes de sélection distinctes (SD GPIO12, LoRa GPIO5). La coexistence simultanée reste un essai matériel à réaliser ; une déclaration de partage dans le code ne prouve pas à elle seule l'absence de collision de transactions, d'accès concurrents ou de sélection CS incorrecte.
+Le code actuel de `lora.cpp` réutilise le même objet SPI global que `sd_files.cpp`. Cette réutilisation est nécessaire : la microSD et le SX1262 partagent physiquement SCK/MISO/MOSI et ont deux lignes de sélection distinctes (SD GPIO12, LoRa GPIO5). La coexistence simultanée reste un essai matériel à réaliser ; une déclaration de partage dans le code ne prouve pas à elle seule l'absence de collision de transactions, d'accès concurrents ou de sélection CS incorrecte.
 
 Le firmware doit conserver l'écoute LoRa comme comportement par défaut. Aucune émission automatique ne doit être introduite. Les profils hors bande ou incompatibles avec l'antenne du Cap ne doivent pas être présentés comme des profils d'émission utilisables. Toute émission doit être explicitement demandée, avec région, fréquence, puissance, duty-cycle, antenne et réglementation France/UE vérifiés.
 
@@ -139,10 +139,10 @@ Le firmware doit conserver l'écoute LoRa comme comportement par défaut. Aucune
 L'identification du système de fichiers de la carte réelle n'est pas consignée. Une carte de 128 Go ne doit pas être supposée FAT32 ; une carte SDXC peut notamment être formatée en exFAT.
 
 Constats dans le code actif :
-- \`sdInit()\` appelle \`SPI.begin(40, 39, 14, 12)\`, puis \`SD.begin(12, SPI, 20000000)\` ;
+- `sdInit()` appelle `SPI.begin(40, 39, 14, 12)`, puis `SD.begin(12, SPI, 20000000)` ;
 - le montage Arduino SD est en lecture/écriture ; le code ne prouve pas l'existence d'un montage protégé contre les écritures ;
-- \`sdInit()\` est appelé au démarrage dans le firmware actuel, alors que la règle du dépôt demande de ne pas monter automatiquement la carte de 128 Go avant identification de son format ;
-- \`formatSD()\` ne recrée pas un système de fichiers : elle supprime récursivement les fichiers et dossiers de la carte via \`SD.remove\` et \`SD.rmdir\`. C'est une opération destructive malgré son nom affiché ;
+- `sdInit()` est appelé au démarrage dans le firmware actuel, alors que la règle du dépôt demande de ne pas monter automatiquement la carte de 128 Go avant identification de son format ;
+- `formatSD()` ne recrée pas un système de fichiers : elle supprime récursivement les fichiers et dossiers de la carte via `SD.remove` et `SD.rmdir`. C'est une opération destructive malgré son nom affiché ;
 - le partage SPI avec le SX1262 doit être testé avec une carte de test et des procédures non destructives.
 
 Décision de préparation : ne pas effectuer de test d'écriture, de suppression ou de formatage sur la carte utilisateur. Étudier une détection non destructive du type de partition et du système de fichiers, puis un pilote assurant la prise en charge du format constaté. SdFat 2.3.1 est un candidat à évaluer pour FAT/exFAT et SPI, mais il ne doit pas remplacer Arduino SD sans test de lecture des données existantes, mesures mémoire et contrôle du bus partagé. Si aucun montage réellement sûr ne peut être garanti, laisser le stockage désactivé plutôt que d'afficher une protection fictive.
@@ -157,13 +157,13 @@ Les contraintes structurantes sont les suivantes :
 | PSRAM | aucune supposée par la configuration ROZA |
 | Écran | 240 × 135 pixels |
 | Canvas RGB565 plein écran | 240 × 135 × 2 = 64 800 octets, soit environ 63,3 Kio |
-| Allocation du canvas | alignement spécifique dans \`globals.cpp\` pour éviter la fragmentation du heap |
+| Allocation du canvas | alignement spécifique dans `globals.cpp` pour éviter la fragmentation du heap |
 | Cache de tuile cartographique | environ 48 Kio documentés dans le plan des dépendances |
 | Bundle de certificats racines | 121 racines, environ 56 Kio compilés en Flash selon la configuration actuelle |
 | TLS | allocations temporaires importantes et besoin de blocs contigus ; les accès HTTPS lourds libèrent temporairement le canvas |
 | Radio / audio | buffers et tâches concurrentes ; la lecture radio libère le canvas afin de réserver de la RAM au décodeur et au flux |
 
-Les mesures historiques de RAM/Flash dans \`firmware/docs/dependency-pins.md\` ont été obtenues sur une base Arduino 2.0.17 / ESP-IDF 4.4.7. Elles ne sont pas des mesures de la base actuelle Arduino 3.3.12 / IDF 5.5.5 et encore moins une mesure de la branche 4.0.0. Elles doivent être conservées comme archives comparatives, pas comme budget courant.
+Les mesures historiques de RAM/Flash dans `firmware/docs/dependency-pins.md` ont été obtenues sur une base Arduino 2.0.17 / ESP-IDF 4.4.7. Elles ne sont pas des mesures de la base actuelle Arduino 3.3.12 / IDF 5.5.5 et encore moins une mesure de la branche 4.0.0. Elles doivent être conservées comme archives comparatives, pas comme budget courant.
 
 La CI du commit de référence échoue avant l'édition de liens. Il n'existe donc pas de mesure fiable du binaire lié courant pour ce SHA. À l'étape 2, relever au minimum :
 - RAM statique et Flash à l'édition de liens ;
@@ -206,8 +206,8 @@ Recommandation : conserver la base 8.0.0 comme point de comparaison reproductibl
 
 ### 5.2 Ruptures et risques amont majeurs
 
-- M5Unified et M5GFX 0.3.0 sont déjà synchronisés. Leur mise à niveau a changé la rotation absolue : sur Cardputer / Cardputer ADV, l'ancien \`setRotation(1)\` correspond maintenant à \`setRotation(0)\`. Certaines fonctions ont également changé leur type de retour de \`void\` à \`bool\`. Les tests écran, microphone, haut-parleur, DMA, IMU et clavier ADV restent obligatoires.
-- RadioLib 8.0.0 est une rupture d'API : les anciens appels \`begin(...)\` à paramètres individuels sont remplacés par des structures de configuration, de nombreux paramètres flottants deviennent des entiers, les callbacks d'interruption sont unifiés et des codes de retour changent. Il faut répertorier tous les appels SX1262 de \`lora.cpp\` avant la migration.
+- M5Unified et M5GFX 0.3.0 sont déjà synchronisés. Leur mise à niveau a changé la rotation absolue : sur Cardputer / Cardputer ADV, l'ancien `setRotation(1)` correspond maintenant à `setRotation(0)`. Certaines fonctions ont également changé leur type de retour de `void` à `bool`. Les tests écran, microphone, haut-parleur, DMA, IMU et clavier ADV restent obligatoires.
+- RadioLib 8.0.0 est une rupture d'API : les anciens appels `begin(...)` à paramètres individuels sont remplacés par des structures de configuration, de nombreux paramètres flottants deviennent des entiers, les callbacks d'interruption sont unifiés et des codes de retour changent. Il faut répertorier tous les appels SX1262 de `lora.cpp` avant la migration.
 - FastLED 3.10.10 est plus récent que le 3.10.3 intégré ; les vieux benchmarks du fichier de pins comparaient surtout des versions sous IDF 4.4.7. Ils ne prouvent pas que 3.10.10 augmente ou réduit la mémoire sur la base actuelle. Mesurer le binaire et vérifier GPIO21 / SK6812 / RMT et la coexistence audio.
 - ESP8266Audio 2.4.3 contient des corrections postérieures au tag 1.9.9, notamment autour des formats ID3v2.4, AAC corrompu et de la pile I²S ESP32. Le portage doit valider le lecteur local, les flux radio, les interruptions de lecture, la mémoire et les transitions microphone/haut-parleur.
 - Le README de LibSSH-ESP32 dit que les cores 2.0.17 et 3.0.7 sont testés ; la version ROZA actuelle est 3.3.12. Un build réussi ne suffit pas à prouver la sûreté de SSH/TLS ou les allocations de mémoire. Comparer le port existant à wolfSSH sans perdre SSH/SCP et après examen des licences.
@@ -273,7 +273,7 @@ Le menu réel contient 40 entrées. La ligne « modernisation prévue » décrit
 - Planes utilise HTTP pour la requête de position des avions.
 - GeoLoc utilise HTTP vers ip-api.com lorsqu'aucune position GNSS/cache n'est disponible.
 - Radio rejette explicitement les URL HTTPS et n'accepte que HTTP.
-- Chat possède une option explicite \`CHAT_ALLOW_INSECURE\` qui appelle \`setInsecure()\`. Elle doit rester désactivée pour toute configuration normale ; les clés API ne doivent jamais être envoyées à travers une connexion dont le certificat n'est pas vérifié.
+- Chat possède une option explicite `CHAT_ALLOW_INSECURE` qui appelle `setInsecure()`. Elle doit rester désactivée pour toute configuration normale ; les clés API ne doivent jamais être envoyées à travers une connexion dont le certificat n'est pas vérifié.
 - GitHub, FX, OKX et Typhoon utilisent déjà des connexions TLS avec bundle ou certificat ; leurs chemins doivent être conservés et testés.
 - Sats utilise HTTPS correctement vérifié, mais exige une clé N2YO intégrée à l'URL. Une source publique sans clé avec calcul local est préférable si la précision et les fonctionnalités sont équivalentes.
 - Le catalogue Apps utilise HTTPS sur GitHub Raw et limite la source à ce domaine.
@@ -288,12 +288,12 @@ Le menu réel contient 40 entrées. La ligne « modernisation prévue » décrit
 
 ### 7.1 État actuel constaté
 
-La table active \`firmware/partitions_8MB.csv\` contient :
+La table active `firmware/partitions_8MB.csv` contient :
 - NVS ;
 - PHY init ;
-- une seule partition applicative \`factory\` à partir de 0x10000, de taille 0x7E0000.
+- une seule partition applicative `factory` à partir de 0x10000, de taille 0x7E0000.
 
-Elle ne contient ni \`otadata\`, ni partitions \`ota_0\` et \`ota_1\`. Le fichier racine \`partitions.csv\` contient un ancien exemple avec deux slots, mais il est historique et interdit d'utilisation pour la compilation active par \`AGENTS.md\`.
+Elle ne contient ni `otadata`, ni partitions `ota_0` et `ota_1`. Le fichier racine `partitions.csv` contient un ancien exemple avec deux slots, mais il est historique et interdit d'utilisation pour la compilation active par `AGENTS.md`.
 
 Le système de livraison actuel produit :
 - une image fusionnée USB à flasher à 0x0000, qui réécrit également la zone NVS et réinitialise donc les préférences ;
@@ -302,14 +302,14 @@ Le système de livraison actuel produit :
 
 Ce deuxième binaire n'est pas un OTA : la carte doit être reliée en USB et placée en mode téléchargement. SHA-256 détecte une corruption ; sans signature et clé de confiance indépendante, il ne prouve pas l'identité de l'éditeur du paquet.
 
-Il n'existe donc pas encore de moteur OTA de production, de mise à jour A/B ou de rollback de firmware. Le document \`docs/ARCHITECTURE.md\` a précédemment décrit deux slots comme s'ils étaient actifs ; cette description doit être corrigée pour refléter la table réellement utilisée.
+Il n'existe donc pas encore de moteur OTA de production, de mise à jour A/B ou de rollback de firmware. Le document `docs/ARCHITECTURE.md` a précédemment décrit deux slots comme s'ils étaient actifs ; cette description doit être corrigée pour refléter la table réellement utilisée.
 
 ### 7.2 Architecture à étudier à l'étape 3
 
 1. Manifeste versionné signé couvrant la cible, la version, la taille, le hash SHA-256, le partitionnement minimum et le paquet.
 2. Clé privée de signature hors du dépôt ; clé publique de vérification intégrée au firmware.
 3. Vérification de signature avant l'installation, puis hash, taille, modèle et compatibilité.
-4. Slots OTA A/B avec \`otadata\`, confirmation du premier démarrage et rollback bootloader activé.
+4. Slots OTA A/B avec `otadata`, confirmation du premier démarrage et rollback bootloader activé.
 5. Téléchargement par Wi-Fi uniquement après demande explicite, et installation locale depuis SD après validation de la carte.
 6. Sauvegarde des préférences NVS avant migration ; récupération USB-C toujours disponible.
 7. Étude précise du budget 8 Mo après compilation du binaire réellement modernisé. L'ancienne table A/B à la racine ne constitue pas une validation du dimensionnement courant.

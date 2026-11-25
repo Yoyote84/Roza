@@ -1,8 +1,8 @@
 # ROZA — Matrice de migration préparatoire pour l'étape 2/5
 
 **Mise à jour :** 25 novembre 2026  
-**Branche de référence :** \`main\`  
-**Commit audité :** \`71cd1ff0216ec426f8d073153c838373181da5b9\`  
+**Branche de référence :** `main`  
+**Commit audité :** `71cd1ff0216ec426f8d073153c838373181da5b9`  
 **Dossier complet :** [Audit étape 1/5](FIRMWARE_REFRESH_STEP1_AUDIT.md)
 
 > Cette matrice est un dossier de préparation. Elle ne signifie pas que les versions cibles sont déjà intégrées ou compatibles. Aucun code firmware ni dépendance n'est modifié ici.
@@ -25,7 +25,7 @@
 | LibSSH-ESP32 | 5.9.0 |
 | SD | Arduino SD / SPI partagé avec SX1262 |
 
-La CI du commit de départ échoue dans Wardrive sur le symbole interne retiré \`STA_STARTED_BIT\`. La compilation échouée interdit d'obtenir une mesure Flash/RAM à jour. Corriger cette API privée fait partie du premier lot de l'étape 2.
+La CI du commit de départ échoue dans Wardrive sur le symbole interne retiré `STA_STARTED_BIT`. La compilation échouée interdit d'obtenir une mesure Flash/RAM à jour. Corriger cette API privée fait partie du premier lot de l'étape 2.
 
 ## 2. Cible du framework
 
@@ -55,7 +55,7 @@ Ne pas confondre pioarduino, qui est une plateforme communautaire, avec la plate
 ## 4. Lots d'intégration proposés
 
 ### Lot A — rendre la base actuelle compilable
-1. Remplacer l'usage de \`STA_STARTED_BIT\` dans Wardrive par les API publiques de gestion Wi-Fi adaptées au core réel.
+1. Remplacer l'usage de `STA_STARTED_BIT` dans Wardrive par les API publiques de gestion Wi-Fi adaptées au core réel.
 2. Contrôler les appels d'attente Wi-Fi et leur timeout, sans dépendance aux symboles internes.
 3. Traiter les avertissements de troncature et référence JSON potentiellement pendante.
 4. Obtenir CI verte sur le commit exact, avec tests logiciels et images de build.

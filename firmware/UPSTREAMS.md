@@ -3,24 +3,24 @@
 ## Source principale et historique d'import
 
 - Dépôt amont initial : https://github.com/Lewis-Peter/cardputer-adv-firmware
-- Commit amont importé : \`3671c86f7850bd0342f39b5befad5b0c02d33f5b\`
+- Commit amont importé : `3671c86f7850bd0342f39b5befad5b0c02d33f5b`
 - Date du commit amont indiquée à l'import : 8 octobre 2026
 - Date d'import dans ROZA : 4 novembre 2026
-- Répertoires importés à l'origine : \`src/\`, \`lib/\`, \`data/\`, \`tools/\`, \`docs/\`, \`platformio.ini\` et les licences associées.
+- Répertoires importés à l'origine : `src/`, `lib/`, `data/`, `tools/`, `docs/`, `platformio.ini` et les licences associées.
 
 Cette provenance explique l'origine du code, mais les versions listées dans la section « import initial » ne représentent pas nécessairement le firmware actuel.
 
 ## Chaîne de compilation active vérifiée sur main le 25 novembre 2026
 
 - Outil : PlatformIO Core 6.2.0
-- Plateforme : \`espressif32@8.0.0\`
+- Plateforme : `espressif32@8.0.0`
 - Framework : Arduino-ESP32 3.3.12
 - Base ESP-IDF : 5.5.5
-- Environnement : \`cardputer-adv\`
-- Carte PlatformIO : \`esp32-s3-devkitc-1\`, Flash 8 Mo
-- Table active : \`firmware/partitions_8MB.csv\`
-- Commande : \`cd firmware && pio run -e cardputer-adv\`
-- Workflow : \`.github/workflows/roza_esp32s3.yml\`
+- Environnement : `cardputer-adv`
+- Carte PlatformIO : `esp32-s3-devkitc-1`, Flash 8 Mo
+- Table active : `firmware/partitions_8MB.csv`
+- Commande : `cd firmware && pio run -e cardputer-adv`
+- Workflow : `.github/workflows/roza_esp32s3.yml`
 
 Le firmware actif est un projet PlatformIO + Arduino-ESP32. Les anciens fichiers ESP-IDF racine sont conservés à titre historique et ne doivent pas être utilisés pour compiler ce firmware.
 
@@ -38,7 +38,7 @@ Le firmware actif est un projet PlatformIO + Arduino-ESP32. Les anciens fichiers
 | ESP8266Audio | tag Git 1.9.9 |
 | LibSSH-ESP32 | 5.9.0 |
 
-Les versions actuellement épinglées sont définies par \`firmware/platformio.ini\` et décrites dans \`firmware/docs/dependency-pins.md\`. Les versions amont disponibles et les changements proposés sont suivis dans \`docs/FIRMWARE_REFRESH_STEP1_AUDIT.md\`.
+Les versions actuellement épinglées sont définies par `firmware/platformio.ini` et décrites dans `firmware/docs/dependency-pins.md`. Les versions amont disponibles et les changements proposés sont suivis dans `docs/FIRMWARE_REFRESH_STEP1_AUDIT.md`.
 
 ## État de validation CI au 25 novembre 2026
 
@@ -46,7 +46,7 @@ Commit de référence : https://github.com/Yoyote84/Roza/commit/71cd1ff0216ec426
 
 Exécution CI : https://github.com/Yoyote84/Roza/actions/runs/45518114744
 
-Le test de nettoyage des anciens composants du jeu retiré réussit. La compilation firmware échoue ensuite dans \`firmware/src/wardrive.cpp\` sur l'identifiant interne \`STA_STARTED_BIT\` qui n'est plus exposé par le core actuel. Les étapes de génération des images et de publication des artefacts sont donc ignorées. Aucun nouveau binaire final ni mesure de mémoire liée au commit de référence n'est disponible.
+Le test de nettoyage des anciens composants du jeu retiré réussit. La compilation firmware échoue ensuite dans `firmware/src/wardrive.cpp` sur l'identifiant interne `STA_STARTED_BIT` qui n'est plus exposé par le core actuel. Les étapes de génération des images et de publication des artefacts sont donc ignorées. Aucun nouveau binaire final ni mesure de mémoire liée au commit de référence n'est disponible.
 
 Un ancien succès CI ou une mesure mémoire sous Arduino 2.0.17 / ESP-IDF 4.4.7 ne valide pas le commit courant.
 

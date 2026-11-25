@@ -1,6 +1,6 @@
 # Architecture logicielle
 
-\`\`\`text
+```text
 Application / Lanceur
         |
 API de services (événements, stockage, périphériques)
@@ -18,17 +18,17 @@ API de services (événements, stockage, périphériques)
 Abstraction matérielle (BSP Cardputer ADV + Cap)
         |
 ESP32-S3FN8 / ST7789V2 / TCA8418 / BMI270 / SD / SX1262 / AT6668
-\`\`\`
+```
 
 ## Modules
 
-- \`kernel\` : cycle de vie, événements, supervision.
-- \`bsp\` : broches et initialisation de la carte.
-- \`drivers\` : pilotes matériels isolés.
-- \`services\` : API stables pour les applications.
-- \`apps\` : applications autonomes.
-- \`ui\` : écran d'accueil, widgets et thème ROZA.
-- \`storage\` : configuration NVS et données microSD.
+- `kernel` : cycle de vie, événements, supervision.
+- `bsp` : broches et initialisation de la carte.
+- `drivers` : pilotes matériels isolés.
+- `services` : API stables pour les applications.
+- `apps` : applications autonomes.
+- `ui` : écran d'accueil, widgets et thème ROZA.
+- `storage` : configuration NVS et données microSD.
 
 ## Règles de concurrence
 
@@ -50,9 +50,9 @@ ESP32-S3FN8 / ST7789V2 / TCA8418 / BMI270 / SD / SX1262 / AT6668
 
 ## Partitionnement réellement utilisé par le firmware actif
 
-La configuration active est \`firmware/partitions_8MB.csv\`, sélectionnée dans \`firmware/platformio.ini\`. Elle réserve NVS, PHY init et une seule partition applicative \`factory\` de 0x7E0000 octets à partir de 0x10000.
+La configuration active est `firmware/partitions_8MB.csv`, sélectionnée dans `firmware/platformio.ini`. Elle réserve NVS, PHY init et une seule partition applicative `factory` de 0x7E0000 octets à partir de 0x10000.
 
-**Il n'y a actuellement ni partition \`otadata\`, ni \`ota_0\`, ni \`ota_1\`.** Le firmware ne dispose donc pas d'un partitionnement A/B et ne peut pas garantir de rollback logiciel après une mise à jour. Le fichier racine \`partitions.csv\` est historique et n'est pas utilisé pour compiler le firmware actif.
+**Il n'y a actuellement ni partition `otadata`, ni `ota_0`, ni `ota_1`.** Le firmware ne dispose donc pas d'un partitionnement A/B et ne peut pas garantir de rollback logiciel après une mise à jour. Le fichier racine `partitions.csv` est historique et n'est pas utilisé pour compiler le firmware actif.
 
 ## Architecture OTA à envisager à l'étape 3
 
