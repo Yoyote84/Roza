@@ -67,9 +67,21 @@ Avertissements secondaires observés dans la même sortie :
 - `typhoon.cpp` : référence potentiellement pendante vers un `JsonArray` temporaire ;
 - `wardrive.cpp` : format `%u` utilisé avec un `uint32_t` qui correspond à `%lu` sur cette cible.
 
-La CI actuelle exécute aussi les suites IR, LoRa, Drone ID, GNSS, JSON, Hash Oven, batterie, RAM, Astro, calculatrice, horloge, tests routeur/RID, balayage mémoire, test statique NimBLE, tests de paquetage et création des images. Le test de nettoyage des anciens composants Hawkins est réussi sur ce commit. La compilation échouant avant l'édition de liens, aucun nouveau rapport RAM/Flash ni binaire complet n'est disponible pour le SHA de référence.
+Le workflow définit aussi les suites IR, LoRa, Drone ID, GNSS, JSON, Hash Oven, batterie, RAM, Astro, calculatrice, horloge, routeur/RID, balayage mémoire, contrôle statique NimBLE, tests de paquetage et génération des images. **Ces étapes sont placées après la compilation et ont été ignorées dans cette exécution**, car la compilation s'est arrêtée en erreur. Le test de nettoyage des anciens composants Hawkins, placé avant la compilation, a réussi. Aucun nouveau rapport RAM/Flash ni binaire complet n'est disponible pour le SHA de référence.
 
 **Conséquence pour la suite :** réparer l'API Wi-Fi privée dans Wardrive, traiter les avertissements qui révèlent un risque réel, compiler et mesurer le binaire relèvent de l'étape 2/5. Ne pas masquer cet échec en modifiant la documentation ou en sautant le contrôle CI.
+
+### 2.3.1 Examen du workflow GitHub Actions
+
+Le workflow `.github/workflows/roza_esp32s3.yml` a été relu :
+- déclenchement sur les changements de `main`, les pull requests vers `main` et le lancement manuel ;
+- filtre de chemins sur le firmware, les documents et le workflow lui-même ;
+- permission explicite `contents: read`, sans permission d'écriture de dépôt ou de publication ;
+- PlatformIO Core installé en version exacte 6.2.0 et dépendances résolues affichées par `platformio pkg list` ;
+- artefacts de compilation conservés 14 jours ;
+- actions externes référencées par tags majeurs (`actions/checkout@v4`, `actions/upload-artifact@v4`) et non par SHA de commit immuable.
+
+Le principe de moindre privilège est correct. Le point d'amélioration de la chaîne d'approvisionnement est d'épingler les actions externes à leur SHA complet et vérifié, puis d'automatiser leur suivi de version. Le runner `ubuntu-latest` reste volontairement mobile ; les versions de PlatformIO et des bibliothèques doivent donc rester exactes, et le journal de compilation doit toujours afficher les outils réellement résolus.
 
 ### 2.4 Inventaire exact du menu
 
@@ -273,7 +285,7 @@ Le menu réel contient 40 entrées. La ligne « modernisation prévue » décrit
 - Planes utilise HTTP pour la requête de position des avions.
 - GeoLoc utilise HTTP vers ip-api.com lorsqu'aucune position GNSS/cache n'est disponible.
 - Radio rejette explicitement les URL HTTPS et n'accepte que HTTP.
-- Chat possède une option explicite `CHAT_ALLOW_INSECURE` qui appelle `setInsecure()`. Elle doit rester désactivée pour toute configuration normale ; les clés API ne doivent jamais être envoyées à travers une connexion dont le certificat n'est pas vérifié.
+- Les valeurs par défaut dans `api_config.h` sont vides pour les services qui ont besoin d'un compte ou d'une clé, et `CHAT_ALLOW_INSECURE` vaut `false`. Le fichier exemple contient des marqueurs de remplacement, pas de vrais secrets. Chat possède néanmoins une option explicite `CHAT_ALLOW_INSECURE` qui appelle `setInsecure()` lorsqu'elle est activée : elle doit rester désactivée pour toute configuration normale ; les clés API ne doivent jamais être envoyées à travers une connexion dont le certificat n'est pas vérifié. Sats est la seule application relevée dont le chemin de récupération des données retourne immédiatement une erreur lorsque la clé N2YO est vide.
 - GitHub, FX, OKX et Typhoon utilisent déjà des connexions TLS avec bundle ou certificat ; leurs chemins doivent être conservés et testés.
 - Sats utilise HTTPS correctement vérifié, mais exige une clé N2YO intégrée à l'URL. Une source publique sans clé avec calcul local est préférable si la précision et les fonctionnalités sont équivalentes.
 - Le catalogue Apps utilise HTTPS sur GitHub Raw et limite la source à ce domaine.
