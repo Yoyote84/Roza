@@ -1,0 +1,2 @@
+# ESP-IDF 5.5.6 bootloader setting required for A/B OTA rollback.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
