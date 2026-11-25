@@ -24,7 +24,7 @@ La base active visée pour le Cardputer ADV est désormais :
 - La sélection du sous-domaine des tuiles gère explicitement une liste vide, configuration hors ligne par défaut.
 - Le scan BLE étendu configure les événements HCI à **257 octets**, requis par NimBLE 2.5.2 pour EXT_ADV ; la valeur générique de 70 octets du SDK est harmonisée avant la compilation des bibliothèques.
 
-Le palier 55.03.313 est un saut incrémental par rapport à la base 3.3.12 / 5.5.5. La branche Arduino 4.0 / ESP-IDF 6.1.1 reste un saut majeur distinct et n'est pas adoptée sans validation séparée. Les dépendances non indispensables au portage restent épinglées à leurs versions précédentes : elles seront mises à niveau séparément uniquement si un conflit de compilation ou un besoin concret l'exige.
+Le palier 55.03.313 est un saut incrémental par rapport à la base 3.3.12 / 5.5.5. FastLED est maintenant épinglé en 3.10.10 (publication du 20/11/2026) : ses notes de version récentes annoncent notamment des réductions de Flash/RAM sur ESP32, mais le build CI ne valide pas le comportement électrique/RMT du SK6812 GPIO21. La branche Arduino 4.0 / ESP-IDF 6.1.1 reste un saut majeur distinct et n'est pas adoptée sans validation séparée, car elle change plusieurs API du framework et des dépendances.
 
 **Attention :** les mesures RAM/Flash de la section benchmark ci-dessous ont été obtenues sous Arduino 2.0.17 / ESP-IDF 4.4.7. Elles sont un point de comparaison historique, pas une mesure de la nouvelle base. La compilation et la CI doivent fournir de nouvelles mesures avant de déclarer la migration validée.
 
@@ -41,7 +41,7 @@ M5Unified/M5GFX 0.3.0 change la sémantique des rotations absolues : sur Cardput
 | M5Unified | 0.3.0 | À synchroniser avec M5GFX 0.3.0 |
 | M5GFX | 0.3.0 | Épinglé explicitement avec M5Unified 0.3.0 |
 | NimBLE-Arduino | 2.5.2 | Nouvelle pile BLE sans Bluedroid direct; BLE scan/HID, annonces étendues et PHY Coded |
-| FastLED | 3.10.3 | Maintenu pour isoler cette migration ; revalider la version récente sous IDF 5.5.6 |
+| FastLED | 3.10.10 | Version amont du 20/11/2026 ; build CI à valider sous Arduino 3.3.13. Le RMT/SK6812 GPIO21 reste un essai physique de l'étape 5. |
 | ArduinoJson | 7.4.3 | |
 | RadioLib | 8.0.0 | |
 | TinyGPSPlus | 1.1.0 | |
