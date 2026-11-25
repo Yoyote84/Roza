@@ -152,13 +152,16 @@ static bool fetchTrack(WiFiClientSecure& client, TcMeta& m) {
     int hours = o["advancedHours"];
     if (hours == 0) {
       // 实况段：track 里是走过的路。先热带低压阶段，再台风阶段，接起来就是完整路径。
-      for (const char* key : {"preTyphoon", "typhoon"})
-        for (JsonArray p : o["track"][key].as<JsonArray>()) {
+      JsonObject track = o["track"].as<JsonObject>();
+      for (const char* key : {"preTyphoon", "typhoon"}) {
+        JsonArray points = track[key].as<JsonArray>();
+        for (JsonArray p : points) {
           if (det.pastN >= MAX_TRACK || p.size() != 2) continue;
           det.past[det.pastN].lat = p[0];
           det.past[det.pastN].lon = p[1];
           det.pastN++;
         }
+      }
       JsonArray c = o["center"];
       if (c.size() == 2) { det.lat = c[0]; det.lon = c[1]; }
     } else if (det.fcN < MAX_FC) {

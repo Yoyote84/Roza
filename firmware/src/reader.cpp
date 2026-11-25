@@ -55,11 +55,11 @@ static uint32_t fnv1a(const String& s) {
   return h;
 }
 void readerSaveProgress() {
-  char key[9]; snprintf(key, sizeof(key), "%08x", fnv1a(readerPath));
+  char key[9]; snprintf(key, sizeof(key), "%08lx", (unsigned long)fnv1a(readerPath));
   saveUInt("reader", key, readerPageStart);
 }
 uint32_t readerLoadProgress(const String& path) {
-  char key[9]; snprintf(key, sizeof(key), "%08x", fnv1a(path));
+  char key[9]; snprintf(key, sizeof(key), "%08lx", (unsigned long)fnv1a(path));
   return loadUInt("reader", key, 0);
 }
 

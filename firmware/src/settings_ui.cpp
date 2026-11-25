@@ -325,7 +325,7 @@ void drawTz() {
   if(manualTimeEditing) {
     drawPageHeader("Reglage manuel","DATE / HEURE",ACCENT);
     const char* names[]={"ANNEE","MOIS","JOUR","HEURE","MIN"};
-    char dateBuf[24],timeBuf[16],dayBuf[24];
+    char dateBuf[40],timeBuf[16],dayBuf[24];
     snprintf(dateBuf,sizeof(dateBuf),"%04d-%02d-%02d",manualTimeValue.tm_year+1900,manualTimeValue.tm_mon+1,manualTimeValue.tm_mday);
     snprintf(timeBuf,sizeof(timeBuf),"%02d:%02d",manualTimeValue.tm_hour,manualTimeValue.tm_min);
     struct tm p=manualTimeValue; p.tm_isdst=-1; time_t ep=mktime(&p); struct tm wd{}; localtime_r(&ep,&wd);

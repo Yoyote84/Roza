@@ -81,7 +81,7 @@ static void ridAppStartRecord() {
   char toast[28];
   const char* slash = strrchr(path, '/');
   const char* fname = slash ? (slash + 1) : path;
-  snprintf(toast, sizeof(toast), "REC: %s", fname);
+  snprintf(toast, sizeof(toast), "REC: %.22s", fname);
   setSdToast(toast, TFT_GREEN);
 }
 
@@ -788,7 +788,7 @@ static void drawRidRadar(uint32_t now, bool haveMe, double myLat, double myLon) 
       cv.drawLine(x, y, x + (int)lroundf(sinf(a) * 9), y - (int)lroundf(cosf(a) * 9), col);
     }
     if (clipped) cv.drawCircle(x, y, 3, col); else cv.fillCircle(x, y, sel ? 3 : 2, col);
-    char num[4]; snprintf(num, sizeof(num), "%d", i + 1);
+    char num[12]; snprintf(num, sizeof(num), "%d", i + 1);
     cv.setTextDatum(top_left); cv.setTextColor(col, TFT_BLACK);
     cv.drawString(num, x + 4, y - 9);
   }

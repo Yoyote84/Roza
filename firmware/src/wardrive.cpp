@@ -103,7 +103,8 @@ void wardriveEnter() {
   WiFi.mode(scanMode);
   uint32_t t0 = millis();
   while (WiFi.getMode() != scanMode && (millis() - t0 < 300)) delay(10);
-  WiFiGenericClass::waitStatusBits(STA_STARTED_BIT, 300);
+  // WiFi.mode() démarre l'interface STA dans Arduino-ESP32.
+  // STA_STARTED_BIT est un détail privé du framework, pas une API publique.
   WiFi.disconnect();
   delay(40);
   resetStats();
@@ -233,7 +234,7 @@ void drawWardrive() {
   if (autoMode) {
     int32_t left = (int32_t)(nextScanMs - millis());
     uint32_t remain = left > 0 ? (uint32_t)left / 1000 : 0;
-    snprintf(rightBuf, sizeof(rightBuf), "AUTO %us  %s", remain, sdStatus);
+    snprintf(rightBuf, sizeof(rightBuf), "AUTO %lus  %s", (unsigned long)remain, sdStatus);
   } else {
     snprintf(rightBuf, sizeof(rightBuf), "%s  %s", scanning ? "SCANNING" : "MANUAL", sdStatus);
   }

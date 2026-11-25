@@ -438,7 +438,7 @@ void drawPlayer() {
     cv.setTextDatum(middle_left);
 
     // 编号胶囊
-    char numBuf[8];
+    char numBuf[12];
     snprintf(numBuf, sizeof(numBuf), "%02d", idx + 1);
     cv.setTextColor(sel ? 0x07FF : 0x632C, bg);
     cv.drawString(numBuf, 14, y + rowH / 2 - 1);

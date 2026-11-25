@@ -22,7 +22,7 @@ void drawSkyBg(int ytop, int yhor, int maxEl) {
   for (int e = step; e < maxEl; e += step) {
     int y = yhor - e * hh / maxEl;
     for (int x = 0; x < SW; x += 8) cv.drawPixel(x, y, DIM_BORDER);
-    char s[6]; snprintf(s, sizeof(s), "%d", e);
+    char s[12]; snprintf(s, sizeof(s), "%d", e);
     cv.setTextColor(ICON_DIM);
     cv.drawString(s, SW - 2, y);
   }

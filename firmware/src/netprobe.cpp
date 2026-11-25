@@ -530,8 +530,8 @@ static bool dnsStartPending = false;
 
 // 发一次标准正常查询并计算 RTT 毫秒；若超时返回 0
 static uint16_t controlCheckRtt(WiFiUDP& udp) {
-  udp.flush();
-  while (udp.parsePacket() > 0) udp.flush(); // 清理历史残留响应
+  udp.clear();
+  while (udp.parsePacket() > 0) udp.clear(); // 清理历史残留响应
 
   uint16_t reqId = nextDnsId();
   uint8_t buf[64];
@@ -558,7 +558,7 @@ static uint16_t controlCheckRtt(WiFiUDP& udp) {
       if (udp.available() >= 2) {
         respId = ((uint16_t)udp.read() << 8) | (uint16_t)udp.read();
       }
-      udp.flush();
+      udp.clear();
       if (respId == reqId) {
         return dt == 0 ? 1 : (uint16_t)dt;
       }
@@ -627,7 +627,7 @@ static void runDnsCase(int i) {
       int psize = udp.parsePacket();
       if (psize > 0) {
         dnsResults[i].directReply = true;
-        udp.flush(); // 释放接收缓冲，避免后续探针误阻塞
+        udp.clear(); // 释放接收缓冲，避免后续探针误阻塞
         break;
       }
       delay(5);
@@ -893,7 +893,7 @@ void drawNetprobe() {
     } else if (autoMode) {
       int32_t left = (int32_t)(nextAutoMs - millis());
       uint32_t remain = left > 0 ? (uint32_t)left / 1000 : 0;
-      snprintf(rightBuf, sizeof(rightBuf), "AUTO %us %s", remain, sdReady() ? "[SD]" : "[NO SD]");
+      snprintf(rightBuf, sizeof(rightBuf), "AUTO %lus %s", (unsigned long)remain, sdReady() ? "[SD]" : "[NO SD]");
       rightCol = TFT_YELLOW;
     } else if (probeResults[0].status == STAT_WAIT) {
       snprintf(rightBuf, sizeof(rightBuf), "READY %s", sdReady() ? "[SD]" : "[NO SD]");
