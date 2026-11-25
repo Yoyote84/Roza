@@ -32,6 +32,19 @@ La clé privée n'est jamais stockée dans le dépôt. Le workflow Pages attend 
 
 La signature porte sur une représentation canonique qui lie la cible, le build, le commit, la taille, le SHA-256 et l'URL exacte du binaire. Le manifeste seul ne peut donc pas être modifié pour pointer vers une autre image ou une autre version.
 
+## Configuration initiale du secret GitHub Actions
+
+La clé privée de signature correspond à la clé publique intégrée dans `firmware/src/ota_public_key.h`. Elle est fournie séparément au propriétaire du dépôt et ne doit jamais être commitée, publiée dans un artefact public ou envoyée dans une issue.
+
+Dans GitHub :
+1. Ouvrir le dépôt `Yoyote84/Roza`, puis **Settings → Secrets and variables → Actions**.
+2. Choisir **New repository secret**.
+3. Nom exact : `ROZA_OTA_SIGNING_KEY_PEM`.
+4. Coller le contenu intégral du fichier PEM privé fourni séparément, en conservant les lignes BEGIN/END.
+5. Enregistrer le secret.
+
+Le workflow Pages le consomme uniquement pendant la création du manifeste signé. Sans ce secret, aucun manifeste OTA installable n'est publié. Le connecteur GitHub utilisé pour les modifications du code ne permet pas de créer des secrets de dépôt ; cette étape de configuration doit donc être faite par le propriétaire dans l'interface GitHub.
+
 ## Limites de sécurité
 
 Secure Boot, chiffrement Flash et anti-rollback eFuse ne sont pas activés automatiquement : ces protections irréversibles nécessitent un provisioning matériel, une stratégie de récupération et des essais dédiés. La CI ne simule pas une coupure d'alimentation ni un Cardputer physique ; les essais de l'écran, du clavier, du GNSS, du SX1262 et du rollback réel restent à faire à l'étape 5/5.
