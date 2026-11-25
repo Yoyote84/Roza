@@ -117,9 +117,14 @@ jobs:
           echo "::group::Flash package guard tests"
           python tools/package_flash_test.py
           echo "::endgroup::"
+          echo "::group::OTA signature and partition security tests"
+          python tools/ota_security_test.py
+          echo "::endgroup::"
       - name: Assemble flashable Cardputer ADV images
         working-directory: firmware
         shell: bash
+        env:
+          ROZA_OTA_SIGNING_KEY_PEM: ${{ secrets.ROZA_OTA_SIGNING_KEY_PEM }}
         run: |
           set -euo pipefail
           BUILD=".pio/build/cardputer-adv"
@@ -188,6 +193,21 @@ jobs:
           cp "$BUILD/partitions.bin" "$PACKAGE/partitions.bin"
           cp "$GITHUB_WORKSPACE/firmware/tools/migrate_to_ota.sh" "$PACKAGE/migrate_to_ota.sh"
           chmod +x "$PACKAGE/migrate_to_ota.sh"
+
+          # Signing key is scoped to this step and never uploaded as an artifact.
+          if [[ -n "$ROZA_OTA_SIGNING_KEY_PEM" ]]; then
+            printf '%s\n' "$ROZA_OTA_SIGNING_KEY_PEM" > "$RUNNER_TEMP/roza-ota-signing-key.pem"
+            cp "$BUILD/firmware.bin" "$PACKAGE/ROZA-OTA.bin"
+            python "$GITHUB_WORKSPACE/firmware/tools/create_ota_manifest.py" \
+              --firmware "$PACKAGE/ROZA-OTA.bin" \
+              --private-key "$RUNNER_TEMP/roza-ota-signing-key.pem" \
+              --output "$PACKAGE/ota-manifest.json" \
+              --build-number "$GITHUB_RUN_NUMBER" \
+              --commit "$GITHUB_SHA"
+            rm -f "$RUNNER_TEMP/roza-ota-signing-key.pem"
+          else
+            echo "::warning::ROZA_OTA_SIGNING_KEY_PEM absent: no unsigned OTA will be published."
+          fi
 
           export FIRMWARE_BYTES APP_PARTITION_BYTES FLASH_BYTES RAM_LINE FLASH_LINE
           python - <<'PY'
@@ -264,6 +284,9 @@ jobs:
           EOF
 
           (cd "$PACKAGE" && sha256sum *.bin BUILD_MANIFEST.json PLATFORMIO_MEMORY.txt PLATFORMIO_BUILD_REPORT.txt ELF_SECTIONS.txt INSTALLATION.txt migrate_to_ota.sh > SHA256SUMS.txt)
+          if [[ -s "$PACKAGE/ota-manifest.json" ]]; then
+            (cd "$PACKAGE" && sha256sum ota-manifest.json >> SHA256SUMS.txt)
+          fi
           (cd "$PACKAGE" && sha256sum -c SHA256SUMS.txt)
           ls -lh "$PACKAGE"
 
@@ -303,6 +326,11 @@ jobs:
             "$RUNNER_TEMP/roza-firmware-package/firmware.bin" \
             "$RUNNER_TEMP/roza-firmware-package/migrate_to_ota.sh" \
             "$GITHUB_WORKSPACE/site/downloads/migration/"
+          if [[ -s "$RUNNER_TEMP/roza-firmware-package/ota-manifest.json" ]]; then
+            cp "$RUNNER_TEMP/roza-firmware-package/ROZA-OTA.bin" \
+              "$RUNNER_TEMP/roza-firmware-package/ota-manifest.json" \
+              "$GITHUB_WORKSPACE/site/downloads/"
+          fi
           cp "$RUNNER_TEMP/roza-firmware-package/INSTALLATION.txt" \
             "$GITHUB_WORKSPACE/site/downloads/INSTALLATION.txt"
           cp "$RUNNER_TEMP/roza-firmware-package/BUILD_MANIFEST.json" \
