@@ -1,104 +1,61 @@
-# Flasher РO3A — M5Stack Cardputer ADV
+# ROZA — Flash et migration Cardputer ADV
 
-Ce guide concerne exclusivement le **M5Stack Cardputer ADV** (ESP32-S3FN8, 8 Mio de Flash, sans PSRAM).
+Cible : M5Stack Cardputer ADV, ESP32-S3FN8, Flash 8 Mio, sans PSRAM.
 
-## Image prête à flasher
+## Règles
 
-Le workflow GitHub Actions « ROZA Firmware Build » publie un artefact nommé
-`roza-cardputer-adv-flash-<commit>`. Il contient :
+- Ne jamais utiliser Erase all, Chip erase ou un effacement complet pour conserver les réglages NVS.
+- Ne pas flasher un binaire applicatif à une adresse supposée.
+- La microSD ne participe pas aux mises à jour : elle ne sera ni montée, ni formatée, ni écrite.
+- L'image complète écrite à 0x0000 réinitialise les préférences NVS ; les fichiers de la microSD restent séparés et ne sont pas inclus dans l'image.
 
-- `roza-cardputer-adv-8mb.bin` : image fusionnée unique, à écrire à l'adresse `0x0000` ;
-- `FLASH-INFO.txt` : cible et disposition mémoire ;
-- `SHA256SUMS.txt` : empreinte de contrôle.
+## 1. Migration USB unique de l'ancienne table factory vers A/B
 
-L'image fusionne les régions réellement compilées :
-- bootloader à `0x0000` ;
-- table de partitions à `0x8000` ;
-- application `factory` à `0x10000`.
+Nécessaire uniquement aux appareils utilisant encore l'ancienne table factory à 0x10000. Cette ancienne table ne possède aucun slot OTA.
 
-Le paquetage vérifie que la partition factory existe et que le binaire applicatif tient dedans. Il ne modifie aucun fichier de l'interface.
+Le paquet de migration contient :
+- bootloader.bin à 0x0000 ;
+- partitions.bin à 0x8000 ;
+- firmware.bin à 0x20000 (slot OTA_0) ;
+- migrate_to_ota.sh et SHA256SUMS-migration.txt.
 
-## Données réinitialisées par cette image
+Depuis le dossier du paquet :
+    
+    sha256sum -c SHA256SUMS-migration.txt
+    chmod +x migrate_to_ota.sh
+    ./migrate_to_ota.sh /dev/ttyACM0 .
 
-L'image fusionnée est écrite en une seule fois depuis l'adresse `0x0000`. Les espaces
-entre le bootloader, la table de partitions et l'application sont remplis avec `0xFF`.
-Cela inclut la partition NVS (`0x9000`), qui contient les préférences et identifiants
-enregistrés par le firmware. **Chaque flash de cette image réinitialise donc les réglages
-ROZA** (fuseau horaire, luminosité, réseaux Wi-Fi mémorisés, mot de passe du hotspot, etc.).
+Remplace /dev/ttyACM0 par le port série réellement attribué au Cardputer. Sur Android, identifie le port OTG avant d'exécuter le script.
 
-La microSD est une mémoire séparée : cette image ne l'efface pas et ne la formate pas. Les cartes détaillées ne sont pas incluses dans le binaire : elles se copient séparément sur la microSD, selon `firmware/docs/MAPS_OFFLINE.md`.
-Attention : le pilote SD actuel monte la carte en lecture/écriture ; il ne garantit pas un
-montage matériellement protégé en lecture seule. La fonction appelée « Format SD » ne
-recrée pas le système de fichiers : elle supprime récursivement les fichiers et dossiers.
-Ne l'utiliser sous aucun prétexte pendant les premiers essais. Utiliser une carte de test
-vide ou une sauvegarde vérifiée. Le pilote Arduino SD courant ne garantit pas la prise
-en charge d'une carte SDXC exFAT de 128 Go ; vérifier le format avant de compter dessus.
+Le script exige que tu saisisses MIGRATE-ROZA. Il efface seulement otadata (0xF000, 8 Kio), écrit ensuite le bootloader, la table et OTA_0, sans effacer la puce. NVS (0x9000..0xDFFF) et PHY (0xE000..0xEFFF) sont préservées. Ne débranche pas le câble et ne coupe pas l'alimentation pendant les écritures. Après migration, redémarre et vérifie ROZA avant toute OTA.
 
-## Mise à jour USB sans réinitialiser les réglages
+## 2. Image complète USB
 
-Pour une ROZA déjà installée avec la table de partitions actuelle, le workflow publie
-un artefact séparé `roza-cardputer-adv-update-<commit>`. Il contient `ROZA_UPDATE.bin`,
-qui est uniquement le binaire applicatif destiné à la partition factory.
+Pour une installation neuve, une récupération ou un changement depuis un autre firmware :
+1. Vérifie SHA256SUMS-flash.txt.
+2. Flashe roza-cardputer-adv-8mb.bin à l'adresse 0x0000.
+3. Cette image complète réinitialise les préférences NVS ; elle ne contient pas les fichiers de la microSD et ne la formate pas.
 
-Conditions impératives :
-- Cardputer ADV ESP32-S3FN8, 8 Mio ;
-- firmware ROZA déjà installé ;
-- table de partitions inchangée (le SHA-256 attendu est indiqué dans `UPDATE-INFO.txt`) ;
-- écrire `ROZA_UPDATE.bin` à **`0x10000`** ;
-- désactiver toute option « Erase all / Erase flash / Chip erase » dans l'outil.
+## 3. Mode téléchargement Cardputer ADV
 
-Cette opération ne contient ni bootloader, ni table de partitions, ni NVS : elle ne
-réécrit donc pas ces zones. Les préférences et la microSD ne sont pas volontairement
-effacées. Le nouveau firmware peut toutefois effectuer ses propres migrations NVS au
-démarrage ; une sauvegarde des réglages importants reste prudente.
+1. Débranche le câble USB.
+2. Mets l'interrupteur latéral sur OFF.
+3. Maintiens G0.
+4. Branche le câble USB-C de données.
+5. Relâche G0 quand la carte est alimentée.
 
-**Ne pas utiliser ce paquet** pour passer de M5Launcher ou d'un autre firmware à ROZA,
-ni si la table de partitions a changé. Dans ces cas, utiliser l'image complète à
-`0x0000` et prévoir la réinitialisation des réglages. Il ne s'agit pas d'une OTA :
-le Cardputer doit toujours être connecté en USB et placé en mode téléchargement.
+## 4. OTA après migration
 
-## Entrer en mode téléchargement
+Après installation de la table A/B et vérification du démarrage :
+1. Active Wi-Fi depuis Paramètres et connecte-toi à un réseau mémorisé.
+2. Ouvre Paramètres → Mise à jour.
+3. Appuie sur R ou Entrée pour vérifier le manifeste signé.
+4. Vérifie le numéro de build puis appuie sur Y pour confirmer.
+5. Laisse le Cardputer alimenté jusqu'au redémarrage.
+6. ROZA ne confirme le nouveau firmware qu'après le contrôle de démarrage ; un échec doit déclencher le retour au slot précédent.
 
-1. Débrancher le câble USB.
-2. Mettre l'interrupteur latéral sur **OFF**.
-3. Maintenir le bouton **G0** (bouton utilisateur).
-4. Brancher le câble USB-C de données tout en maintenant G0.
-5. Relâcher G0 une fois la carte alimentée : elle est en mode téléchargement.
+Une OTA signée n'est publiée qu'après configuration du secret Actions ROZA_OTA_SIGNING_KEY_PEM. Sans ce secret, aucune image OTA non signée n'est publiée ou installable.
 
-Cette séquence correspond à la procédure officielle M5Stack pour Cardputer-Adv.
+## 5. Essais matériels — étape 5/5
 
-## Flash
-
-Dans un outil de flash ESP32-S3 qui accepte une image binaire unique :
-
-1. Sélectionner la puce **ESP32-S3**.
-2. Sélectionner `roza-cardputer-adv-8mb.bin`.
-3. Régler l'adresse de flash sur **`0x0000`**.
-4. Lancer l'écriture et attendre la confirmation de fin.
-5. Débrancher, puis redémarrer normalement (interrupteur ON).
-
-Ne pas sélectionner séparément `firmware.bin` à l'adresse 0 : ce fichier ne contient que l'application, pas le bootloader ni la table de partitions.
-
-## Depuis Android
-
-Le téléphone doit prendre en charge l'USB OTG et le câble doit transporter les données. La prise en charge du port série USB dépend de l'application et du navigateur utilisés ; Chrome Android ne fournit pas le Web Serial natif de bureau. On vérifiera le moyen de flash réellement disponible sur ton téléphone avant de lancer l'opération, plutôt que de te faire installer un outil qui ne voit pas le Cardputer.
-
-## Premier démarrage
-
-Après un flash réussi, vérifier d'abord :
-1. démarrage et affichage ;
-2. clavier et navigation ;
-3. batterie et veille ;
-4. microSD : vérifier la détection et la lecture, sans suppression ni écriture ;
-5. modules radio/GNSS uniquement lorsqu'ils sont présents et activés volontairement.
-
-Ne pas formater la microSD. Ne pas activer d'émission LoRa automatique. Les essais physiques ne sont pas simulés par la CI.
-
-
-## Contrôles anti-paquet invalide
-
-Avant publication, le paquetage vérifie que la table de partitions correspond exactement à la disposition ROZA Cardputer ADV, que l'en-tête applicatif cible l'ESP32-S3 et que l'application tient dans la partition factory. Les fichiers générés sont relus et comparés aux octets attendus. La CI exécute des tests négatifs pour vérifier le rejet d'une table modifiée, d'une cible incorrecte, d'un en-tête invalide et d'une image tronquée. Le fichier `UPDATE-INFO.txt` contient aussi l'empreinte SHA-256 de l'application.
-
-Ces contrôles vérifient la structure et la cible du binaire, pas son comportement sur le Cardputer. Ils ne peuvent pas garantir à eux seuls l'absence d'écran noir : un essai de démarrage sur le matériel reste indispensable.
-
-Le partitionnement actuel ne comporte qu'un seul emplacement applicatif factory. Il ne permet donc pas de revenir automatiquement à l'ancienne version après un échec de démarrage. Un vrai rollback exige une migration du partitionnement et du bootloader, qui n'est pas incluse dans cette mise à jour.
+Tester l'écran, le clavier, le son, le démarrage avec et sans SD, la conservation NVS/SD, GNSS, IMU, SX1262, une mise à jour A/B et un rollback provoqué volontairement sur un appareil de test. La CI ne remplace pas ces essais.
