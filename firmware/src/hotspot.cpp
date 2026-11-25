@@ -3,7 +3,7 @@
 #include <esp_wifi.h>
 #include <esp_system.h>
 #include <bootloader_random.h>
-#include "dhcpserver/dhcpserver.h"   // dhcp_search_ip_on_mac：按 MAC 查 DHCP 租约表拿到分配的 IP
+#include <esp_netif.h>              // API publique pour lire les baux DHCP du SoftAP
 #include "ui_common.h"
 #include "config.h"
 
@@ -15,16 +15,28 @@ struct HotspotClient {
   String ip;
 };
 
-// 连上的设备只知道 MAC（esp_wifi_ap_get_sta_list），IP 得再查一次 DHCP 租约表才有
+// La liste Wi-Fi fournit les MAC ; ESP-NETIF récupère ensuite leurs baux DHCP.
 static int listClients(HotspotClient* out, int maxOut) {
   wifi_sta_list_t staList;
   if (esp_wifi_ap_get_sta_list(&staList) != ESP_OK) return 0;
+
+  // WIFI_AP_DEF est l'interface SoftAP créée par le framework Arduino-ESP32.
+  // Cette API publique existe sur ESP-IDF 5.5 et 6.x ; ne pas dépendre de dhcps_t,
+  // qui est un détail interne du serveur DHCP et dont la signature a changé.
+  esp_netif_t* apNetif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+
   int n = 0;
   for (int i = 0; i < staList.num && n < maxOut; i++) {
-    memcpy(out[n].mac, staList.sta[i].mac, 6);
-    ip4_addr_t ip;
-    if (dhcp_search_ip_on_mac(staList.sta[i].mac, &ip)) {
-      out[n].ip = IPAddress(ip.addr).toString();
+    memcpy(out[n].mac, staList.sta[i].mac, sizeof(out[n].mac));
+
+    esp_netif_pair_mac_ip_t lease = {};
+    memcpy(lease.mac, staList.sta[i].mac, sizeof(lease.mac));
+    const esp_err_t result = apNetif
+        ? esp_netif_dhcps_get_clients_by_mac(apNetif, 1, &lease)
+        : ESP_ERR_INVALID_STATE;
+
+    if (result == ESP_OK && lease.ip.addr != 0) {
+      out[n].ip = IPAddress(lease.ip.addr).toString();
     } else {
       out[n].ip = "negotiating...";
     }
