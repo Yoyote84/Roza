@@ -21,15 +21,18 @@ Commit de renforcement : `37193e54a3a8dba20d4ba6d3fcaa6f993e3cbbab`.
 
 ## Renforcement de tests ajouté
 
-Le script `firmware/tools/ota_security_test.py` ajoute des tests structurels qui vérifient :
+Le script `firmware/tools/ota_security_test.py` ajoute des tests structurels et cryptographiques qui vérifient :
 - URL de téléchargement verrouillée et parser qui échoue fermé;
 - taille et formats de hash/commit;
 - revalidation du manifeste avant écriture;
 - SHA-256, abandon et fin d'installation;
-- TLS HTTPS et absence de `setInsecure()`;
+- TLS HTTPS et absence de `setInsecure()` ;
+- lecture du manifeste bornée à 2 Kio avec `Content-Length` obligatoire ;
+- correspondance exacte entre la clé privée du pipeline et la clé publique ECDSA embarquée ;
 - confirmation/rollback et monotonie du numéro de build;
 - migration USB sans chip erase et confirmation explicite;
-- conservation de NVS/PHY et non-intervention sur la SD.
+- conservation de NVS/PHY et non-intervention sur la SD ;
+- contrôle SHA-256 du kit de migration USB avant toute demande de confirmation ou opération d'effacement.
 
 La suite de sécurité existante vérifie aussi la signature cryptographique générée, l'altération du payload, la table de partitions, la clé publique et le rollback configuré.
 
@@ -41,11 +44,11 @@ Cette migration initiale est une opération de flashage et doit être exécutée
 
 ## Éléments qui nécessitent encore confirmation
 
-- [ ] CI du commit de renforcement `37193e5` : tests, build et packaging doivent être réussis.
+- [ ] CI du commit courant : tests OTA, compilation Cardputer ADV, packaging et rendu du simulateur doivent tous réussir ; l'échec précédent était arrêté avant la compilation par des références textuelles résiduelles dans le contrôle de retrait du jeu, désormais corrigées.
 - [ ] Configuration GitHub Actions du secret `ROZA_OTA_SIGNING_KEY_PEM` : inaccessible depuis le connecteur, et non confirmée. Sans ce secret, le pipeline ne publie pas de manifeste OTA installable signé; ne pas utiliser de manifeste non signé.
 - [ ] Essai sur Cardputer ADV réel : migration USB, vérification, installation OTA, démarrage, retour arrière simulé si possible. À faire en étape 5.
 - [ ] Secure Boot et chiffrement flash : volontairement non activés automatiquement, car leur provisioning peut rendre la récupération difficile ou irréversible.
 
 ## Conclusion
 
-Le code de l'architecture de sécurité OTA est intégré; le commit de renforcement ajoute des garde-fous de test. La clôture complète de l'étape 3 dépend de la CI de ce commit, du secret de signature de publication et des essais matériels prévus à l'étape 5. Ne pas prétendre qu'une mise à jour OTA signée est publiquement disponible tant que le secret et la publication n'ont pas été vérifiés.
+Le code OTA et ses garde-fous renforcés sont intégrés. La clôture logicielle de l'étape 3 dépend encore de la CI du commit courant. La publication d'un manifeste OTA installable dépend également de la présence du secret `ROZA_OTA_SIGNING_KEY_PEM` et de sa correspondance avec la clé publique embarquée. Les essais de migration, d'installation, de démarrage et de retour arrière sur le Cardputer ADV physique restent réservés à l'étape 5. Ne pas annoncer une OTA signée disponible tant qu'un manifeste n'a pas réellement été publié et vérifié.

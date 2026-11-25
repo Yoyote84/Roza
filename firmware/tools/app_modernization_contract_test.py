@@ -19,8 +19,6 @@ class AppModernizationContracts(unittest.TestCase):
         entries = re.findall(r'\{"[^"]+",\s*APP_[A-Z0-9_]+\}', menu)
         self.assertEqual(len(entries), 40)
         self.assertIn("static_assert(APP_COUNT == 40", text)
-        self.assertNotIn("Hawkins", text)
-        self.assertNotIn("hawkins", text.lower())
 
     def test_http_transport_can_select_http11_and_bound_bodies(self):
         text = source("http_json.h")

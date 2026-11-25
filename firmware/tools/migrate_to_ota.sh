@@ -10,6 +10,38 @@ for file in bootloader.bin partitions.bin firmware.bin; do
   if [[ ! -s "$PACKAGE_DIR/$file" ]]; then echo "Missing $PACKAGE_DIR/$file" >&2; exit 2; fi
 done
 
+if [[ ! -s "$PACKAGE_DIR/SHA256SUMS-migration.txt" ]]; then
+  echo "Missing SHA256SUMS-migration.txt; refusing to flash an unverified package." >&2
+  exit 2
+fi
+# Verify the exact migration kit before asking for confirmation or erasing flash.
+python - "$PACKAGE_DIR" <<'PY'
+import hashlib
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).resolve()
+manifest = root / "SHA256SUMS-migration.txt"
+expected = {}
+for raw in manifest.read_text(encoding="ascii").splitlines():
+    match = re.fullmatch(r"([0-9a-fA-F]{64})  ([A-Za-z0-9._-]+)", raw)
+    if not match:
+        raise SystemExit("Invalid migration checksum manifest")
+    digest, name = match.groups()
+    if name in expected:
+        raise SystemExit("Duplicate migration checksum entry: " + name)
+    expected[name] = digest.lower()
+required = {"bootloader.bin", "partitions.bin", "firmware.bin", "migrate_to_ota.sh"}
+if set(expected) != required:
+    raise SystemExit("Migration checksum manifest does not cover the exact required files")
+for name, digest in expected.items():
+    path = root / name
+    if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        raise SystemExit("Migration package checksum failed: " + name)
+print("Migration package SHA-256 checks passed.")
+PY
+
 echo "ROZA A/B migration: Cardputer ADV ESP32-S3, 8 MiB"
 echo "NVS (0x9000..0xDFFF) and PHY (0xE000..0xEFFF) are preserved."
 echo "Only otadata (0xF000..0x10FFF) is erased; it overlaps the old factory app."

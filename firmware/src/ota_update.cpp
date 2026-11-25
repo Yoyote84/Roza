@@ -96,11 +96,23 @@ static bool fetchManifest(OtaManifest& m,char* err,size_t errSize){
  http.setUserAgent("ROZA-OTA/1.0");
  if(!http.begin(client,MANIFEST_URL)){snprintf(err,errSize,"Ouverture HTTPS impossible");return false;}
  const int code=http.GET();const int length=http.getSize();
- if(code!=HTTP_CODE_OK||(length>0&&(size_t)length>MANIFEST_MAX)){
-  snprintf(err,errSize,"Manifeste HTTP %d",code);http.end();return false;
+ // Le manifeste publie est un fichier statique : exiger Content-Length connu
+ // et le borner avant toute allocation evite getString() sur une reponse arbitraire.
+ if(code!=HTTP_CODE_OK||length<=0||(size_t)length>MANIFEST_MAX){
+  snprintf(err,errSize,"Manifeste HTTP %d / taille invalide",code);http.end();return false;
  }
- String body=http.getString();http.end();
- if(!body.length()||body.length()>MANIFEST_MAX||(length>0&&body.length()!=(size_t)length)){
+ String body;body.reserve((unsigned int)length);
+ Stream& stream=http.getStream();uint8_t buffer[256];size_t received=0;
+ while(received<(size_t)length){
+  const size_t remaining=(size_t)length-received;
+  const size_t wanted=remaining<sizeof(buffer)?remaining:sizeof(buffer);
+  const size_t got=stream.readBytes((char*)buffer,wanted);
+  if(!got)break;
+  body.concat((const char*)buffer,(unsigned int)got);
+  received+=got;
+ }
+ http.end();
+ if(received!=(size_t)length||body.length()!=(unsigned int)length){
   snprintf(err,errSize,"Manifeste tronque ou invalide");return false;
  }
  return parseManifest(body,m,err,errSize);

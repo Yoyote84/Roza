@@ -9,14 +9,23 @@ import package_flash as package
 ROOT = Path(__file__).resolve().parents[1]
 
 def keypair(directory: Path):
+    directory.mkdir(parents=True, exist_ok=True)
     private = directory / "private.pem"
     public = directory / "public.pem"
+    header = directory / "ota_public_key.h"
     subprocess.run(["openssl", "genpkey", "-algorithm", "EC",
                     "-pkeyopt", "ec_paramgen_curve:P-256", "-out", str(private)],
                    check=True, capture_output=True)
     subprocess.run(["openssl", "pkey", "-in", str(private), "-pubout", "-out", str(public)],
                    check=True, capture_output=True)
-    return private, public
+    pem_lines = public.read_text(encoding="ascii").splitlines()
+    header.write_text(
+        "#pragma once\nstatic const char ROZA_OTA_PUBLIC_KEY_PEM[] =\n"
+        + "".join('    "' + line + r'\n"' + "\n" for line in pem_lines)
+        + ";\n",
+        encoding="ascii",
+    )
+    return private, public, header
 
 def partition_table() -> bytes:
     import struct
@@ -32,11 +41,18 @@ def partition_table() -> bytes:
                     for t, st, off, size, name in rows) + b"\xff" * (0x1000 - 160)
 
 class OtaSecurityTests(unittest.TestCase):
+    def test_signing_key_must_match_embedded_public_key(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            private_a, _public_a, _header_a = keypair(root / "a")
+            _private_b, _public_b, header_b = keypair(root / "b")
+            with self.assertRaises(ValueError):
+                signer.verify_signing_key_matches_public(private_a, header_b)
     def test_signature_and_hash_verify(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp); private, public = keypair(root)
+            root = Path(temp); private, public, header = keypair(root)
             firmware = root / "firmware.bin"; firmware.write_bytes(b"ROZA test firmware image" * 512)
-            m = signer.make_manifest(firmware, private, 222, "a" * 40)
+            m = signer.make_manifest(firmware, private, 222, "a" * 40, public_key_header=header)
             self.assertEqual(m["sha256"], signer.hashlib.sha256(firmware.read_bytes()).hexdigest())
             payload = signer.canonical_payload(m["build"], m["commit"], m["size"], m["sha256"], m["url"])
             data = root / "manifest.txt"; signature = root / "signature.der"
@@ -46,9 +62,9 @@ class OtaSecurityTests(unittest.TestCase):
 
     def test_tampered_build_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp); private, public = keypair(root)
+            root = Path(temp); private, public, header = keypair(root)
             firmware = root / "firmware.bin"; firmware.write_bytes(b"ROZA test firmware image" * 512)
-            m = signer.make_manifest(firmware, private, 101, "b" * 40)
+            m = signer.make_manifest(firmware, private, 101, "b" * 40, public_key_header=header)
             changed = signer.canonical_payload(m["build"] + 1, m["commit"], m["size"], m["sha256"], m["url"])
             data = root / "changed.txt"; signature = root / "signature.der"
             data.write_bytes(changed); signature.write_bytes(base64.b64decode(m["signature"]))
@@ -58,10 +74,10 @@ class OtaSecurityTests(unittest.TestCase):
 
     def test_zero_build_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp); private, _ = keypair(root)
+            root = Path(temp); private, _public, header = keypair(root)
             firmware = root / "firmware.bin"; firmware.write_bytes(b"x" * 4096)
             with self.assertRaises(ValueError):
-                signer.make_manifest(firmware, private, 0, "c" * 40)
+                signer.make_manifest(firmware, private, 0, "c" * 40, public_key_header=header)
 
     def test_partition_layout_keeps_nvs_and_has_two_slots(self):
         csv = (ROOT / "partitions_8MB.csv").read_text()
@@ -75,11 +91,11 @@ class OtaSecurityTests(unittest.TestCase):
         import re
         source = (ROOT / "src" / "ota_public_key.h").read_text()
         block = re.search(
-            r"ROZA_OTA_PUBLIC_KEY_PEM\\[\\]\\s*=\\s*(.*?);",
+            r"ROZA_OTA_PUBLIC_KEY_PEM\[\]\s*=\s*(.*?);",
             source, re.S
         )
         self.assertIsNotNone(block)
-        fragments = re.findall(r'"((?:\\\\.|[^"])*)"', block.group(1))
+        fragments = re.findall(r'"((?:\\.|[^"\\])*)"', block.group(1))
         pem = "".join(bytes(item, "utf-8").decode("unicode_escape") for item in fragments)
         with tempfile.TemporaryDirectory() as temp:
             key_path = Path(temp) / "public.pem"
@@ -117,10 +133,14 @@ class OtaSecurityTests(unittest.TestCase):
         self.assertIn('FIRMWARE_URL[]="https://', source)
         self.assertIn('tlsUseCaBundle(client)', source)
         self.assertNotIn('setInsecure()', source)
+        self.assertIn("length<=0", source.replace(" ", ""))
+        self.assertIn("MANIFEST_MAX", source)
 
     def test_migration_never_chip_erases_and_requires_confirmation(self):
         script = (ROOT / "tools" / "migrate_to_ota.sh").read_text()
         self.assertIn('MIGRATE-ROZA', script)
+        self.assertIn('SHA256SUMS-migration.txt', script)
+        self.assertIn('hashlib.sha256', script)
         self.assertIn('erase-region 0xF000 0x2000', script)
         self.assertNotIn('erase-flash', script)
         self.assertNotIn('erase_flash', script)

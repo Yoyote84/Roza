@@ -48,7 +48,7 @@ La CI ne prouve pas le fonctionnement des périphériques physiques.
 - OKX : source primaire et fallback doivent rester explicites; une panne du premier fournisseur ne doit pas bloquer l'écran.
 - BadApple : lecteur local sur SD; fichier attendu `/video/badapple.dat`, créé par l'outil de conversion; aucun fichier vidéo ne peut être livré dans le firmware sans tenir compte du budget Flash.
 - Les apps et fonctions existantes doivent être conservées; aucune suppression fonctionnelle, aucune simulation/stub à la place d'un vrai service.
-- Le jeu Hawkins retiré ne doit être réintroduit ni dans le firmware, ni dans les packages, ni dans les tests.
+- Le module de jeu retiré ne doit être réintroduit ni dans le firmware, ni dans les paquets, ni dans les tests.
 
 ## 4. Pourquoi Arduino-ESP32 4.0.0 n'est pas adopté immédiatement
 
@@ -69,7 +69,7 @@ Références primaires :
 - [x] Tests logiciels de régression passés.
 - [x] Images flashables assemblées et artefacts publiés.
 - [x] Viewer web généré et déployé.
-- [x] Ancien jeu Hawkins absent de la vérification CI.
+- [x] Ancien module de jeu absent de la vérification CI.
 - [x] Pas d'effacement/formatage automatique de la carte SD.
 - [x] Pas de faux statut d'essai matériel.
 - [ ] Essais écran, clavier, audio, SD, GNSS, IMU, LoRa/SX1262 et comportement batterie sur Cardputer ADV physique — **étape 5**.

@@ -11,13 +11,13 @@ La nouvelle table conserve exactement NVS (0x9000, taille 0x5000) et PHY init (0
 - ota_0 : 0x20000, taille 0x3F0000 ;
 - ota_1 : 0x410000, taille 0x3F0000.
 
-Le script de migration efface uniquement les 8 Kio de otadata (0xF000..0x10FFF), qui chevauchent l'ancienne application factory ; il écrit ensuite bootloader, table et application dans OTA_0. NVS et PHY restent à leurs adresses d'origine. Le script exige MIGRATE-ROZA et n'utilise jamais de commande de chip erase.
+Le script de migration vérifie d'abord SHA256SUMS-migration.txt pour les quatre fichiers du kit (bootloader, table, application et script), puis exige MIGRATE-ROZA. Il efface uniquement les 8 Kio de otadata (0xF000..0x10FFF), qui chevauchent l'ancienne application factory ; il écrit ensuite bootloader, table et application dans OTA_0. NVS et PHY restent à leurs adresses d'origine. Il n'utilise jamais de commande de chip erase. Les sommes SHA-256 détectent une corruption accidentelle, mais ne remplacent pas une signature d'authenticité du kit USB.
 
 **La microSD n'est jamais utilisée par le mécanisme OTA.** Aucun montage, formatage, effacement ou écriture sur la carte n'est nécessaire.
 
 ## Chaîne OTA
 
-1. Le manifeste est téléchargé en HTTPS avec validation du certificat.
+1. Le manifeste est téléchargé en HTTPS avec validation du certificat. Son en-tête Content-Length doit être connu et inférieur ou égal à 2 Kio ; le client lit au maximum cette taille avant de parser le JSON.
 2. Sa signature ECDSA P-256 est vérifiée avec la clé publique intégrée au firmware.
 3. La cible, le schéma, l'URL autorisée, le numéro de build, la taille, le SHA Git et le SHA-256 sont contrôlés.
 4. Le build proposé doit être plus récent que le firmware courant et que le numéro le plus élevé confirmé en NVS.
@@ -30,7 +30,7 @@ Le rollback dépend de CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y, défini dans fir
 
 La clé privée n'est jamais stockée dans le dépôt. Le workflow Pages attend le secret Actions ROZA_OTA_SIGNING_KEY_PEM. Sans ce secret, les images USB sont construites mais aucun manifeste OTA non signé n'est publié ; le client échoue fermé.
 
-La signature porte sur une représentation canonique qui lie la cible, le build, le commit, la taille, le SHA-256 et l'URL exacte du binaire. Le manifeste seul ne peut donc pas être modifié pour pointer vers une autre image ou une autre version.
+La signature porte sur une représentation canonique qui lie la cible, le build, le commit, la taille, le SHA-256 et l'URL exacte du binaire. Avant de produire un manifeste, l'outil de publication dérive la clé publique de la clé privée CI et compare son encodage DER à la clé publique embarquée ; une paire incohérente fait échouer la publication. Le manifeste seul ne peut donc pas être modifié pour pointer vers une autre image ou une autre version.
 
 ## Configuration initiale du secret GitHub Actions
 
