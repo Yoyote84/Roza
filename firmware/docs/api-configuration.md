@@ -24,9 +24,23 @@ au dépôt. Aucun secret fictif ou clé de remplacement n'est fourni.
 
 Les services suivants utilisent des API publiques sans clé dans l'implémentation actuelle :
 ADS-B (adsbdb / adsb.lol), séismes (USGS), météo et qualité de l'air (Open-Meteo),
-typhons (JMA), géolocalisation IP (ip-api), cotations (OKX / CoinGecko) et flux de cartes
-configurés par URL. Ils ne nécessitent aucun secret pour compiler. Leur disponibilité
+typhons (JMA), géolocalisation IP (ipwho.is), cotations (OKX ; repli CoinPaprika + Frankfurter)
+et flux de cartes configurés par URL. Ils ne nécessitent aucun secret pour compiler. Leur disponibilité
 dépend d'une connexion réseau, du service distant et de ses conditions d'utilisation.
+
+### Taux USDT/CNY
+
+L'application tente d'abord la cotation C2C d'OKX. En cas d'échec, elle combine
+le prix USDT/USD de CoinPaprika et le taux de référence USD/CNY de Frankfurter.
+Ce second résultat est une estimation, pas un prix C2C exécutable. L'écran affiche
+l'attribution « Powered by CoinPaprika ». L'accès gratuit sans clé CoinPaprika est
+réservé à un usage personnel et soumis aux limites et conditions du fournisseur.
+
+### Satellite Radar
+
+Le service N2YO exige une clé API valide. Sans `N2YO_API_KEY`, l'application
+reste installée et indique explicitement que les données distantes ne sont pas configurées.
+Aucune clé fictive n'est embarquée.
 
 ## Exemple de configuration locale
 
