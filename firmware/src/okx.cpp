@@ -4,6 +4,7 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <cstdlib>
+#include <cmath>
 #include <ctime>
 #include "tls_ca.h"
 #include "ui_common.h"
