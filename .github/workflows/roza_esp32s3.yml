@@ -85,6 +85,9 @@ jobs:
           echo "::group::Vérification structurelle de la migration BLE NimBLE"
           python tools/bt_nimble_static_test.py
           echo "::endgroup::"
+          echo "::group::Tests de sécurité OTA et signature"
+          python tools/ota_security_test.py
+          echo "::endgroup::"
 
       - name: Vérifier la génération des binaires
         run: |
@@ -114,17 +117,12 @@ jobs:
             firmware/.pio/build/cardputer-adv/flash-package/roza-cardputer-adv-8mb.bin
             firmware/.pio/build/cardputer-adv/flash-package/FLASH-INFO.txt
             firmware/.pio/build/cardputer-adv/flash-package/SHA256SUMS-flash.txt
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Publier la mise à jour sans réinitialiser les réglages
-        uses: actions/upload-artifact@v4
-        with:
-          name: roza-cardputer-adv-update-${{ github.sha }}
-          path: |
-            firmware/.pio/build/cardputer-adv/flash-package/ROZA_UPDATE.bin
-            firmware/.pio/build/cardputer-adv/flash-package/UPDATE-INFO.txt
-            firmware/.pio/build/cardputer-adv/flash-package/SHA256SUMS-update.txt
+            firmware/.pio/build/cardputer-adv/flash-package/bootloader.bin
+            firmware/.pio/build/cardputer-adv/flash-package/partitions.bin
+            firmware/.pio/build/cardputer-adv/flash-package/firmware.bin
+            firmware/.pio/build/cardputer-adv/flash-package/migrate_to_ota.sh
+            firmware/.pio/build/cardputer-adv/flash-package/MIGRATION-USB.txt
+            firmware/.pio/build/cardputer-adv/flash-package/SHA256SUMS-migration.txt
           if-no-files-found: error
           retention-days: 14
 
