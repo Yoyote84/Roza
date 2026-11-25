@@ -21,7 +21,7 @@
 | FastLED | 3.10.3 |
 | ArduinoJson | 7.4.3 |
 | TinyGPSPlus | 1.1.0 déclaré par PlatformIO |
-| ESP8266Audio | tag Git 1.9.9 |
+| ESP8266Audio | tag Git 2.4.3 |
 | LibSSH-ESP32 | 5.9.0 |
 | SD | Arduino SD / SPI partagé avec SX1262 |
 

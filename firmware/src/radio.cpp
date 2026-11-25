@@ -165,8 +165,8 @@ private:
 };
 
 // ESP8266Audio 2.4.3 initialise les pointeurs internes dans chaque constructeur.
- // Le décodeur amont peut être utilisé directement tout en conservant les allocations
- // préallouées explicites pour limiter la fragmentation de la RAM interne.
+// Le décodeur amont peut être utilisé directement tout en conservant les allocations
+// préallouées explicites pour limiter la fragmentation de la RAM interne.
 // 自定义 HTTP 流源：基于标准 WiFiClient + HTTPClient 实现 AudioFileSource 接口。
 // 库原生的 AudioFileSourceHTTPStream 构造即阻塞且无法配置超时（默认 5s），
 // 这里显式设置 1500ms 连接与读取超时，并在握手、数据读取各环节响应 gRadioStopReq，

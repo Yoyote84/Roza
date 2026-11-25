@@ -71,7 +71,10 @@ for old_name, new_name in (
     ("mbedtls_sha256_update_ret", "mbedtls_sha256_update"),
     ("mbedtls_sha256_finish_ret", "mbedtls_sha256_finish"),
 ):
-    check(f"#define {old_name} {new_name}" in CRYPTO_CPP,
+    check(re.search(
+        rf"(?m)^\s*#\s*define\s+{re.escape(old_name)}\s+{re.escape(new_name)}\b",
+        CRYPTO_CPP,
+    ) is not None,
           f"compatibilité API Mbed TLS : {old_name} → {new_name}")
 check("static bool derive128Key(" in CRYPTO_CPP and "if (!derive128Key(key, key128)) return false;" in CRYPTO_CPP,
       "les dérivations AES vérifient les erreurs MD5")
