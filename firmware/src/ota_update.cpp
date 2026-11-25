@@ -167,16 +167,16 @@ void otaEnter(){manifestReady=false;restartRequested=false;status(OTA_IDLE,"R : 
 void drawOta(){
  cv.fillScreen(TFT_BLACK);drawPageHeader("Mise a jour","OTA A/B",ACCENT);
  char line[48];snprintf(line,sizeof(line),"Build actuel : %lu",(unsigned long)ROZA_BUILD_NUMBER);
- cv.setTextDatum(top_left);cv.setTextColor(ROZA_PAPER,TFT_BLACK);cv.drawString(line,7,30);
+ cv.setTextDatum(top_left);cv.setTextColor(TFT_WHITE,TFT_BLACK);cv.drawString(line,7,30);
  if(state==OTA_AVAILABLE){
   snprintf(line,sizeof(line),"Nouveau build : %lu",(unsigned long)manifest.build);
-  cv.setTextColor(ROZA_OLIVE_LIGHT,TFT_BLACK);cv.drawString(line,7,48);
+  cv.setTextColor(ACCENT,TFT_BLACK);cv.drawString(line,7,48);
   snprintf(line,sizeof(line),"%lu Ko / SHA-256 OK",(unsigned long)(manifest.size/1024));
-  cv.setTextColor(ROZA_PAPER_DIM,TFT_BLACK);cv.drawString(line,7,64);
+  cv.setTextColor(TFT_WHITE_DIM,TFT_BLACK);cv.drawString(line,7,64);
  }else{
-  cv.setTextColor(state==OTA_ERROR?TFT_RED:ROZA_PAPER_DIM,TFT_BLACK);cv.drawString(message,7,52);
+  cv.setTextColor(state==OTA_ERROR?TFT_RED:TFT_WHITE_DIM,TFT_BLACK);cv.drawString(message,7,52);
  }
- cv.setTextColor(ROZA_OLIVE,TFT_BLACK);cv.setTextDatum(bottom_left);
+ cv.setTextColor(ACCENT,TFT_BLACK);cv.setTextDatum(bottom_left);
  cv.drawString("R/Entree verifier  Y installer",6,SH-2);
  cv.setTextDatum(bottom_right);cv.drawString("Retour",SW-6,SH-2);
 }
