@@ -102,6 +102,10 @@ static void fetchSats() {
   // 只回 {"info":{...,"satcount":0}}），光看 above 在不在分不出"天上没有"和"响应坏了"。
   JsonObject fi = filter["info"].to<JsonObject>();
   fi["satcount"] = true;
+  // Préserver les messages d'erreur N2YO, sinon une erreur fournisseur devient "no info".
+  filter["error"] = true;
+  filter["message"] = true;
+  filter["msg"] = true;
 
   JsonDocument doc;
   HttpJsonOptions options(10000, 15000);
@@ -118,7 +122,13 @@ static void fetchSats() {
   //   satcount == 0        -> 天上真的没有，above 键本来就不会出现，这是正常的
   //   satcount > 0 却没 above -> 那才是响应坏了
   JsonVariant info = doc["info"];
-  if (info.isNull()) { errMsg = "bad response (no 'info')"; dirty = true; return; }
+  if (info.isNull()) {
+    const char* providerError = doc["error"] | doc["message"] | doc["msg"] | "";
+    errMsg = providerError[0] ? String("N2YO: ") + providerError
+                              : String("N2YO response missing info");
+    dirty = true;
+    return;
+  }
   const int satcount = info["satcount"] | -1;
   JsonArray above = doc["above"].as<JsonArray>();
   if (above.isNull() && satcount != 0) { errMsg = "bad response (no 'above')"; dirty = true; return; }
