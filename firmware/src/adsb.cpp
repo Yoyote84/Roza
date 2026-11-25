@@ -33,9 +33,8 @@ static bool    fromGps = false;
 // ---- 航线（起降机场 + 行程进度）----
 //
 // ADS-B 报文里没有航线：机载广播只有位置/高度/速度/呼号。起降机场得拿呼号去排班库
-// 另查一次，这里用 adsbdb.com。公开数据、请求不带任何凭据，跟 sats.cpp / github.cpp
-// 是同一类，按 README「安全边界」那节用 setInsecure()。它只有 HTTPS（明文会 301），
-// 所以这一页破例吃一次 TLS 握手——但单条响应才 ~700B，且只查当前选中的那一架。
+// 另查一次，这里用 adsbdb.com。请求只走 HTTPS，并用嵌入式根证书 bundle 做校验。
+// 单条响应只有数百字节，且只查询当前选中的飞机。
 //
 // ⚠️ 排班库是按呼号查的静态表，不是实时航迹：呼号复用/换季会给出完全不搭的航线
 // （实测有架在伦敦上空的飞机被返回成 ORD->LIR）。所以进度一律拿实测位置反算，
@@ -98,6 +97,9 @@ static void fetchRoute(const char* cs) {
     }
     JsonDocument doc;
     HttpJsonOptions options(8000, 10000);
+    options.http10 = false;
+    options.stream = false;
+    options.maxBodyBytes = 8192;
     if (fetchJsonHttp(client, url, doc, &filter, options, fetchErr)) {
       JsonObject o = doc["response"]["flightroute"]["origin"];
       JsonObject d = doc["response"]["flightroute"]["destination"];
@@ -173,6 +175,9 @@ static void fetchPlanes() {
 
     JsonDocument doc;
     HttpJsonOptions options(10000, 15000);
+    options.http10 = false;
+    options.stream = false;                 // HTTP/1.1 peut répondre en chunked ; getString() le décode
+    options.maxBodyBytes = 48 * 1024;       // borne la réponse avant le parsing JSON
     if (!fetchJsonHttp(client, url, doc, &filter, options, errMsg)) { dirty = true; return; }
 
     for (JsonObject a : doc["ac"].as<JsonArray>()) {
