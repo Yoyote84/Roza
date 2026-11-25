@@ -161,18 +161,22 @@ jobs:
           }
           "$SIZE_TOOL" -A "$BUILD/firmware.elf" > "$PACKAGE/ELF_SECTIONS.txt"
 
-          ESPTOOL="$(find "$HOME/.platformio/packages/tool-esptoolpy" -maxdepth 1 -type f -name 'esptool.py' -print -quit)"
-          test -n "$ESPTOOL" || {
-            echo "::error::PlatformIO esptool.py was not found"
+          # PlatformIO Espressif32 8.x installe platformio/tool-esptool,
+          # qui expose le binaire "esptool" (et non l'ancien paquet tool-esptoolpy).
+          ESPTOOL="$HOME/.platformio/packages/tool-esptool/esptool"
+          test -x "$ESPTOOL" || {
+            echo "::error::PlatformIO tool-esptool executable was not found: $ESPTOOL"
+            find "$HOME/.platformio/packages" -maxdepth 3 -type f -name 'esptool*' -print
             exit 1
           }
+          "$ESPTOOL" --help >/dev/null
 
           # La partition factory commence a 0x10000 ; le binaire fusionne
           # contient bootloader + table + application et se flashe a 0x0000.
-          python "$ESPTOOL" --chip esp32s3 merge_bin \
+          "$ESPTOOL" --chip esp32s3 merge-bin \
             --output "$PACKAGE/ROZA-Cardputer-ADV-factory.bin" \
-            --flash_mode keep \
-            --flash_size 8MB \
+            --flash-mode keep \
+            --flash-size 8MB \
             0x0 "$BUILD/bootloader.bin" \
             0x8000 "$BUILD/partitions.bin" \
             0x10000 "$BUILD/firmware.bin"
