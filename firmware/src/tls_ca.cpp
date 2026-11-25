@@ -6,9 +6,11 @@
 // 链接器给嵌入文件生成的符号：路径 data/cert/x509_crt_bundle.bin
 // -> _binary_data_cert_x509_crt_bundle_bin_start（把 / 和 . 换成 _）
 extern const uint8_t rootca_crt_bundle_start[] asm("_binary_data_cert_x509_crt_bundle_bin_start");
+extern const uint8_t rootca_crt_bundle_end[]   asm("_binary_data_cert_x509_crt_bundle_bin_end");
 
 void tlsUseCaBundle(WiFiClientSecure& client) {
-  client.setCACertBundle(rootca_crt_bundle_start);
+  const size_t bundleSize = static_cast<size_t>(rootca_crt_bundle_end - rootca_crt_bundle_start);
+  client.setCACertBundle(rootca_crt_bundle_start, bundleSize);
 }
 
 bool tlsClockReady() {
