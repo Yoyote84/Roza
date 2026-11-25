@@ -194,7 +194,6 @@ void wifiChanScan() {
     WiFi.mode(scanMode);
     uint32_t t0 = millis();
     while (WiFi.getMode() != scanMode && (millis() - t0 < 300)) delay(10);
-    WiFiGenericClass::waitStatusBits(STA_STARTED_BIT, 300);
     delay(20);
   }
 
