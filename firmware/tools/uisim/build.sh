@@ -62,6 +62,7 @@ $GFX/lgfx/v1/platforms/sdl/common.cpp
 # stubs/sim_arduino.h 里还得陪一份 Print/Printable，固件自己并不用它们。
 DEFS="-DLGFX_USE_V1 -DARDUINOJSON_ENABLE_ARDUINO_STRING=1 -DARDUINOJSON_ENABLE_ARDUINO_STREAM=1"
 INC="-I stubs -I $GFX -I $AJSON -I $TINYGPS -I $SSH $SDL_CFLAGS"
+# stubs/mbedtls/version.h matches the API implemented by mbedtls_stub.cpp.
 
 # ---- 先验菜单表 ----
 # globals.cpp / pages.cpp / icons.cpp 不进模拟器二进制（globals.cpp 会跟 sim_main 抢

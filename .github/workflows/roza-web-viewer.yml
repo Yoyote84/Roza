@@ -258,7 +258,7 @@ jobs:
 
           Cette image est compilee pour le Cardputer ADV 8 MB, sans PSRAM.
           La compilation CI ne remplace pas un essai sur la carte reelle.
-                    EOF
+          EOF
 
           (cd "$PACKAGE" && sha256sum \
             *.bin BUILD_MANIFEST.json  \
