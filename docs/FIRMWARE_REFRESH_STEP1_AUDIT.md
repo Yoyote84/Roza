@@ -30,8 +30,8 @@ La cible proposée est un socle Arduino-ESP32 moderne, sans basculer le firmware
 - La commande de référence est `cd firmware && pio run -e cardputer-adv`.
 - Les fichiers racine `CMakeLists.txt`, `main/`, `partitions.csv` et `sdkconfig.defaults` sont historiques. Ils ne définissent pas la compilation active.
 - Le projet actif utilise la branche `main`. Les branches de travail et les pull requests non intégrées ne constituent pas l'état livré.
-- Deux pull requests restent ouvertes au moment de l'audit : la PR #3 sur le découplage du jeu séparé et la PR #1 de test de mise à jour 105. Elles ne sont pas considérées comme intégrées à `main` et ne doivent pas être fusionnées sans examen de leur différence avec l'état courant.
-- Le test CI de nettoyage des anciens composants du jeu retiré passe sur le commit examiné. Aucun fichier ou symbole Hawkins n'a été observé dans le menu actif de `globals.cpp`. Le jeu Hawkins ne fait donc pas partie du périmètre de ROZA à reconstruire ou à réintroduire.
+- Deux pull requests restent ouvertes au moment de l'audit : la PR #3 sur la séparation de l'ancien module de jeu et la PR #1 de test de mise à jour 105. Elles ne sont pas considérées comme intégrées à `main` et ne doivent pas être fusionnées sans examen de leur différence avec l'état courant.
+- Le test CI de nettoyage de l'ancien module de jeu passe sur le commit examiné. Aucun fichier ou symbole du module de jeu n'a été observé dans le menu actif de `globals.cpp`. Ce module ne fait donc pas partie du périmètre de ROZA à reconstruire ou à réintroduire.
 
 ### 2.2 Chaîne de compilation active
 
@@ -67,7 +67,7 @@ Avertissements secondaires observés dans la même sortie :
 - `typhoon.cpp` : référence potentiellement pendante vers un `JsonArray` temporaire ;
 - `wardrive.cpp` : format `%u` utilisé avec un `uint32_t` qui correspond à `%lu` sur cette cible.
 
-Le workflow définit aussi les suites IR, LoRa, Drone ID, GNSS, JSON, Hash Oven, batterie, RAM, Astro, calculatrice, horloge, routeur/RID, balayage mémoire, contrôle statique NimBLE, tests de paquetage et génération des images. **Ces étapes sont placées après la compilation et ont été ignorées dans cette exécution**, car la compilation s'est arrêtée en erreur. Le test de nettoyage des anciens composants Hawkins, placé avant la compilation, a réussi. Aucun nouveau rapport RAM/Flash ni binaire complet n'est disponible pour le SHA de référence.
+Le workflow définit aussi les suites IR, LoRa, Drone ID, GNSS, JSON, Hash Oven, batterie, RAM, Astro, calculatrice, horloge, routeur/RID, balayage mémoire, contrôle statique NimBLE, tests de paquetage et génération des images. **Ces étapes sont placées après la compilation et ont été ignorées dans cette exécution**, car la compilation s'est arrêtée en erreur. Le test de nettoyage de l'ancien module de jeu, placé avant la compilation, a réussi. Aucun nouveau rapport RAM/Flash ni binaire complet n'est disponible pour le SHA de référence.
 
 **Conséquence pour la suite :** réparer l'API Wi-Fi privée dans Wardrive, traiter les avertissements qui révèlent un risque réel, compiler et mesurer le binaire relèvent de l'étape 2/5. Ne pas masquer cet échec en modifiant la documentation ou en sautant le contrôle CI.
 
