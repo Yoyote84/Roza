@@ -161,24 +161,16 @@ jobs:
           }
           "$SIZE_TOOL" -A "$BUILD/firmware.elf" > "$PACKAGE/ELF_SECTIONS.txt"
 
-          # Platformes Espressif32 8.x et pioarduino 55.x ne nomment pas
-          # l'outil de la même manière. Accepter esptool CLI ou le paquet Python.
-          ESPTOOL="$HOME/.platformio/packages/tool-esptool/esptool"
-          ESPTOOL_PY="$(find "$HOME/.platformio/packages" -type f -path '*/tool-esptoolpy/esptool.py' -print -quit)"
-          if [[ -x "$ESPTOOL" ]]; then
-            ESPTOOL_CMD=("$ESPTOOL")
-          elif [[ -n "$ESPTOOL_PY" && -s "$ESPTOOL_PY" ]]; then
-            ESPTOOL_CMD=(python "$ESPTOOL_PY")
-          else
-            echo "::error::Neither tool-esptool/esptool nor tool-esptoolpy/esptool.py was found"
-            find "$HOME/.platformio/packages" -maxdepth 4 -type f -name 'esptool*' -print
-            exit 1
-          fi
-          "${ESPTOOL_CMD[@]}" --help >/dev/null
+          # pioarduino 55.03.313 fournit esptool 5.6.0 comme outil de build.
+          # Le package PlatformIO expose esptool.py sans installer ses dépendances
+          # Python dans l'interpréteur système du runner. Installer la même version
+          # depuis PyPI pour récupérer son environnement complet, sans flottement.
+          python -m pip install --disable-pip-version-check "esptool==5.6.0"
+          python -m esptool --help >/dev/null
 
           # La partition factory commence a 0x10000 ; le binaire fusionne
           # contient bootloader + table + application et se flashe a 0x0000.
-          "${ESPTOOL_CMD[@]}" --chip esp32s3 merge-bin \
+          python -m esptool --chip esp32s3 merge-bin \
             --output "$PACKAGE/ROZA-Cardputer-ADV-factory.bin" \
             --flash-mode keep \
             --flash-size 8MB \
