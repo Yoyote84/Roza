@@ -1,319 +1,407 @@
-# РO3A — Audit actuel de la grande mise à jour VHS (étape 1/5)
+# РO3A — Audit de référence de la grande mise à jour VHS (étape 1/5)
 
-**Date de référence :** 25 novembre 2026  
+**Date de l'audit :** 25 novembre 2026  
 **Dépôt :** https://github.com/Yoyote84/Roza  
-**Branche examinée :** `main`  
-**Commit de base :** `a18cbbcf1052eab511f001c3df61f0f9a535680b`  
-**Cible :** M5Stack Cardputer ADV + Cap LoRa-1262  
-**Contraintes confirmées :** ESP32-S3FN8, Flash 8 Mio, absence de PSRAM, écran 240×135, clavier TCA8418, microSD 128 Go à identifier.
+**Branche examinée :** \`main\` uniquement  
+**Commit de référence :** \`71cd1ff0216ec426f8d073153c838373181da5b9\`  
+**Matériel cible :** M5Stack Cardputer ADV + Cap LoRa-1262  
+**Périmètre :** firmware actif de \`firmware/\`, ses applications, ses dépendances, ses services et sa chaîne de livraison.
 
-> Ce document remplace les conclusions d'étape 1 précédentes qui étaient fondées sur un commit antérieur. Il décrit l'état visible sur `main` au 25/11/2026. Cet audit n'est ni une compilation, ni une validation sur carte physique.
+> Ce dossier est l'état de référence documentaire de l'étape 1. Il distingue les faits observés dans le dépôt, les informations amont officielles, les recommandations de migration et les validations qui ne peuvent être réalisées qu'aux étapes suivantes. Il ne prétend ni que le firmware compile actuellement, ni que les périphériques ont été testés sur la carte physique.
 
 ---
 
-## 1. Décision générale
+## 1. Décision et résultat de l'étape 1
 
-La grande mise à jour doit moderniser **le système et chacune de ses applications**, pas seulement changer les numéros des bibliothèques. Les applications existantes doivent être conservées fonctionnellement. Un remplacement est acceptable uniquement s'il apporte une solution plus récente, maintenue, mieux sécurisée ou réellement plus complète, et si toutes les fonctions utiles sont reprises ou améliorées.
+L'étape 1 est **complète sur son périmètre d'audit et de préparation**. Le dépôt, le commit, la chaîne de compilation, le catalogue réel, les dépendances, les possibilités de remplacement, les contraintes du matériel, les risques de mémoire, les problèmes réseau, le partitionnement et les priorités de migration ont été relevés et consignés.
 
-La modernisation se fera en cinq étapes séquentielles :
+La modernisation doit conserver les **40 entrées du menu actuel** et leur rôle. Aucune application ne doit être retirée pour simplifier une mise à niveau. Une technologie peut être remplacée lorsque la nouvelle solution apporte un gain démontré et reprend les fonctions utiles, les formats de données et les cas d'usage existants.
 
-1. **Audit et préparation** — état réel, inventaire, versions amont, matériel, mémoire, risques et matrice de migration.
-2. **Nouveau cœur système** — migration du framework et des bibliothèques, adaptation des API et correction des erreurs de compilation.
-3. **Mise à jour intelligente** — dépôt de paquets, manifeste signé, vérification, installation, sauvegarde, OTA A/B et retour arrière.
-4. **Nouvelle interface VHS** — identité visuelle VHS/CRT, écran, menu, icônes, typographies, animations et sons facultatifs.
-5. **Intégration et test final** — build complet, non-régression des 40 applications, tests réseau/radio/GNSS/SD/audio, BIN, sommes de contrôle et essais sur le Cardputer réel.
+La cible proposée est un socle Arduino-ESP32 moderne, sans basculer le firmware actif vers un projet ESP-IDF natif. La version actuelle du dépôt est déjà plus récente que les anciens audits : PlatformIO Espressif32 8.0.0, Arduino-ESP32 3.3.12 / ESP-IDF 5.5.5, M5Unified 0.3.0 et M5GFX 0.3.0. Les versions 4.0.0 / IDF 6.1.1 et les bibliothèques les plus récentes doivent désormais être évaluées comme migrations depuis cette base, et non comme un premier portage depuis Arduino 2.0.17.
 
-**Aucune application n'est autorisée à disparaître pour faciliter une migration.** Une application bloquée par une dépendance doit être corrigée ou portée vers une alternative avant validation de l'étape concernée.
+**À ne pas confondre :** la CI actuelle échoue encore sur une erreur de compilation dans Wardrive. Cette correction appartient à l'étape 2/5. Elle n'annule pas l'audit documentaire de l'étape 1, mais interdit de déclarer le firmware compilable ou de mesurer son binaire actuel.
 
-## 2. État du dépôt au commit examiné
+## 2. État réel du dépôt au commit de référence
 
-### 2.1 Base et chaîne de compilation
+### 2.1 Dépôt et règles de travail
 
-- Le projet firmware actif est exclusivement dans `firmware/`.
-- La chaîne active est PlatformIO + Arduino-ESP32, environnement `cardputer-adv`.
-- Commande de référence : `cd firmware && pio run -e cardputer-adv`.
-- Le dépôt utilise actuellement `platform = espressif32@8.0.0`.
-- Le build résout Arduino-ESP32 3.3.12 / ESP-IDF 5.5.5.
-- PlatformIO Core est épinglé à 6.2.0 dans le workflow firmware.
-- M5Unified et M5GFX sont déjà en 0.3.0. NimBLE-Arduino est déjà en 2.5.2.
-- Les anciens fichiers racine `main/`, `CMakeLists.txt`, `partitions.csv` et `sdkconfig.defaults` sont historiques : ils ne doivent pas être utilisés pour développer ni compiler le firmware actif.
+- Le firmware actif est exclusivement dans \`firmware/\`.
+- La compilation de référence est PlatformIO, environnement \`cardputer-adv\`.
+- La commande de référence est \`cd firmware && pio run -e cardputer-adv\`.
+- Les fichiers racine \`CMakeLists.txt\`, \`main/\`, \`partitions.csv\` et \`sdkconfig.defaults\` sont historiques. Ils ne définissent pas la compilation active.
+- Le projet actif utilise la branche \`main\`. Les branches de travail et les pull requests non intégrées ne constituent pas l'état livré.
+- Deux pull requests restent ouvertes au moment de l'audit : la PR #3 sur le découplage du jeu séparé et la PR #1 de test de mise à jour 105. Elles ne sont pas considérées comme intégrées à \`main\` et ne doivent pas être fusionnées sans examen de leur différence avec l'état courant.
+- Le test CI de nettoyage des anciens composants du jeu retiré passe sur le commit examiné. Aucun fichier ou symbole Hawkins n'a été observé dans le menu actif de \`globals.cpp\`. Le jeu Hawkins ne fait donc pas partie du périmètre de ROZA à reconstruire ou à réintroduire.
 
-### 2.2 État de compilation constaté
+### 2.2 Chaîne de compilation active
 
-Le dernier run visible sur le commit de base est :
+| Élément | État réel dans le dépôt |
+|---|---|
+| Plateforme PlatformIO | \`espressif32@8.0.0\` |
+| Framework | Arduino-ESP32 3.3.12 |
+| Base ESP-IDF du framework | 5.5.5 |
+| PlatformIO Core en CI | 6.2.0 |
+| Carte PlatformIO | \`esp32-s3-devkitc-1\`, configurée pour 8 Mo |
+| Environnement | \`cardputer-adv\` |
+| Table active | \`firmware/partitions_8MB.csv\` |
+| Workflow CI | \`.github/workflows/roza_esp32s3.yml\` |
 
-- Workflow : [ROZA Web Screen Viewer + Cardputer ADV firmware](https://github.com/Yoyote84/Roza/actions/runs/45512359543)
-- Conclusion : **échec**.
-- La résolution PlatformIO et le test de retrait des anciens composants du jeu passent.
-- La compilation s'arrête dans `firmware/src/hotspot.cpp:26`.
+Le dépôt n'est pas un firmware ESP-IDF natif. Une éventuelle adoption d'un niveau ESP-IDF plus récent doit être effectuée au travers d'une plateforme PlatformIO compatible avec Arduino-ESP32, puis vérifiée sur le projet complet.
 
-Cause exacte : l'appel `dhcp_search_ip_on_mac(staList.sta[i].mac, &ip)` utilise l'ancienne signature. Avec le framework actuellement résolu, `dhcp_search_ip_on_mac()` attend d'abord un pointeur `dhcps_t*`, puis l'adresse MAC et l'adresse IP. Le compilateur refuse donc de convertir `uint8_t*` en `dhcps_t*`.
+### 2.3 Résultat CI exact
 
-Conséquences :
-- Le commit actuel n'est pas compilable dans ce run.
-- Aucun nouveau binaire de firmware n'est produit par ce run.
-- La taille Flash/RAM du firmware **actuel** n'est donc pas confirmée.
-- Les étapes d'assemblage et de publication du paquet flash sont ignorées.
-- Aucune réussite matérielle n'est revendiquée.
+Exécution associée au commit de référence :
 
-Ce défaut sera corrigé à l'étape 2, après validation de la stratégie de migration. Il ne faut pas contourner l'erreur par un stub ou une fonction simulée.
+- Workflow : ROZA Web Screen Viewer + Cardputer ADV firmware
+- Run : https://github.com/Yoyote84/Roza/actions/runs/45518114744
+- Job de compilation : https://github.com/Yoyote84/Roza/actions/runs/45518114744/job/138882744067
+- Conclusion : échec.
+- Étape fautive : compilation de \`src/wardrive.cpp\`.
+- Erreur : \`STA_STARTED_BIT was not declared in this scope\`, à l'appel \`WiFiGenericClass::waitStatusBits(STA_STARTED_BIT, 300)\`.
+- La production des images de flash, la génération de l'artefact Web et les étapes qui suivent la compilation ont été ignorées.
 
-### 2.3 Inventaire vérifié du menu
+Le correctif du point d'accès dans \`hotspot.cpp\` n'est plus l'erreur bloquante de ce commit. Il utilise déjà l'API publique ESP-NETIF \`esp_netif_dhcps_get_clients_by_mac\`. Les anciens rapports qui désignent encore \`hotspot.cpp\` comme erreur courante sont obsolètes.
 
-Le tableau `APPS[]` et les groupes `GROUPS[]` de `firmware/src/globals.cpp` confirment **40 applications réelles, dans 7 groupes** :
+Avertissements secondaires observés dans la même sortie :
+- \`skyview.cpp\` : possible troncature du texte formaté dans un tampon de six octets ;
+- \`typhoon.cpp\` : référence potentiellement pendante vers un \`JsonArray\` temporaire ;
+- \`wardrive.cpp\` : format \`%u\` utilisé avec un \`uint32_t\` qui correspond à \`%lu\` sur cette cible.
 
-| Groupe | Applications | Nombre |
+La CI actuelle exécute aussi les suites IR, LoRa, Drone ID, GNSS, JSON, Hash Oven, batterie, RAM, Astro, calculatrice, horloge, tests routeur/RID, balayage mémoire, test statique NimBLE, tests de paquetage et création des images. Le test de nettoyage des anciens composants Hawkins est réussi sur ce commit. La compilation échouant avant l'édition de liens, aucun nouveau rapport RAM/Flash ni binaire complet n'est disponible pour le SHA de référence.
+
+**Conséquence pour la suite :** réparer l'API Wi-Fi privée dans Wardrive, traiter les avertissements qui révèlent un risque réel, compiler et mesurer le binaire relèvent de l'étape 2/5. Ne pas masquer cet échec en modifiant la documentation ou en sautant le contrôle CI.
+
+### 2.4 Inventaire exact du menu
+
+Le tableau \`APPS[]\` de \`firmware/src/globals.cpp\` contient **40 entrées**, réparties en **7 groupes**. Les contrôles statiques du même fichier vérifient que les plages des groupes se suivent, couvrent toutes les entrées et ne dépassent pas quatre colonnes sur deux lignes.
+
+| Groupe | Entrées visibles dans le menu | Nombre |
 |---|---|---:|
-| TOOLS | Time, IMU, Files, Spectrum, Calc, Converter, Player, Hash Oven | 8 |
+| TOOL | Time, IMU, Files, Spectrum, Calc, Converter, Player, Hash Oven | 8 |
 | SCAN | WiFi Chan, Sniffer, Wardrive, Drone ID, BLE Scan | 5 |
 | NET | Hotspot, LAN Scan, NetProbe, Router, SSH, ChatGPT | 6 |
 | HID | BT Keys, BT Media, Ducky | 3 |
 | SIG | LoRa, GNSS, Map, IR | 4 |
 | SKY | Astro, Weather, Planes, Sats, Typhoon, Quake | 6 |
 | MORE | GitHub, Radio, FX, OKX, Reader, BadApple, Apps, Settings | 8 |
-| **Total** | | **40** |
+| **Total** | **40 entrées / 7 groupes** | **40** |
 
-Le document `firmware/docs/feature-inventory.md` annonce 40 applications / 85 écrans, mais son tableau de groupes est incohérent : il compte seulement 5 applications dans NET, place ChatGPT dans MORE alors que le code la place dans NET, et totalise 39. Le code `APPS[]` / `GROUPS[]` est la référence actuelle : la documentation et le comptage des écrans devront être régénérés à partir du code, sans modifier les applications.
+Le fichier historique \`firmware/docs/feature-inventory.md\` décrit encore une organisation amont différente et annonce 34 applications. Il ne doit plus servir de référence au nombre d'entrées du menu ROZA. La table \`APPS[]\` de \`globals.cpp\` est la source de vérité pour le menu courant. Les écrans et sous-modes d'une entrée ne doivent pas être comptés comme des applications supplémentaires.
 
-### 2.4 Catalogue d'applications
+Le menu Paramètres contient actuellement 15 choix : Wi-Fi, PC MODE, GNSS Config, Brightness, Volume, Boot sound, LED, Theme, Screen off, Date/heure, Units, Battery, Debug bar, Format SD et About.
 
-Le catalogue actuel `firmware/data/apps/catalog.json` contient une seule application déclarative : **Guide ROZA 1.0.0**. Les paquets `.rapp.json` sont des descriptions de mini-applications et non des binaires natifs exécutables.
+## 3. Matériel et compatibilité
 
-Le futur magasin devra distinguer clairement :
-1. le firmware natif, publié uniquement via des versions vérifiées et signées ;
-2. les mini-applications déclaratives, installables sans exécuter de code arbitraire ;
-3. les ressources volumineuses sur microSD : cartes, audio, vidéo, documents, données et packs régionaux.
+### 3.1 M5Stack Cardputer ADV
 
-L'objectif est un vrai catalogue enrichi, avec versions, notes, compatibilités, empreintes, dépendances, mise à jour et restauration, sans permettre à un paquet non fiable d'exécuter du code natif.
-
-## 3. Compatibilité matérielle et contraintes
-
-### 3.1 Cardputer ADV
-
-La documentation officielle M5Stack confirme :
-- ESP32-S3FN8 double cœur, 240 MHz ;
-- 8 Mo de Flash, sans PSRAM externe ;
-- écran ST7789V2 240×135 ;
-- clavier 56 touches ;
+La documentation officielle décrit notamment :
+- SoC ESP32-S3FN8 ;
+- Flash 8 Mo ;
+- écran ST7789V2 de 240 × 135 pixels ;
+- clavier 56 touches, matrice 4 × 14 pilotée par TCA8418 ;
 - IMU BMI270 ;
-- codec audio ES8311, amplificateur NS4150B, haut-parleur et microphone MEMS ;
-- microSD et batterie intégrée de 1750 mAh.
+- codec audio ES8311, amplificateur NS4150B et haut-parleur 1 W ;
+- microphone MEMS ;
+- émetteur infrarouge ;
+- lecteur microSD ;
+- batterie annoncée à 1 750 mAh.
 
-Le budget RAM est la contrainte la plus sensible : TLS, BLE, cartes, audio et gros buffers se disputent la mémoire contiguë. Chaque migration doit fournir une mesure Flash, heap libre, plus grand bloc libre et minimum historique. Les valeurs d'anciens builds ne sont pas des mesures du commit actuel.
+La configuration ROZA considère la carte sans PSRAM. Aucune fonctionnalité de la modernisation ne doit supposer une PSRAM disponible. L'écran, le clavier ADV, l'IMU, l'audio, la batterie et la microSD doivent continuer à utiliser les pilotes ou le BSP déjà présents tant qu'un défaut démontré ne justifie pas une extension.
 
-### 3.2 Cap LoRa-1262 / GNSS
+Broches importantes du Cardputer ADV, recoupées avec le code :
+- I²C interne : GPIO8 SDA et GPIO9 SCL ;
+- clavier TCA8418 : adresse I²C 0x34 et interruption GPIO11 ;
+- IMU BMI270 : bus I²C interne ;
+- écran : GPIO33 reset, GPIO34 RS/DC, GPIO35 données, GPIO36 horloge, GPIO37 CS, GPIO38 rétroéclairage / alimentation LED ;
+- microSD : GPIO12 CS, GPIO14 MOSI, GPIO40 SCK, GPIO39 MISO ;
+- infrarouge : GPIO44 ;
+- batterie : mesure ADC sur GPIO10.
 
-La documentation M5Stack du Cap LoRa-1262 indique :
-- radio Semtech SX1262, plage annoncée 868–923 MHz ;
-- antenne RP-SMA adaptée ;
-- GNSS ATGM336H-6N avec contrôleur AT6668, NMEA 0183 à 115200 bauds ;
-- constellations GPS, QZSS, BeiDou 2/3, Galileo et GLONASS ;
-- liaison GNSS UART et radio SPI.
+### 3.2 Cap LoRa-1262 et GNSS
 
-Broches du Cap sur Cardputer ADV :
-- SX1262 : RST GPIO3, IRQ/DIO1 GPIO4, NSS GPIO5, BUSY GPIO6 ;
-- bus SPI partagé : SCK GPIO40, MOSI GPIO14, MISO GPIO39 ;
-- GNSS : RX GPIO15 et TX GPIO13 ;
-- expandeur I²C : SDA GPIO8, SCL GPIO9.
+La documentation officielle M5Stack du Cap LoRa-1262 confirme :
+- transceiver Semtech SX1262 ;
+- bande matérielle indiquée 868–923 MHz ;
+- GPS ATGM336H-6N / AT6668 ;
+- bus SPI partagé avec la microSD ;
+- expandeur d'E/S PI4IOE5V6408 ;
+- interrupteur RF d'antenne à activer par P0 de l'expandeur ;
+- GNSS sur UART : GPIO13 côté émission du Cardputer vers GPS-RX et GPIO15 côté réception depuis GPS-TX ;
+- LoRa : NSS GPIO5, RESET GPIO3, IRQ GPIO4, BUSY GPIO6, SCK GPIO40, MOSI GPIO14 et MISO GPIO39 ;
+- I²C du Cap sur GPIO8/GPIO9, adresse d'expandeur utilisée par le code : 0x43.
 
-Le code ROZA décrit le module comme ATGM336H et lui envoie des commandes propriétaires PCAS. La référence officielle complète est ATGM336H-6N / AT6668 : la compatibilité des commandes PCAS et des modes dynamiques devra être vérifiée sur le vrai Cap. Le fait de recevoir des phrases NMEA ne suffit pas à valider toutes les commandes propriétaires.
+Le code actuel de \`lora.cpp\` réutilise le même objet SPI global que \`sd_files.cpp\`. Cette réutilisation est nécessaire : la microSD et le SX1262 partagent physiquement SCK/MISO/MOSI et ont deux lignes de sélection distinctes (SD GPIO12, LoRa GPIO5). La coexistence simultanée reste un essai matériel à réaliser ; une déclaration de partage dans le code ne prouve pas à elle seule l'absence de collision de transactions, d'accès concurrents ou de sélection CS incorrecte.
 
-Le SX1262 et la microSD partagent physiquement le même SPI. Il faut conserver un seul gestionnaire de bus, gérer les lignes CS et vérifier les transitions de périphérique. Ne pas créer un second bus SPI concurrent. L'expandeur du Cap commande aussi le chemin RF/antenne : son initialisation et le séquencement doivent être validés matériellement.
+Le firmware doit conserver l'écoute LoRa comme comportement par défaut. Aucune émission automatique ne doit être introduite. Les profils hors bande ou incompatibles avec l'antenne du Cap ne doivent pas être présentés comme des profils d'émission utilisables. Toute émission doit être explicitement demandée, avec région, fréquence, puissance, duty-cycle, antenne et réglementation France/UE vérifiés.
 
-**LoRa reste en réception par défaut.** Aucune émission automatique ne sera ajoutée. Toute émission éventuelle devra être soumise à une validation distincte de fréquence, puissance, antenne, duty-cycle et réglementation France/UE.
+### 3.3 microSD de 128 Go : risque matériel et logiciel à traiter
 
-### 3.3 microSD 128 Go
+L'identification du système de fichiers de la carte réelle n'est pas consignée. Une carte de 128 Go ne doit pas être supposée FAT32 ; une carte SDXC peut notamment être formatée en exFAT.
 
-L'application active utilise actuellement l'API Arduino `SD.h`. Les audits précédents indiquent un montage en lecture/écriture et ne démontrent pas la prise en charge exFAT de cette carte SDXC. Le système de fichiers réel de la carte utilisateur est inconnu.
+Constats dans le code actif :
+- \`sdInit()\` appelle \`SPI.begin(40, 39, 14, 12)\`, puis \`SD.begin(12, SPI, 20000000)\` ;
+- le montage Arduino SD est en lecture/écriture ; le code ne prouve pas l'existence d'un montage protégé contre les écritures ;
+- \`sdInit()\` est appelé au démarrage dans le firmware actuel, alors que la règle du dépôt demande de ne pas monter automatiquement la carte de 128 Go avant identification de son format ;
+- \`formatSD()\` ne recrée pas un système de fichiers : elle supprime récursivement les fichiers et dossiers de la carte via \`SD.remove\` et \`SD.rmdir\`. C'est une opération destructive malgré son nom affiché ;
+- le partage SPI avec le SX1262 doit être testé avec une carte de test et des procédures non destructives.
 
-Candidat technique à tester : **SdFat 2.3.1**, qui prend en charge FAT16/FAT32/exFAT et a corrigé le traitement de champs exFAT. Ce n'est pas un remplacement automatique : il faut mesurer sa taille, vérifier les API utilisées par toutes les applications, préserver le SPI partagé et tester d'abord sur une carte de test.
+Décision de préparation : ne pas effectuer de test d'écriture, de suppression ou de formatage sur la carte utilisateur. Étudier une détection non destructive du type de partition et du système de fichiers, puis un pilote assurant la prise en charge du format constaté. SdFat 2.3.1 est un candidat à évaluer pour FAT/exFAT et SPI, mais il ne doit pas remplacer Arduino SD sans test de lecture des données existantes, mesures mémoire et contrôle du bus partagé. Si aucun montage réellement sûr ne peut être garanti, laisser le stockage désactivé plutôt que d'afficher une protection fictive.
 
-Règles non négociables :
-- identifier le format réel avant toute opération ;
-- ne jamais formater automatiquement ;
-- ne pas effacer ou réorganiser la carte personnelle ;
-- sauvegarder avant tout test d'écriture ;
-- séparer les données de l'utilisateur, les ressources, les sauvegardes et les paquets de mise à jour.
+## 4. Budget de mémoire et de performance
 
-## 4. Versions : état actuel et dernières bases stables candidates
+Les contraintes structurantes sont les suivantes :
 
-Vérification des sources officielles/amont effectuée le 25/11/2026. Une release stable récente n'est pas automatiquement compatible : chaque changement sera épinglé, compilé proprement et testé avant d'être adopté.
-
-| Composant | Version dans ROZA | Version stable candidate / constat | Décision |
-|---|---:|---|---|
-| PlatformIO Core | 6.2.0 | 6.2.0 dans le workflow actuel | Conserver et épingler ; reproduire localement et en CI. |
-| PlatformIO Espressif officiel | 8.0.0 | 8.0.0, base Arduino 3.3.12 / IDF 5.5.5 | Base officielle actuelle du dépôt ; alternative conservatrice. |
-| pioarduino communautaire | non utilisé | 61.04.00 : Arduino 4.0.0 / IDF 6.1.1 ; 55.03.313 : Arduino 3.3.13 / IDF 5.5.6 | Candidat de migration à éprouver en environnement séparé, puis épingler exactement. |
-| Arduino-ESP32 | 3.3.12 | 4.0.0 stable, IDF 6.1.1 | Cible prioritaire de test, pas encore validée par ROZA. Ruptures importantes à corriger. |
-| ESP-IDF | 5.5.5 | 6.1.1 stable | Tester les API réseau, TLS, DHCP, BLE, USB, SPI/I²C, audio et FreeRTOS. |
-| M5Unified | 0.3.0 | 0.3.0 | Déjà à jour. Garder. |
-| M5GFX | 0.3.0 | 0.3.0 | Déjà à jour et à synchroniser avec M5Unified. Contrôler rendu, DMA et rotation. |
-| NimBLE-Arduino | 2.5.2 | 2.5.2 | Déjà sur la dernière release trouvée. Garder et tester cycles scan/HID/démontage. |
-| RadioLib | 7.7.1 | 8.0.0 | Migration nécessaire : nouvelle configuration en structure, paramètres entiers, TCXO enum et API IRQ remaniée. |
-| FastLED | 3.10.3 | 3.10.10 | Candidat de mise à niveau ; mesurer Flash/RAM et valider RMT / LED SK6812 avec audio. |
-| ESP8266Audio | 1.9.9 | 2.4.2 | Candidat de mise à niveau ; corrections WAV, AAC et I²S, mais tester tous les lecteurs sur la cible sans PSRAM. |
-| ArduinoJson | 7.4.3 | 7.4.3 | Déjà sur la dernière release trouvée ; conserver. |
-| TinyGPSPlus | paquet PlatformIO 1.1.0 | Dépôt amont : v1.0.3a | Écart de numérotation à élucider (source exacte, commit et paquet réellement résolu) avant toute modification. |
-| LibSSH-ESP32 | 5.9.0 | Port amont testé explicitement jusqu'aux cores 2.0.17 et 3.0.7 seulement ; wolfSSH 1.6.0 existe | Point de risque majeur : tester le port actuel sous core 3.3.12 et 4.0.0. Comparer wolfSSH sans supprimer SSH. |
-| SdFat | absent | 2.3.1 | Candidat pour exFAT 128 Go, uniquement après tests d'intégration et sauvegarde. |
-
-### Choix du cœur recommandé
-
-**Premier candidat :** pioarduino 61.04.00 + Arduino-ESP32 4.0.0 + ESP-IDF 6.1.1. C'est la génération la plus récente observée dans les releases stables au 25/11/2026. Elle provient d'une plateforme communautaire PlatformIO, alors que ROZA utilise aujourd'hui la plateforme officielle Espressif 8.0.0 : le gain de fraîcheur doit être mis en balance avec la reproductibilité de l'outil.
-
-**Alternative de repli :** pioarduino 55.03.313 + Arduino-ESP32 3.3.13 + ESP-IDF 5.5.6 ; autre solution conservatrice : plateforme officielle 8.0.0 + Arduino 3.3.12 + IDF 5.5.5. Cette seconde génération peut être préférée si le port IDF 6 bloque une dépendance critique.
-
-La stratégie correcte est de construire un petit firmware de référence, puis de porter le projet par lots. Ne pas modifier toutes les dépendances en même temps : on doit pouvoir attribuer chaque régression à une seule migration.
-
-## 5. Audit des 40 applications — améliorations prévues
-
-Les noms et fonctionnalités existants restent la base de non-régression. Les améliorations ci-dessous sont des cibles d'étude pour les étapes suivantes, pas des fonctionnalités déjà installées.
-
-| Application | État / migration à étudier |
+| Élément | Donnée ou conséquence |
 |---|---|
-| **Time** | Conserver les cadrans et l'agenda. Ajouter date/heure manuelles fiables, fuseau Europe/Paris, changement été/hiver et synchronisation optionnelle NTP/GNSS. Le temps local doit rester utilisable sans Wi-Fi. |
-| **IMU** | Garder BMI270/M5Unified. Revoir calibration, orientation, filtre, économie d'énergie et diagnostic capteur. |
-| **Files** | Conserver toutes les opérations existantes. Tester SdFat/exFAT pour 128 Go, navigation plus rapide, recherche, copie, déplacement, informations et sauvegarde non destructive. |
-| **Spectrum** | Garder FFT, barres et waterfall. Vérifier latence micro, buffer, LED et audio après migration M5Unified/M5GFX. Étudier export de mesures. |
-| **Calc** | Conserver calcul local hors ligne ; ajouter fonctions scientifiques et conversions sans alourdir le démarrage. |
-| **Converter** | Élargir les catégories et vérifier les facteurs/unités ; le mode réseau ne doit pas devenir nécessaire aux conversions locales. |
-| **Player** | Conserver WAV. Évaluer MP3/AAC locaux avec ESP8266Audio 2.4.2, métadonnées, playlists et reprise ; confirmer le budget RAM et les formats pris en charge. |
-| **Hash Oven** | Conserver les modes historiques en les signalant comme pédagogiques/CTF. Étudier chiffrement authentifié moderne (AES-GCM ou ChaCha20-Poly1305), SHA-2 et HMAC ; ne pas présenter RC4/MD5 comme sûrs pour un usage réel. |
-| **WiFi Chan** | Garder l'analyse passive et ses détails. Corriger le cycle radio pour que le scan soit une action explicite et que la radio soit ensuite arrêtée. |
-| **Sniffer** | Préserver le mode promiscuous et ses statistiques. Améliorer filtres, compteurs, export et garde-fous de durée/consommation. |
-| **Wardrive** | Conserver la collecte explicitement lancée par l'utilisateur. Améliorer format CSV/JSON, journalisation robuste et protection de la vie privée des traces GPS. |
-| **Drone ID** | Conserver Remote ID. Vérifier les formats d'annonces Bluetooth/Wi-Fi récents, les décodeurs et les tests de non-régression. |
-| **BLE Scan** | NimBLE 2.5.2 est déjà à jour. Conserver les scans passifs, filtres et détails ; mesurer le coût RAM et tester la sortie/réinitialisation BLE. |
-| **Hotspot** | Corriger d'abord l'appel DHCP qui bloque la compilation. Ensuite améliorer gestion des clients, bail IP, sécurité du mot de passe, QR et coexistence AP/scan. |
-| **LAN Scan** | Conserver les fonctions locales. Moderniser temporisations, concurrence, reprise après échec et métriques ; ne pas monopoliser les sockets ou le heap. |
-| **NetProbe** | Conserver les tests réseau locaux. Améliorer profils, résultats, timeout, et protocoles réellement compatibles avec lwIP/IDF cible. |
-| **Router** | Garder l'intégration Clash/Mihomo facultative. Vérifier l'API du contrôleur, l'authentification, les erreurs et les valeurs configurables sans secret dans Git. |
-| **SSH** | Conserver terminal et authentification. Valider libssh-ESP32 sur les nouveaux cores ; tester wolfSSH 1.6.0 comme alternative si le port actuel est bloqué. Vérifier clé d'hôte, authentification et SCP. |
-| **ChatGPT** | Remplacer le chemin OpenAI historique Chat Completions par la Responses API pour le fournisseur OpenAI, en gardant un mode compatible pour les passerelles qui en ont besoin. Choix du fournisseur/modèle configurable ; TLS strict ; réponses limitées et cache. Clé API jamais publiée dans Git. |
-| **BT Keys** | Conserver le clavier HID BLE. Mettre à jour profils, reconnexion, état des touches et sécurité d'appairage avec NimBLE actuel. |
-| **BT Media** | Conserver les commandes multimédias. Vérifier compatibilité AVRCP/HID côté hôtes et cycle d'appairage. |
-| **Ducky** | Conserver les scripts de frappe. Ajouter aperçu, validation, arrêt immédiat et avertissement avant exécution sur un appareil jumelé. |
-| **LoRa** | Porter RadioLib 8.0.0 si retenu. Garder réception par défaut, profils régionaux et logs SD ; étudier une réception décodée compatible Meshtastic comme mode distinct, sans promettre une implémentation complète sur 320 Ko RAM. |
-| **GNSS** | Conserver navigation, vitesse, altitude, qualité et temps GNSS hors ligne. Vérifier NMEA multi-constellation et les commandes PCAS du modèle exact ATGM336H-6N/AT6668. |
-| **Map** | Priorité aux cartes locales WGS-84 sur SD. Revoir la prise en charge exFAT ; proposer des packs de tuiles JPEG adaptés et un téléchargement HTTPS manuel/optionnel. Ne pas faire du réseau une condition de la carte. |
-| **IR** | Conserver l'émetteur intégré et ses protocoles. Ne pas promettre l'apprentissage/réception IR : le Cardputer ADV documenté possède un émetteur, pas un récepteur dédié. |
-| **Astro** | Conserver les calculs hors ligne. Actualiser les algorithmes/éphémérides utiles, ajouter choix de lieu, date et fuseau, avec cache local. |
-| **Weather** | Remplacer les URL HTTP par HTTPS. Enrichir données actuelles, horaires, journalières et qualité de l'air ; Open-Meteo/Météo-France offre des modèles pertinents pour la France. Cache local et dernier résultat disponible hors ligne. |
-| **Planes** | Maintenir l'accès ADS-B Internet comme service externe, pas comme récepteur radio ADS-B. Utiliser HTTPS, cache, gestion 429/Retry-After et respecter la limite du service choisi. |
-| **Sats** | Ne plus rendre N2YO obligatoire. Étudier CelesTrak GP/OMM en JSON ou KVN, puis calcul orbital local (SGP4) et cache SD ; conserver N2YO comme source facultative si l'utilisateur fournit sa clé. Prendre en charge les identifiants NORAD à six chiffres. |
-| **Typhoon** | Conserver la source officielle JMA et la carte des trajectoires. Ajouter cache, actualisation contrôlée, état/heure de mise à jour et source de secours seulement si elle apporte une donnée vérifiable. |
-| **Quake** | Conserver USGS GeoJSON. Ajouter filtres par magnitude, distance et période, tri et cache hors ligne ; éviter de télécharger des flux trop volumineux. |
-| **GitHub** | Garder la contribution heatmap et ajouter dépôts, versions/releases, issues et activité du compte. Cache et requêtes groupées ; token facultatif car l'API publique non authentifiée est limitée à 60 requêtes/heure, contre 5 000 avec authentification personnelle. |
-| **Radio** | Remplacer les seules stations HTTP codées en dur par recherche Radio Browser, favoris et pays/genre/codec. Ajouter flux HTTPS avec validation des certificats, ainsi que la gestion des pertes réseau et du buffer. |
-| **FX** | Migrer Frankfurter v1 vers v2 (v1 est dépréciée). Ajouter devises, actifs couverts, horodatage, source, cache et affichage du dernier taux disponible hors ligne. |
-| **OKX** | Conserver le cours P2P USDT/CNY comme source distincte si son endpoint reste exploitable. Ajouter un mode marchés au comptant via API publique documentée OKX v5, avec limites de requêtes et solution de repli. |
-| **Reader** | Conserver lecture et position. Améliorer UTF-8, gros fichiers, recherche, signets et reprise de lecture depuis la SD. |
-| **BadApple** | Conserver la lecture BAP1 actuelle. Le fichier `/video/badapple.dat` n'est pas fourni dans le catalogue de ressources contrôlé ; prévoir un pack ou un convertisseur pour médias que l'utilisateur possède. Étudier une vidéo JPEG/MJPEG basse résolution avec audio séparé seulement après mesures réelles : le Cardputer n'a pas de PSRAM et ne doit pas être présenté comme un lecteur MP4 généraliste sans preuve. |
-| **Apps** | Étendre le catalogue au-delà du seul Guide ROZA. Distinguer mini-apps déclaratives, packs de ressources et firmware natif signé ; afficher versions, dépendances, compatibilité, intégrité, sauvegarde et mise à jour. |
-| **Settings** | Enrichir réglages radio/réseau, date/heure, énergie, stockage, sauvegarde, maintenance, mise à jour et récupération. Wi-Fi/BT arrêtés par défaut. |
+| Flash | 8 Mo au total |
+| PSRAM | aucune supposée par la configuration ROZA |
+| Écran | 240 × 135 pixels |
+| Canvas RGB565 plein écran | 240 × 135 × 2 = 64 800 octets, soit environ 63,3 Kio |
+| Allocation du canvas | alignement spécifique dans \`globals.cpp\` pour éviter la fragmentation du heap |
+| Cache de tuile cartographique | environ 48 Kio documentés dans le plan des dépendances |
+| Bundle de certificats racines | 121 racines, environ 56 Kio compilés en Flash selon la configuration actuelle |
+| TLS | allocations temporaires importantes et besoin de blocs contigus ; les accès HTTPS lourds libèrent temporairement le canvas |
+| Radio / audio | buffers et tâches concurrentes ; la lecture radio libère le canvas afin de réserver de la RAM au décodeur et au flux |
 
-## 6. Défauts transversaux prioritaires
+Les mesures historiques de RAM/Flash dans \`firmware/docs/dependency-pins.md\` ont été obtenues sur une base Arduino 2.0.17 / ESP-IDF 4.4.7. Elles ne sont pas des mesures de la base actuelle Arduino 3.3.12 / IDF 5.5.5 et encore moins une mesure de la branche 4.0.0. Elles doivent être conservées comme archives comparatives, pas comme budget courant.
 
-### Priorité critique
+La CI du commit de référence échoue avant l'édition de liens. Il n'existe donc pas de mesure fiable du binaire lié courant pour ce SHA. À l'étape 2, relever au minimum :
+- RAM statique et Flash à l'édition de liens ;
+- heap libre, plus grand bloc contigu et minimum historique au démarrage ;
+- mêmes mesures pendant TLS, GNSS/cartographie, BLE, audio/lecture radio et lecture/écriture SD ;
+- temps de rendu et fluidité BadApple après mise à jour de M5GFX ;
+- consommation en veille et lors des fonctions réseau/radio sur matériel réel à l'étape 5.
 
-1. **Build cassé** : signature DHCP dans `hotspot.cpp`.
-2. **Politique Wi-Fi contradictoire** : `setup()` appelle `bootWifiStart()`; `wifi_net.cpp` démarre automatiquement la connexion au réseau mémorisé, active l'auto-reconnexion et laisse la radio allumée même après timeout. Cela contredit l'objectif hors ligne et la règle de connexion volontaire. À corriger à l'étape 2 : Wi-Fi et Bluetooth arrêtés au démarrage ; connexion seulement sur action utilisateur ou tâche de mise à jour explicitement autorisée ; réseaux enregistrés uniquement ; échec sans effet sur les applis locales.
-3. **OTA A/B absent** : la table `partitions_8MB.csv` ne contient qu'une partition `factory`. Pas de `ota_0`, `ota_1` ni `otadata`; le paquet `ROZA_UPDATE.bin` est une image app-only pour flash USB, pas un moteur OTA.
-4. **Signature absente** : SHA-256 permet de détecter un fichier corrompu, mais ne prouve pas l'identité de l'auteur si le binaire et le manifeste peuvent être remplacés ensemble.
-5. **Carte SD** : format inconnu ; montage actuel non prouvé exFAT ni réellement lecture seule.
+Aucun chiffre d'un ancien build ne doit être réutilisé comme mesure du nouveau binaire.
 
-### Priorité élevée
+## 5. Versions amont : état réel et candidats stables
 
-- **Chat** : secrets définis dans `secrets.h` au moment de la compilation, modèle par défaut codé en dur, pas de configuration depuis l'interface. Le mode TLS sans vérification existe en option explicite (`CHAT_ALLOW_INSECURE`) et doit rester interdit dans la configuration de livraison normale.
-- **Radio, météo, cartes et données avions** : certaines requêtes utilisent HTTP en clair ; la radio refuse HTTPS. Migrer vers HTTPS validé lorsque la source le permet. Le réseau doit rester facultatif et non bloquant.
-- **Sats** : la fonction refuse de démarrer sans clé N2YO, ce qui rend cette app dépendante d'un compte/API. Étudier un catalogue orbital public et la prédiction locale.
-- **GNSS** : le code configure le module avec des commandes PCAS ; confirmer le modèle et les commandes sur le Cap réel.
-- **Catalogue App Store** : un seul paquet Guide ROZA.
-- **Inventaire d'écrans** : les 85 écrans annoncés ne sont pas recalculés ici à partir de toutes les déclarations ; automatiser ce contrôle.
+Les versions ci-dessous ont été recoupées dans les dépôts de publication officiels au 25 novembre 2026. « Candidat » signifie qu'une version stable existe en amont ; cela ne signifie pas qu'elle compile déjà avec ROZA.
 
-## 7. Mises à jour, partitions et récupération
+| Composant | Version ROZA actuelle | Dernière version stable vérifiée | Décision de préparation |
+|---|---:|---:|---|
+| PlatformIO Core | 6.2.0 | 6.2.0 | Garder ; version cohérente avec la CI |
+| Plateforme PlatformIO Espressif32 | 8.0.0 | 8.0.0 dans la base active ; branche communautaire pioarduino 61.04.00 disponible | Comparer les chaînes sans confondre la plateforme officielle et le fork pioarduino |
+| Arduino-ESP32 | 3.3.12 | 4.0.0 | Cible majeure à évaluer |
+| ESP-IDF sous Arduino | 5.5.5 | 6.1.1 | Suit le core Arduino sélectionné ; vérifier le guide de migration |
+| M5Unified | 0.3.0 | 0.3.0 | Déjà à jour ; ne pas remplacer |
+| M5GFX | 0.3.0 | 0.3.0 | Déjà à jour ; ne pas remplacer |
+| NimBLE-Arduino | 2.5.2 | 2.5.2 | Déjà à jour ; conserver les tests BLE |
+| RadioLib | 7.7.1 | 8.0.0 | Mise à niveau utile mais API majeure incompatible |
+| FastLED | 3.10.3 | 3.10.10 | Candidat ; mesurer Flash/RAM et tester le pilote RMT LED |
+| ArduinoJson | 7.4.3 | 7.4.3 | Déjà à jour ; conserver les correctifs et les tests JSON |
+| TinyGPSPlus | 1.1.0 via la dépendance PlatformIO | dernier tag public GitHub observé v1.0.3a | Clarifier la provenance/version réellement résolue ; garder le parseur tant que couverture NMEA non équivalente |
+| ESP8266Audio | tag Git 1.9.9 | 2.4.3 | Mise à niveau prioritaire à tester pour I²S, AAC, WAV, MIDI et flux |
+| LibSSH-ESP32 | 5.9.0 | pas de version GitHub Release publiée | Compatibilité du port à confirmer ; son README ne cite que les cores Arduino 2.0.17 et 3.0.7 comme testés |
+| wolfSSH | absent | 1.6.0 stable | Alternative à étudier pour SSH ; ce n'est pas un remplacement direct de LibSSH |
+| SdFat | absent | 2.3.1 | Alternative candidate pour FAT/exFAT, sous réserve de tests Cardputer et bus SPI |
 
-### État actuel
+### 5.1 Cœur système : cible recommandée
 
-- Partition Flash : NVS, PHY et une seule partition application `factory`.
-- Le paquetage produit une image fusionnée USB et une image application seule, avec manifeste SHA-256.
-- Les contrôles actuels vérifient structure, cible ESP32-S3, taille et relecture du paquet ; ils ne vérifient pas une signature cryptographique de confiance.
-- Aucun moteur OTA applicatif de production n'a été identifié dans `firmware/src/`.
-- Le retour arrière de l'application n'est pas possible avec une seule partition factory.
+Deux cibles amont plus récentes existent :
+- Arduino-ESP32 3.3.13 / ESP-IDF 5.5.6, distribués par la plateforme communautaire pioarduino 55.03.313 ; c'est le saut incrémental qui permet d'isoler la migration de core ;
+- Arduino-ESP32 4.0.0 / ESP-IDF 6.1.1, distribués par pioarduino 61.04.00 ; c'est la cible majeure la plus récente vérifiée.
 
-### Architecture recommandée pour l'étape 3
+Recommandation : conserver la base 8.0.0 comme point de comparaison reproductible, puis tester d'abord le saut incrémental 3.3.13/5.5.6 avant le saut majeur 4.0.0/6.1.1. La cible de livraison doit être la version stable la plus récente qui passe le projet complet, les tests, les mesures mémoire et les contrôles matériels. Il ne faut pas adopter le core 4.0 uniquement parce qu'il est plus récent si une bibliothèque essentielle, l'audio ou le BSP Cardputer ADV régresse. Le fork pioarduino doit être identifié comme tel et ne doit pas être présenté comme une version officielle PlatformIO ou Espressif.
 
-1. Construire un manifeste versionné signé (Ed25519 ou ECDSA selon les bibliothèques validées), qui couvre modèle de carte, version, taille, hash SHA-256, partition minimale, version minimale du bootloader et URL/nom du paquet.
-2. Intégrer uniquement la clé publique de vérification au firmware ; garder la clé privée de signature hors du dépôt, dans le système de publication protégé.
-3. Vérifier signature **avant installation**, puis hash, taille, modèle et compatibilité.
-4. Prévoir slots OTA A/B et `otadata`, contrôle du premier démarrage et confirmation explicite après autotests ; utiliser le rollback du bootloader ESP-IDF.
-5. Prévoir l'installation via Wi-Fi optionnel et via microSD, sans dépendance internet permanente.
-6. Sauvegarder les préférences NVS avant migration ; l'installation initiale d'une nouvelle table de partitions devra se faire par USB-C. La microSD ne doit jamais être formatée par le processus d'update.
-7. Dimensionner les deux slots uniquement après compilation du firmware actuel et inspection de la table générée. Aucune capacité A/B n'est déclarée acquise à ce stade.
-8. Conserver une méthode de récupération USB-C complète si OTA ou SD ne sont plus accessibles.
+### 5.2 Ruptures et risques amont majeurs
 
-Ne pas activer de manière irréversible Secure Boot/eFuses au cours de cette migration sans procédure de provisionnement des clés, de restauration et de validation distincte.
+- M5Unified et M5GFX 0.3.0 sont déjà synchronisés. Leur mise à niveau a changé la rotation absolue : sur Cardputer / Cardputer ADV, l'ancien \`setRotation(1)\` correspond maintenant à \`setRotation(0)\`. Certaines fonctions ont également changé leur type de retour de \`void\` à \`bool\`. Les tests écran, microphone, haut-parleur, DMA, IMU et clavier ADV restent obligatoires.
+- RadioLib 8.0.0 est une rupture d'API : les anciens appels \`begin(...)\` à paramètres individuels sont remplacés par des structures de configuration, de nombreux paramètres flottants deviennent des entiers, les callbacks d'interruption sont unifiés et des codes de retour changent. Il faut répertorier tous les appels SX1262 de \`lora.cpp\` avant la migration.
+- FastLED 3.10.10 est plus récent que le 3.10.3 intégré ; les vieux benchmarks du fichier de pins comparaient surtout des versions sous IDF 4.4.7. Ils ne prouvent pas que 3.10.10 augmente ou réduit la mémoire sur la base actuelle. Mesurer le binaire et vérifier GPIO21 / SK6812 / RMT et la coexistence audio.
+- ESP8266Audio 2.4.3 contient des corrections postérieures au tag 1.9.9, notamment autour des formats ID3v2.4, AAC corrompu et de la pile I²S ESP32. Le portage doit valider le lecteur local, les flux radio, les interruptions de lecture, la mémoire et les transitions microphone/haut-parleur.
+- Le README de LibSSH-ESP32 dit que les cores 2.0.17 et 3.0.7 sont testés ; la version ROZA actuelle est 3.3.12. Un build réussi ne suffit pas à prouver la sûreté de SSH/TLS ou les allocations de mémoire. Comparer le port existant à wolfSSH sans perdre SSH/SCP et après examen des licences.
+- TinyGPSPlus est central dans un parseur GNSS riche en champs NMEA personnalisés. Ne pas le remplacer par un parseur plus petit sans démontrer l'équivalence des constellations, GGA/GSV, qualité de fix, HDOP, âge des données et états d'antenne.
 
-## 8. Recommandation technique consolidée
+## 6. Audit des applications et modernisation sans suppression
 
-Le meilleur chemin est une migration en lots contrôlés :
+Le menu réel contient 40 entrées. La ligne « modernisation prévue » décrit le travail à examiner à l'étape 2 et ne déclare pas déjà la fonction corrigée.
 
-- **Socle** : commencer par un prototype propre pioarduino 61.04.00 / Arduino 4.0.0 / IDF 6.1.1 ; comparer immédiatement avec 3.3.13 / IDF 5.5.6 et la plateforme officielle 8.0.0 / 3.3.12 / 5.5.5. Retenir la base la plus récente qui compile et passe les tests de tous les services, pas seulement un exemple minimal.
-- **M5Stack** : garder M5Unified/M5GFX 0.3.0 déjà présents, puis vérifier rotation, audio, écran, DMA et clavier ADV.
-- **Périphériques** : mettre à niveau RadioLib/FastLED/ESP8266Audio séparément ; garder NimBLE/ArduinoJson tant qu'ils sont déjà à jour ; résoudre la provenance TinyGPSPlus ; valider ou remplacer LibSSH sans perdre SSH.
-- **SD** : prouver d'abord exFAT sur carte de test avec SdFat 2.3.1 et le bus SPI partagé ; conserver l'accès aux données actuelles.
-- **Services** : passer les flux HTTP en HTTPS, utiliser les API officielles documentées, cache local, quotas et dates de fraîcheur ; ne jamais imposer une clé API pour les fonctions qui disposent d'une source publique utilisable.
-- **Apps** : préserver les 40 entrées et ajouter des options/écrans ou des sources modernes ; n'en retirer aucune.
-- **Ressources** : déplacer les fichiers volumineux sur SD, ne pas les incorporer au binaire Flash sans justification mesurée.
+| Groupe | Application | Fichiers/technologie repérés | Modernisation à préserver ou à évaluer |
+|---|---|---|---|
+| TOOL | Time | horloge, date, chronomètre | Temps manuel et fonctionnement hors ligne ; NTP facultatif, fuseau et changement été/hiver |
+| TOOL | IMU | M5Unified / BMI270 | Conserver cache partagé, état matériel indisponible et mesures réelles |
+| TOOL | Files | Arduino SD / gestion de fichiers | Conserver les fichiers ; sécuriser le montage, les opérations destructives et exFAT |
+| TOOL | Spectrum | ES8311 / audio / analyse | Tester micro, buffers audio, rendu et coexistence avec le haut-parleur |
+| TOOL | Calc | calcul local | Garder l'application locale et ses tests de calcul |
+| TOOL | Converter | conversions locales | Garder les conversions sans réseau ni clé |
+| TOOL | Player | lecteur de fichiers WAV et audio | Conserver la lecture SD ; évaluer ESP8266Audio 2.4.3 et les formats sans dépasser la RAM |
+| TOOL | Hash Oven | fonctions de hachage et crypto | Garder les fonctions, vérifier SHA-256, erreurs et vecteurs connus |
+| SCAN | WiFi Chan | scan Wi-Fi passif | API Wi-Fi du core ; radio arrêtée hors activation explicite |
+| SCAN | Sniffer | mode promiscuous Wi-Fi | Préserver suspension/reprise du Hotspot et les compteurs |
+| SCAN | Wardrive | scan et journalisation géographique | Corriger l'API Wi-Fi interne retirée ; garantir journalisation sûre et SD non destructive |
+| SCAN | Drone ID | Remote ID / découverte | Vérifier réception passive, NimBLE et parsing des trames |
+| SCAN | BLE Scan | NimBLE-Arduino | Déjà épinglé sur la dernière version stable ; conserver EXT_ADV, PHY et limites HCI |
+| NET | Hotspot | SoftAP, ESP-NETIF DHCP | Conserver gestion des clients et mot de passe aléatoire ; confirmer arrêt/reprise |
+| NET | LAN Scan | Wi-Fi / découverte LAN | API du core, délais bornés et aucun blocage de l'interface |
+| NET | NetProbe | TCP / DNS / HTTP | Distinguer les tests réseau explicites et les cibles contrôlées par l'utilisateur |
+| NET | Router | statistiques et outils réseau | Tests logiciels existants, mesure mémoire et traitement non bloquant |
+| NET | SSH | LibSSH-ESP32 | Préserver client SSH/SCP ; valider la compatibilité 3.3.12/4.0 et les alternatives |
+| NET | ChatGPT | HTTPS, API configurable, clé facultative | TLS avec validation de certificat par défaut ; clé et fournisseur configurables, réseau optionnel |
+| HID | BT Keys | NimBLE HID | Garder le profil clavier et les commandes utilisateur explicites |
+| HID | BT Media | NimBLE HID / multimédia | Garder les contrôles multimédia et la gestion d'appairage |
+| HID | Ducky | macros HID | Conserver l'exécution locale, la prévisualisation et les limites de sécurité |
+| SIG | LoRa | RadioLib / SX1262 | Migrer RadioLib sans perte RX, scanner, presets, journaux ; TX manuel et régional |
+| SIG | GNSS | TinyGPSPlus / UART1 | Conserver parseur NMEA, GPS hors ligne, constellations et réglages du Cap |
+| SIG | Map | monde/tuiles et cache | Garder carte hors ligne ; cache en RAM borné et sources HTTPS vérifiées |
+| SIG | IR | M5Stack / IR | Conserver envoi/réception compatibles avec le matériel et les codes existants |
+| SKY | Astro | calculs locaux | Fonctionnement hors ligne, calculs et tests locaux |
+| SKY | Weather | Open-Meteo / qualité de l'air | Passer les URL HTTP en HTTPS lorsque les endpoints le permettent ; cache et état réseau non bloquant |
+| SKY | Planes | ADS-B.lol | HTTPS à évaluer ; garder le parsing en flux et les filtres mémoire |
+| SKY | Sats | N2YO | Dépend actuellement d'une clé N2YO obligatoire ; étudier TLE publics CelesTrak + propagation orbitale locale, sans fausse clé |
+| SKY | Typhoon | données JMA / JSON | Garder HTTPS avec CA, filtre JSON, gestion des données absentes |
+| SKY | Quake | données sismiques | Vérifier source, HTTPS, fraîcheur et fonctionnement hors réseau |
+| MORE | GitHub | API GitHub HTTPS | Préserver l'accès public sans token, gérer quotas, cache et dates de fraîcheur |
+| MORE | Radio | ESP8266Audio / flux Web | Fonctionne actuellement uniquement avec URL HTTP ; évaluer HTTPS et la nouvelle pile audio |
+| MORE | FX | Frankfurter / taux de change | Garder source publique, HTTPS, cache et date du taux |
+| MORE | OKX | API OKX HTTPS | Conserver validation TLS et traiter réponse indisponible/quotas sans bloquer |
+| MORE | Reader | fichiers locaux | Préserver les formats réellement présents et lecture sans réseau |
+| MORE | BadApple | lecteur de ressource vidéo dédiée | Garder le format de ressource existant ; vérifier le fichier SD et le débit d'affichage ; un lecteur MP4 général est un projet séparé, non acquis |
+| MORE | Apps | catalogue JSON et pages runtime | Le catalogue courant est limité à 8 apps, fichiers JSON et pages runtime bornés à 8 Kio ; ce n'est pas encore un chargeur sûr de modules natifs |
+| MORE | Settings | paramètres système | Conserver les 15 réglages, les confirmations destructives et l'activation volontaire du réseau/radio |
 
-## 9. Critères de sortie de l'étape 1
+### 6.1 Priorités transversales des applications
 
-- [x] Dépôt, branche et commit courants identifiés.
-- [x] Chaîne de compilation active et versions réellement épinglées relevées.
-- [x] État CI courant et blocage de compilation identifiés.
-- [x] 40 applications et 7 groupes vérifiés directement dans `globals.cpp`.
-- [x] Incohérences du catalogue et de l'inventaire documentaire relevées.
-- [x] Matériel Cardputer ADV / Cap LoRa-1262, broches et bus partagés rapprochés de la documentation M5Stack.
-- [x] Candidats de versions stables vérifiés dans les dépôts amont officiels.
-- [x] Budget/risques RAM, Flash, SD, OTA, TLS, Wi-Fi et services externes documentés.
-- [x] Plan de migration applicatif établi, sans suppression de fonction.
-- [ ] Compilation verte du commit courant : bloquée par `hotspot.cpp`, à corriger à l'étape 2.
-- [ ] Mesures RAM/Flash du binaire courant : après réparation du build.
-- [ ] Essais physiques Cardputer ADV + Cap + carte SD : à effectuer avec le matériel ; aucune simulation ne les remplace.
+**P0 — fiabilité et intégrité**
+1. Corriger l'API Wi-Fi obsolète dans Wardrive et retrouver une compilation CI verte.
+2. Empêcher le montage automatique de la microSD tant que son format n'est pas identifié ; ne jamais laisser un test toucher la carte utilisateur.
+3. Renommer ou réécrire l'action « Format SD » : elle supprime aujourd'hui récursivement les fichiers, elle ne crée pas de système de fichiers.
+4. Conserver les modes hors ligne et les erreurs réseau non bloquantes.
 
-**Conclusion :** l'étape 1 est auditée et son livrable documentaire est prêt. Le firmware n'est pas encore compilable sur le commit examiné. L'étape suivante est exclusivement l'étape 2/5 : corriger le build puis porter le cœur et les applications par lots, sans démarrer la refonte VHS ni l'OTA avant leur tour.
+**P1 — transport et confidentialité**
+- Weather utilise des URL HTTP pour les prévisions et la qualité de l'air.
+- Planes utilise HTTP pour la requête de position des avions.
+- GeoLoc utilise HTTP vers ip-api.com lorsqu'aucune position GNSS/cache n'est disponible.
+- Radio rejette explicitement les URL HTTPS et n'accepte que HTTP.
+- Chat possède une option explicite \`CHAT_ALLOW_INSECURE\` qui appelle \`setInsecure()\`. Elle doit rester désactivée pour toute configuration normale ; les clés API ne doivent jamais être envoyées à travers une connexion dont le certificat n'est pas vérifié.
+- GitHub, FX, OKX et Typhoon utilisent déjà des connexions TLS avec bundle ou certificat ; leurs chemins doivent être conservés et testés.
+- Sats utilise HTTPS correctement vérifié, mais exige une clé N2YO intégrée à l'URL. Une source publique sans clé avec calcul local est préférable si la précision et les fonctionnalités sont équivalentes.
+- Le catalogue Apps utilise HTTPS sur GitHub Raw et limite la source à ce domaine.
 
-## 10. Sources primaires consultées
+**P2 — disponibilité et autonomie**
+- Ajouter cache local, horodatage et état « données périmées » aux services météo, avions, satellites, finance, radio et GitHub.
+- Préserver les fonctions essentielles sans réseau. L'accès Internet ne doit pas être une condition de démarrage ou d'utilisation du Cardputer.
+- Utiliser les réseaux Wi-Fi déjà enregistrés uniquement ; aucun démarrage Wi-Fi/Bluetooth automatique au démarrage.
+- Pour les applications qui dépendent aujourd'hui d'une API, choisir des sources officielles/publiques et sans clé lorsque cela est possible, plutôt que d'inventer des identifiants.
 
-### M5Stack et Espressif
-- Cardputer ADV : https://docs.m5stack.com/en/core/Cardputer-Adv
-- Cap LoRa-1262 : https://docs.m5stack.com/en/cap/Cap_LoRa-1262
-- Arduino-ESP32 4.0.0 : https://github.com/espressif/arduino-esp32/releases/tag/4.0.0
-- ESP-IDF OTA / rollback : https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/ota.html
+## 7. Mises à jour, partitionnement et récupération
 
-### Framework et bibliothèques
+### 7.1 État actuel constaté
+
+La table active \`firmware/partitions_8MB.csv\` contient :
+- NVS ;
+- PHY init ;
+- une seule partition applicative \`factory\` à partir de 0x10000, de taille 0x7E0000.
+
+Elle ne contient ni \`otadata\`, ni partitions \`ota_0\` et \`ota_1\`. Le fichier racine \`partitions.csv\` contient un ancien exemple avec deux slots, mais il est historique et interdit d'utilisation pour la compilation active par \`AGENTS.md\`.
+
+Le système de livraison actuel produit :
+- une image fusionnée USB à flasher à 0x0000, qui réécrit également la zone NVS et réinitialise donc les préférences ;
+- un binaire application seul destiné à un firmware ROZA existant et à la partition courante, à flasher par USB à 0x10000 sans effacement global ;
+- des SHA-256 de contrôle d'intégrité du fichier.
+
+Ce deuxième binaire n'est pas un OTA : la carte doit être reliée en USB et placée en mode téléchargement. SHA-256 détecte une corruption ; sans signature et clé de confiance indépendante, il ne prouve pas l'identité de l'éditeur du paquet.
+
+Il n'existe donc pas encore de moteur OTA de production, de mise à jour A/B ou de rollback de firmware. Le document \`docs/ARCHITECTURE.md\` a précédemment décrit deux slots comme s'ils étaient actifs ; cette description doit être corrigée pour refléter la table réellement utilisée.
+
+### 7.2 Architecture à étudier à l'étape 3
+
+1. Manifeste versionné signé couvrant la cible, la version, la taille, le hash SHA-256, le partitionnement minimum et le paquet.
+2. Clé privée de signature hors du dépôt ; clé publique de vérification intégrée au firmware.
+3. Vérification de signature avant l'installation, puis hash, taille, modèle et compatibilité.
+4. Slots OTA A/B avec \`otadata\`, confirmation du premier démarrage et rollback bootloader activé.
+5. Téléchargement par Wi-Fi uniquement après demande explicite, et installation locale depuis SD après validation de la carte.
+6. Sauvegarde des préférences NVS avant migration ; récupération USB-C toujours disponible.
+7. Étude précise du budget 8 Mo après compilation du binaire réellement modernisé. L'ancienne table A/B à la racine ne constitue pas une validation du dimensionnement courant.
+8. Ne pas activer Secure Boot ou programmer des eFuses de façon irréversible sans procédure de provisionnement, récupération et essais distincts.
+
+La documentation officielle ESP-IDF exige au moins deux partitions d'application OTA et une partition OTA Data pour le mode de mise à jour sécurisé ; le mécanisme de rollback exige en plus les options et l'auto-confirmation prévues au premier démarrage. Le partitionnement ROZA actuel ne remplit pas ces conditions.
+
+## 8. Matrice de migration consolidée
+
+| Domaine | État constaté | Cible de travail | Risque | Porte de validation |
+|---|---|---|---|---|
+| Core ESP32 | Arduino 3.3.12 / IDF 5.5.5 | tester 3.3.13/5.5.6 puis 4.0.0/6.1.1 | élevé | CI complète, API Wi-Fi/BLE/I²S/USB, mesures RAM/Flash |
+| BSP écran | M5Unified/M5GFX 0.3.0 | conserver et auditer les appels | moyen | rotations, DMA, rendu, veille/réveil |
+| Clavier ADV | TCA8418 sur I²C | conserver pilote existant | moyen | matrice complète 56 touches, Fn et modificateurs |
+| IMU | BMI270 via M5Unified | conserver pilote existant | moyen | mesures, disponibilité et stabilité |
+| Wi-Fi/BLE | API core + NimBLE 2.5.2 | conserver NimBLE ; remplacer les symboles internes | élevé | scans, hotspot, BLE HID/EXT_ADV, état radio |
+| LoRa | RadioLib 7.7.1 + SX1262 | tester RadioLib 8.0.0 | élevé | RX, presets, IRQ, SPI partagé ; TX seulement après validation réglementaire |
+| GNSS | TinyGPSPlus 1.1.0 de l'environnement PIO | vérifier provenance et garder couverture NMEA | moyen | constellation, fix, GSV/GGA, GPS offline |
+| Audio | ESP8266Audio 1.9.9 | tester 2.4.3 | élevé | WAV/MP3/AAC/MIDI selon usages, flux, micro, haut-parleur, RAM |
+| LED RGB | FastLED 3.10.3 | tester 3.10.10 | moyen | RMT GPIO21, timing et Flash/RAM |
+| JSON | ArduinoJson 7.4.3 | conserver | faible | suites JSON et parsing flux |
+| SSH | LibSSH-ESP32 5.9.0 | tester sur core moderne ; comparer wolfSSH | élevé | client, SCP, TLS, heap, licence |
+| microSD | Arduino SD, montage RW | comparer SdFat 2.3.1 | critique | identification, exFAT/FAT, conservation des fichiers, bus partagé |
+| Services Web | HTTP/HTTPS mélangés | HTTPS vérifié, cache, API sans clé | élevé | TLS avec heure/CA, erreurs réseau, mémoire |
+| OTA | USB + SHA-256 | signature, A/B, rollback | critique | coupure d'alimentation, premier démarrage et récupération |
+| Catalogue Apps | pages JSON et 8 éléments max | catalogue versionné sûr, sans faux chargeur natif | moyen | validation schéma, limites, intégrité et compatibilité |
+
+## 9. Décisions recommandées
+
+1. **Ne pas refaire l'interface maintenant.** La refonte VHS/CRT attend l'étape 4.
+2. **Ne pas remplacer le BSP M5Stack déjà à jour.** Réutiliser M5Unified/M5GFX et les pilotes Cardputer ADV présents.
+3. **Adopter le plus récent stable après preuve, pas par simple numéro de version.** Évaluer Arduino 4.0/IDF 6.1 comme cible prioritaire, avec 3.3.13/5.5.6 comme palier de comparaison.
+4. **Mettre à niveau séparément les bibliothèques qui ont réellement évolué.** Priorités : ESP8266Audio, RadioLib et FastLED ; maintenir M5Unified, M5GFX, NimBLE et ArduinoJson tant qu'ils restent les dernières versions stables vérifiées.
+5. **Ne pas changer de parseur GNSS sans matrice NMEA.** La couverture actuelle est plus importante que le remplacement nominal d'une dépendance.
+6. **Moderniser les transports réseau.** HTTPS validé dès que disponible, aucune clé en HTTP, horodatage/caches, réseau facultatif et retour clair hors ligne.
+7. **Traiter la microSD avant d'ajouter de grandes données ou des paquets.** Identifier le format, sécuriser le montage, vérifier l'accès exFAT et l'arbitrage SPI.
+8. **Concevoir le vrai OTA comme une fonction de sécurité, pas comme un simple téléchargement.** Signature, double slot, rollback et récupération doivent être vérifiés ensemble.
+9. **Conserver les 40 applications et leurs fonctions.** Un remplacement doit être démontré supérieur et reprendre les fonctions existantes ; aucun stub, aucune suppression de commodité.
+
+## 10. Critères de sortie de l'étape 1
+
+- [x] Dépôt, branche et commit exacts identifiés.
+- [x] Chaîne de build réellement active et versions épinglées relevées.
+- [x] CI du commit courant interrogée ; erreur de compilation exacte documentée.
+- [x] Différence entre l'ancien rapport et l'état courant du dépôt clarifiée.
+- [x] Nombre d'applications et groupes recalculé depuis le tableau de menu réel : 40 / 7.
+- [x] Fonctions des applications rapprochées des fichiers sources actifs et plan de préservation établi.
+- [x] Carte matérielle Cardputer ADV et Cap LoRa-1262, broches, bus partagés et adresse d'expandeur rapprochés des sources officielles et du code.
+- [x] Limites Flash/RAM/absence de PSRAM, canvas, TLS, cartes, audio et radio documentées.
+- [x] Versions stables amont et changements majeurs recherchés dans les dépôts officiels.
+- [x] Matrice de migration avec risques et validations préparée.
+- [x] HTTP en clair, dépendances API, secrets, contraintes microSD et absence d'OTA sécurisée recensés.
+- [x] Incohérences documentaires du partitionnement et des anciennes versions de dépendances identifiées et corrigées dans les documents de référence.
+- [x] Étapes 2 à 5 maintenues dans le bon ordre ; aucun changement du firmware ni refonte d'interface effectué au titre de cette étape.
+
+**Conclusion de porte :** l'étape 1/5 est complète comme audit et préparation. La compilation échouée est enregistrée comme point de départ de l'étape 2, pas maquillée en succès. Les mesures du nouveau binaire et les essais physiques ne sont pas des preuves disponibles à ce stade et restent affectés aux portes de validation des étapes 2 et 5.
+
+## 11. Sources primaires
+
+### Dépôt ROZA
+- Code courant : https://github.com/Yoyote84/Roza/tree/main
+- Commit de référence : https://github.com/Yoyote84/Roza/commit/71cd1ff0216ec426f8d073153c838373181da5b9
+- CI du commit : https://github.com/Yoyote84/Roza/actions/runs/45518114744
+- Configuration PlatformIO : https://github.com/Yoyote84/Roza/blob/main/firmware/platformio.ini
+- Verrouillage des dépendances : https://github.com/Yoyote84/Roza/blob/main/firmware/docs/dependency-pins.md
+
+### Matériel et plateforme
+- M5Stack Cardputer ADV : https://docs.m5stack.com/en/core/Cardputer-Adv
+- M5Stack Cap LoRa-1262 : https://docs.m5stack.com/en/cap/Cap_LoRa-1262
+- Arduino-ESP32 4.0.0 / IDF 6.1.1 : https://release-notes.espressif.com/?project=Arduino
+- ESP-IDF 6.1.1 : https://github.com/espressif/esp-idf/releases/tag/v6.1.1
 - pioarduino 61.04.00 : https://github.com/pioarduino/platform-espressif32/releases/tag/61.04.00
 - pioarduino 55.03.313 : https://github.com/pioarduino/platform-espressif32/releases/tag/55.03.313
+
+### Bibliothèques
 - M5Unified : https://github.com/m5stack/M5Unified/releases
 - M5GFX : https://github.com/m5stack/M5GFX/releases
+- NimBLE-Arduino : https://github.com/h2zero/NimBLE-Arduino/releases
 - RadioLib : https://github.com/jgromes/RadioLib/releases
 - FastLED : https://github.com/FastLED/FastLED/releases
 - ESP8266Audio : https://github.com/earlephilhower/ESP8266Audio/releases
-- NimBLE-Arduino : https://github.com/h2zero/NimBLE-Arduino/releases
 - ArduinoJson : https://github.com/bblanchon/ArduinoJson/releases
-- TinyGPSPlus : https://github.com/mikalhart/TinyGPSPlus/releases
-- SdFat : https://github.com/greiman/SdFat/releases
+- TinyGPSPlus : https://github.com/mikalhart/TinyGPSPlus
 - LibSSH-ESP32 : https://github.com/ewpa/LibSSH-ESP32
 - wolfSSH : https://github.com/wolfSSL/wolfssh/releases
+- SdFat : https://github.com/greiman/SdFat/releases
 
-### Services / formats / API
+### Services et mise à jour
+- OTA et rollback ESP-IDF : https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/ota.html
 - Open-Meteo : https://open-meteo.com/en/docs
-- Météo-France via Open-Meteo : https://open-meteo.com/en/docs/meteofrance-api
-- Air Quality API : https://open-meteo.com/en/docs/air-quality-api
 - Frankfurter : https://frankfurter.dev/
 - CelesTrak GP data : https://celestrak.org/NORAD/elements/gp.php
-- ADSB.lol API : https://www.adsb.lol/docs/open-data/api
+- ADS-B.lol API : https://www.adsb.lol/docs/open-data/api
 - Radio Browser API : https://api.radio-browser.info/
-- GitHub REST rate limits : https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
-- OpenAI Responses API : https://developers.openai.com/api/docs/guides/text
-- Protection des clés API OpenAI : https://help.openai.com/en/articles/8304786-keeping-your-openai-account-secure
+- GitHub API limits : https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api

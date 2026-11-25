@@ -1,39 +1,39 @@
 # Architecture logicielle
 
-```text
+\`\`\`text
 Application / Lanceur
         |
 API de services (événements, stockage, périphériques)
         |
-+------------------ Noyau РОЗА ------------------+
++------------------ Noyau РO3A ------------------+
 | tâches FreeRTOS | gestion énergie | supervision |
 | événements      | configuration   | journal     |
-+-------------------------------------------------+
++------------------------------------------------+
         |
-+--------------------- Services ------------------+
++--------------------- Services -----------------+
 | affichage | clavier | audio | fichiers | GNSS   |
 | radio     | Wi-Fi   | IMU    | batterie | temps  |
-+-------------------------------------------------+
++------------------------------------------------+
         |
 Abstraction matérielle (BSP Cardputer ADV + Cap)
         |
-ESP32-S3 / ST7789V2 / TCA8418 / BMI270 / SD / SX1262 / AT6668
-```
+ESP32-S3FN8 / ST7789V2 / TCA8418 / BMI270 / SD / SX1262 / AT6668
+\`\`\`
 
 ## Modules
 
-- `kernel`: cycle de vie, événements, supervision.
-- `bsp`: broches et initialisation de la carte.
-- `drivers`: pilotes matériels isolés.
-- `services`: API stables pour les applications.
-- `apps`: applications autonomes.
-- `ui`: écran d'accueil, widgets, thème historique.
-- `storage`: configuration NVS et données microSD.
+- \`kernel\` : cycle de vie, événements, supervision.
+- \`bsp\` : broches et initialisation de la carte.
+- \`drivers\` : pilotes matériels isolés.
+- \`services\` : API stables pour les applications.
+- \`apps\` : applications autonomes.
+- \`ui\` : écran d'accueil, widgets et thème ROZA.
+- \`storage\` : configuration NVS et données microSD.
 
 ## Règles de concurrence
 
 - Un seul propriétaire logique du bus SPI partagé.
-- Le pilote SD et le pilote SX1262 acquièrent le bus SPI via un mutex/service commun.
+- Le pilote SD et le pilote SX1262 doivent acquérir le bus SPI via un mutex ou un service commun dont l'efficacité est démontrée par les tests.
 - Tous les CS sont inactifs avant de changer de périphérique.
 - Les opérations longues SD ne doivent pas bloquer les tâches d'interface.
 - Un seul gestionnaire I²C arbitre les accès clavier, IMU et expandeur du Cap.
@@ -43,12 +43,19 @@ ESP32-S3 / ST7789V2 / TCA8418 / BMI270 / SD / SX1262 / AT6668
 ## Mémoire
 
 - Flash interne : bootloader, table de partitions, firmware, NVS et métadonnées.
-- microSD : documents, notes, traces, cartes, médias et sauvegardes.
+- microSD : documents, notes, traces, cartes, médias et sauvegardes, après identification du format.
 - Ne jamais charger une carte complète en RAM.
 - Éviter les allocations dynamiques répétées dans les chemins critiques.
+- Le Cardputer ADV est traité comme une cible sans PSRAM ; chaque allocation volumineuse doit être mesurée.
 
-## Partitionnement initial
+## Partitionnement réellement utilisé par le firmware actif
 
-La table CSV fournie réserve deux emplacements OTA symétriques et NVS.
-La taille réellement disponible pour chaque image doit être vérifiée avec la compilation.
-La récupération matérielle et la procédure de mise à jour seront testées avant toute mise à jour OTA.
+La configuration active est \`firmware/partitions_8MB.csv\`, sélectionnée dans \`firmware/platformio.ini\`. Elle réserve NVS, PHY init et une seule partition applicative \`factory\` de 0x7E0000 octets à partir de 0x10000.
+
+**Il n'y a actuellement ni partition \`otadata\`, ni \`ota_0\`, ni \`ota_1\`.** Le firmware ne dispose donc pas d'un partitionnement A/B et ne peut pas garantir de rollback logiciel après une mise à jour. Le fichier racine \`partitions.csv\` est historique et n'est pas utilisé pour compiler le firmware actif.
+
+## Architecture OTA à envisager à l'étape 3
+
+Une future mise à jour sécurisée devra disposer d'au moins deux partitions d'application OTA et d'une partition OTA Data, vérifier la signature du paquet avant son installation, contrôler le premier démarrage et confirmer la nouvelle image après autotests. Le dimensionnement doit être recalculé sur le binaire effectivement compilé, avec l'ensemble des zones Flash de 8 Mo et la croissance possible du firmware.
+
+L'installation USB-C complète reste le chemin de récupération obligatoire. Ne pas activer de mécanisme Secure Boot/eFuse irréversible sans procédure de provisionnement et de restauration éprouvée.

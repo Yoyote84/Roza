@@ -1,73 +1,91 @@
-# Provenance des composants — fondation firmware ROZA
+# Provenance des composants — firmware ROZA
 
-## Source principale
+## Source principale et historique d'import
 
-- Dépôt amont : https://github.com/Lewis-Peter/cardputer-adv-firmware
-- Commit amont exact importé : `3671c86f7850bd0342f39b5befad5b0c02d33f5b`
-- Date du commit amont : 2026-10-08
-- Date d'import dans ROZA : 2026-11-04
-- Répertoire importé : `src/`, `lib/`, `data/`, `tools/`, `docs/`, `platformio.ini`, ainsi que les fichiers de licence et de documentation associés.
-- Le SHA d'importation ROZA n'est pas le SHA du dépôt amont. Ne pas les intervertir.
+- Dépôt amont initial : https://github.com/Lewis-Peter/cardputer-adv-firmware
+- Commit amont importé : \`3671c86f7850bd0342f39b5befad5b0c02d33f5b\`
+- Date du commit amont indiquée à l'import : 8 octobre 2026
+- Date d'import dans ROZA : 4 novembre 2026
+- Répertoires importés à l'origine : \`src/\`, \`lib/\`, \`data/\`, \`tools/\`, \`docs/\`, \`platformio.ini\` et les licences associées.
 
-## Système de compilation réel
+Cette provenance explique l'origine du code, mais les versions listées dans la section « import initial » ne représentent pas nécessairement le firmware actuel.
 
-- Outil : PlatformIO
-- Environnement : `cardputer-adv`
-- Framework : Arduino-ESP32
-- Plateforme : `espressif32@7.0.1`
-- Paquet framework épinglé : `framework-arduinoespressif32@3.20017.241212`
-- Carte PlatformIO : `esp32-s3-devkitc-1`, configurée pour 8 Mo de Flash
-- Table de partitions ROZA : `partitions_8MB.csv` (partition applicative unique ; pas de double slot OTA)
-- Commande de compilation : `pio run -e cardputer-adv`
+## Chaîne de compilation active vérifiée sur main le 25 novembre 2026
 
-**Important :** ce projet actif n'est pas un projet ESP-IDF natif. Ne pas utiliser `idf.py build` pour compiler ce firmware. Le workflow GitHub Actions doit appeler PlatformIO.
+- Outil : PlatformIO Core 6.2.0
+- Plateforme : \`espressif32@8.0.0\`
+- Framework : Arduino-ESP32 3.3.12
+- Base ESP-IDF : 5.5.5
+- Environnement : \`cardputer-adv\`
+- Carte PlatformIO : \`esp32-s3-devkitc-1\`, Flash 8 Mo
+- Table active : \`firmware/partitions_8MB.csv\`
+- Commande : \`cd firmware && pio run -e cardputer-adv\`
+- Workflow : \`.github/workflows/roza_esp32s3.yml\`
 
-- **Validation CI GitHub Actions #39** : exécution réussie le `2026-11-04` sur le commit `6b57da60850bbcdb7e0c260a1a5071b854783093`.
-  - Le workflow installe PlatformIO `6.1.6` et exécute `platformio run -e cardputer-adv`.
-  - Il vérifie la présence de `firmware.bin`, `firmware.elf`, `bootloader.bin` et `partitions.bin`, puis publie ces artefacts.
-  - RAM : `115612 / 327680 octets (35,3 %)` ; Flash : `3680085 / 8257536 octets (44,6 %)`.
-  - Taille du fichier `firmware.bin` : `3680448 octets`.
-  - Avertissements non bloquants dans LibSSH-ESP32 : perte du qualificatif `const` sur certains pointeurs et appels à des fonctions dépréciées.
-  - **Le workflow ne lance pas de tests unitaires, de tests de syntaxe séparés ni de tests sur carte.** Il valide la compilation croisée et la génération des binaires uniquement.
-  - **Essais physiques sur Cardputer ADV et Cap LoRa-1262 : non effectués.** La compilation CI ne prouve ni le démarrage sur carte, ni la réception RF, ni le fonctionnement des périphériques.
+Le firmware actif est un projet PlatformIO + Arduino-ESP32. Les anciens fichiers ESP-IDF racine sont conservés à titre historique et ne doivent pas être utilisés pour compiler ce firmware.
 
-- Lien de l'exécution : https://github.com/Yoyote84/Roza/actions/runs/41769762257
+## Versions épinglées dans firmware/platformio.ini
 
-## Dépendances déclarées dans platformio.ini
+| Dépendance | Version active |
+|---|---|
+| M5Unified | 0.3.0 |
+| M5GFX | 0.3.0 |
+| NimBLE-Arduino | 2.5.2 |
+| TinyGPSPlus | 1.1.0 déclarée dans PlatformIO |
+| ArduinoJson | 7.4.3 |
+| RadioLib | 7.7.1 |
+| FastLED | 3.10.3 |
+| ESP8266Audio | tag Git 1.9.9 |
+| LibSSH-ESP32 | 5.9.0 |
 
-Les versions doivent rester épinglées et les mises à jour doivent être vérifiées par compilation et tests :
+Les versions actuellement épinglées sont définies par \`firmware/platformio.ini\` et décrites dans \`firmware/docs/dependency-pins.md\`. Les versions amont disponibles et les changements proposés sont suivis dans \`docs/FIRMWARE_REFRESH_STEP1_AUDIT.md\`.
 
-- M5Stack M5Unified 0.2.20
-- M5Stack M5GFX 0.2.27
-- TinyGPSPlus 1.1.0
-- ArduinoJson 7.4.3
-- RadioLib 7.7.1
-- FastLED 3.10.3
-- ESP8266Audio 1.9.9 (référence Git)
-- LibSSH-ESP32 5.9.0
+## État de validation CI au 25 novembre 2026
 
-Les licences des dépendances et les avis de copyright contenus dans les fichiers tiers doivent être conservés. Ne pas déduire la licence de chaque fichier uniquement de la licence MIT du dépôt principal.
+Commit de référence : https://github.com/Yoyote84/Roza/commit/71cd1ff0216ec426f8d073153c838373181da5b9
 
-## Licence
+Exécution CI : https://github.com/Yoyote84/Roza/actions/runs/45518114744
 
-Le fichier `firmware/LICENSE` contient la licence MIT du dépôt amont et son avis de copyright. Le dépôt amont précise que certains fichiers sous `lib/` et `src/sha512_crypt.*` sont des composants tiers soumis à leurs licences d'origine. Conserver leurs en-têtes, notices et fichiers de licence.
+Le test de nettoyage des anciens composants du jeu retiré réussit. La compilation firmware échoue ensuite dans \`firmware/src/wardrive.cpp\` sur l'identifiant interne \`STA_STARTED_BIT\` qui n'est plus exposé par le core actuel. Les étapes de génération des images et de publication des artefacts sont donc ignorées. Aucun nouveau binaire final ni mesure de mémoire liée au commit de référence n'est disponible.
 
-## Adaptations ROZA attendues
+Un ancien succès CI ou une mesure mémoire sous Arduino 2.0.17 / ESP-IDF 4.4.7 ne valide pas le commit courant.
 
-1. Interface et documentation progressivement francisées, sans supprimer les applications fonctionnelles importées.
-2. Wi-Fi et Bluetooth arrêtés au démarrage ; activation uniquement sur demande explicite.
-3. LoRa en réception par défaut ; émission uniquement après action volontaire clairement visible.
-4. GPS utilisable hors ligne.
-5. Aucune commande de formatage automatique de la microSD ; identifier le système de fichiers avant de décider du montage et des écritures.
-6. Aucune clé API, aucun mot de passe ni identifiant privé dans Git.
-7. Respect des limites matérielles : ESP32-S3FN8, 8 Mo Flash, pas de PSRAM.
-8. Aucun test matériel ne doit être déclaré sans essai physique réel.
+## Provenance, licences et règles de conservation
 
-## Vérifications restantes
+- Le dépôt amont initial est sous MIT, mais chaque sous-composant conserve ses propres avis et éventuelles licences distinctes.
+- LibSSH-ESP32 embarque libssh, dont la licence et les obligations doivent être examinées avant remplacement ou redistribution.
+- Toute alternative comme wolfSSH doit faire l'objet d'un contrôle de licence, de dépendances et de compatibilité avant intégration.
+- Conserver tous les fichiers LICENSE, COPYING, en-têtes de copyright et attributions des bibliothèques tierces.
+- Ne jamais intégrer une clé privée, un mot de passe, un token ou une clé API dans Git.
+- Ne jamais créer de stub ou de faux pilote pour faire passer la compilation.
 
-- Réaliser des essais physiques sur le Cardputer ADV réel : démarrage, clavier, écran, audio, GNSS, microSD et stabilité mémoire.
-- Tester physiquement la réception LoRa avec le Cap SX1262, une antenne adaptée et un signal de test autorisé ; vérifier aussi la coexistence SPI avec la microSD.
-- Effectuer un audit exhaustif de toutes les applications et de tous les chemins d'activation Wi-Fi/Bluetooth/LoRa. Les contrôles du démarrage principal ne remplacent pas cet audit complet.
-- Identifier le système de fichiers réellement utilisé par la microSD 128 Go avant toute décision d'écriture ou de formatage. Aucun formatage automatique ne doit être ajouté.
-- Vérifier les obligations réglementaires françaises et européennes avant de définir ou d'activer les paramètres d'émission LoRa.
-- Examiner les avertissements de compilation LibSSH-ESP32 sans modifier le comportement ni les sources tierces sans justification.
+## Compatibilité matérielle à préserver
+
+Cible : M5Stack Cardputer ADV (ESP32-S3FN8, 8 Mo Flash, sans PSRAM dans la configuration ROZA) et Cap LoRa-1262 (SX1262 + GNSS ATGM336H-6N / AT6668).
+
+- Le clavier ADV est un TCA8418 ; il ne faut pas le confondre avec le clavier de l'ancien Cardputer.
+- Le SPI microSD et le SPI SX1262 utilisent GPIO40/GPIO39/GPIO14. La SD utilise CS GPIO12 et le SX1262 CS GPIO5.
+- GNSS : UART sur GPIO13/GPIO15 et expandeur I²C du Cap à l'adresse utilisée par le code 0x43.
+- Le Wi-Fi et le Bluetooth restent arrêtés au démarrage.
+- LoRa reste en réception par défaut ; aucune émission automatique.
+- Ne pas monter, formater, effacer ou écrire sur la microSD de l'utilisateur avant identification du système de fichiers et sauvegarde.
+- Toute validation physique doit être explicitement consignée ; un build CI ne prouve pas le fonctionnement matériel.
+
+## Sources amont
+
+- M5Stack Cardputer ADV : https://docs.m5stack.com/en/core/Cardputer-Adv
+- M5Stack Cap LoRa-1262 : https://docs.m5stack.com/en/cap/Cap_LoRa-1262
+- PlatformIO Core : https://github.com/platformio/platformio-core/releases
+- Arduino-ESP32 : https://github.com/espressif/arduino-esp32/releases
+- ESP-IDF : https://github.com/espressif/esp-idf/releases
+- M5Unified : https://github.com/m5stack/M5Unified/releases
+- M5GFX : https://github.com/m5stack/M5GFX/releases
+- RadioLib : https://github.com/jgromes/RadioLib/releases
+- FastLED : https://github.com/FastLED/FastLED/releases
+- NimBLE-Arduino : https://github.com/h2zero/NimBLE-Arduino/releases
+- ArduinoJson : https://github.com/bblanchon/ArduinoJson/releases
+- TinyGPSPlus : https://github.com/mikalhart/TinyGPSPlus
+- ESP8266Audio : https://github.com/earlephilhower/ESP8266Audio/releases
+- SdFat : https://github.com/greiman/SdFat/releases
+- LibSSH-ESP32 : https://github.com/ewpa/LibSSH-ESP32
+- wolfSSH : https://github.com/wolfSSL/wolfssh/releases
