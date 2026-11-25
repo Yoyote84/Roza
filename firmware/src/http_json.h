@@ -17,13 +17,16 @@ struct HttpJsonOptions {
   const char* userAgent;
   const char* authorization;
   bool stream;
+  bool http10;
+  size_t maxBodyBytes;
   const char* jsonError;
   bool includeJsonDetail;
 
   HttpJsonOptions(uint32_t connectTimeout, uint32_t timeout,
                   const char* agent = HTTP_UA, const char* auth = nullptr)
       : connectTimeoutMs(connectTimeout), timeoutMs(timeout), userAgent(agent),
-        authorization(auth), stream(true), jsonError("json: "), includeJsonDetail(true) {}
+        authorization(auth), stream(true), http10(true), maxBodyBytes(0),
+        jsonError("json: "), includeJsonDetail(true) {}
 };
 
 // 连之前先用 netResolve() 把域名解析掉：有上限（框架那条路径最长能卡 15~31s）、能被后台拉取的
@@ -45,7 +48,8 @@ bool fetchJsonHttp(Client& client, const String& url, JsonDocument& doc,
                    String& err) {
   if (!httpPreResolve(url, err)) return false;
   HTTPClient http;
-  http.useHTTP10(true);   // 下面直接对 getStream() 流式解析：不能让服务端回 chunked
+  http.useHTTP10(options.http10);   // 1.0 保持逐块 JSON 解析的兼容默认；需要 1.1 的端点显式切换
+  http.setReuse(false);
   http.setConnectTimeout(options.connectTimeoutMs);
   http.setTimeout(options.timeoutMs);
   if (!http.begin(client, url)) {
@@ -65,7 +69,8 @@ bool fetchJsonHttp(Client& client, const String& url, JsonDocument& doc,
 
   int code = http.GET();
   if (code != 200) {
-    err = String("http ") + code;
+    err = code < 0 ? String("network: ") + HTTPClient::errorToString(code)
+                   : String("http ") + code;
     http.end();
     return false;
   }
@@ -75,7 +80,19 @@ bool fetchJsonHttp(Client& client, const String& url, JsonDocument& doc,
     e = filter ? deserializeJson(doc, http.getStream(), DeserializationOption::Filter(*filter))
                : deserializeJson(doc, http.getStream());
   } else {
+    const int expectedBytes = http.getSize();
+    if (options.maxBodyBytes && expectedBytes > 0 &&
+        static_cast<size_t>(expectedBytes) > options.maxBodyBytes) {
+      err = "response too large";
+      http.end();
+      return false;
+    }
     String body = http.getString();
+    if (options.maxBodyBytes && body.length() > options.maxBodyBytes) {
+      err = "response too large";
+      http.end();
+      return false;
+    }
     e = filter ? deserializeJson(doc, body, DeserializationOption::Filter(*filter))
                : deserializeJson(doc, body);
   }
@@ -99,7 +116,8 @@ bool fetchJsonStreamArray(Client& client, const String& url, const char* arrayKe
                           ItemCallback onItem, String& err, int maxItems = 1000) {
   if (!httpPreResolve(url, err)) return false;
   HTTPClient http;
-  http.useHTTP10(true);   // 下面直接对 getStream() 流式解析：不能让服务端回 chunked
+  http.useHTTP10(options.http10);   // 1.0 保持逐块 JSON 解析的兼容默认；需要 1.1 的端点显式切换
+  http.setReuse(false);
   http.setConnectTimeout(options.connectTimeoutMs);
   http.setTimeout(options.timeoutMs);
   if (!http.begin(client, url)) {
