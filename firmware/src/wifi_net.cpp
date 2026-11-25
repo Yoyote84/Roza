@@ -226,7 +226,6 @@ void doScan() {
   while (WiFi.getMode() != scanMode && (millis() - t0 < 300)) {
     delay(10);
   }
-  WiFiGenericClass::waitStatusBits(STA_STARTED_BIT, 300);
   delay(50);
 
   // 4. 清除可能残留的在途扫描，再发起扫描
