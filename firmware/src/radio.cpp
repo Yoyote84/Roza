@@ -164,22 +164,9 @@ private:
   }
 };
 
-// ESP8266Audio 1.9.9 的 AudioGeneratorMP3 构造函数只把 buff 置空，stream/frame/synth 留着野值，
-// 析构却四个都 free —— begin() 成功分配之前删掉它（HTTP 打不开、预缓冲超时这些失败路径）
-// 就是 free 野指针，assert 重启。低内存下 HTTP 打不开最常见，所以表现成"堆碎了进 Radio 必重启"
-// （实测回溯：cleanupPipeline -> ~AudioGeneratorMP3 -> free: pointer outside heap areas）。
-// 上游 earlephilhower/ESP8266Audio #715 / PR #716，2.0.0 修复；但 2.3.0 起要 IDF 5，我们锁在 1.9.9，只能自己补。
-class SafeMP3 : public AudioGeneratorMP3 {
- public:
-  SafeMP3() : AudioGeneratorMP3() { stream = nullptr; frame = nullptr; synth = nullptr; }
-  SafeMP3(void *buff, int buffSize, void *stream, int streamSize, void *frame, int frameSize, void *synth, int synthSize)
-    : AudioGeneratorMP3(buff, buffSize, stream, streamSize, frame, frameSize, synth, synthSize) {
-    this->stream = nullptr;
-    this->frame = nullptr;
-    this->synth = nullptr;
-  }
-};
-
+// ESP8266Audio 2.4.3 initialise les pointeurs internes dans chaque constructeur.
+ // Le décodeur amont peut être utilisé directement tout en conservant les allocations
+ // préallouées explicites pour limiter la fragmentation de la RAM interne.
 // 自定义 HTTP 流源：基于标准 WiFiClient + HTTPClient 实现 AudioFileSource 接口。
 // 库原生的 AudioFileSourceHTTPStream 构造即阻塞且无法配置超时（默认 5s），
 // 这里显式设置 1500ms 连接与读取超时，并在握手、数据读取各环节响应 gRadioStopReq，
@@ -390,7 +377,7 @@ static void audioTask(void*) {
   }
 
   gBuf  = new (std::nothrow) AudioFileSourceBuffer(gHttp, gBufMem, RADIO_BUF_BYTES);
-  gMp3  = gBuf ? new (std::nothrow) SafeMP3(
+  gMp3  = gBuf ? new (std::nothrow) AudioGeneratorMP3(
             gMadBuffMem,   AudioGeneratorMP3::preAllocBuffSize(),
             gMadStreamMem, AudioGeneratorMP3::preAllocStreamSize(),
             gMadFrameMem,  AudioGeneratorMP3::preAllocFrameSize(),

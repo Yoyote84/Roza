@@ -46,7 +46,7 @@ M5Unified/M5GFX 0.3.0 change la sémantique des rotations absolues : sur Cardput
 | RadioLib | 7.7.1 | |
 | TinyGPSPlus | 1.1.0 | |
 | LibSSH-ESP32 | 5.9.0 | |
-| ESP8266Audio | 1.9.9 (git tag) | Conservé pour isoler la migration ; compatibilité IDF 5.5.5 à confirmer par la CI |
+| ESP8266Audio | 2.4.3 (git tag) | Mis à jour : pointeurs MP3 initialisés par l'amont ; pilote ULP conditionné par la capacité DAC du SoC |
 
 ---
 
@@ -101,7 +101,7 @@ Trade-offs:
 
 ### Historique — décision PlatformIO antérieure au 24/11/2026 (remplacée)
 
-Cette conclusion décrivait la base 7.1.x antérieure. Elle est remplacée par PlatformIO 8.0.0, qui fournit Arduino-ESP32 3.3.12 / ESP-IDF 5.5.5. ESP8266Audio 1.9.9 reste conservé uniquement pour isoler les changements et doit être vérifié sous ce nouveau core.
+Cette conclusion décrivait la base 7.1.x antérieure. Elle est remplacée par PlatformIO 8.0.0, qui fournit Arduino-ESP32 3.3.12 / ESP-IDF 5.5.5. ESP8266Audio 2.4.3 est maintenant épinglé ; la CI doit confirmer le filtrage du pilote ULP sur ESP32-S3 et le fonctionnement du flux MP3 préalloué.
 
 ---
 

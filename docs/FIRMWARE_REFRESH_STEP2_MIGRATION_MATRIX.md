@@ -48,11 +48,16 @@ Ne pas confondre pioarduino, qui est une plateforme communautaire, avec la plate
 | FastLED | 3.10.3 | 3.10.10 | moyen | tester en isolation ; vérifier GPIO21, RMT, audio et tailles mémoire |
 | ArduinoJson | 7.4.3 | 7.4.3 | faible | conserver ; renforcer les tests des flux et des tableaux temporaires |
 | TinyGPSPlus | 1.1.0 | provenance à clarifier | moyen | garder le parseur et ses champs personnalisés ; ne pas changer sans parité NMEA démontrée |
-| ESP8266Audio | 1.9.9 | 2.4.3 | élevé | migrer séparément, puis tester WAV/MP3/AAC/MIDI selon fonctions réellement utilisées et radios Web |
+| ESP8266Audio | 1.9.9 | 2.4.3 | élevé | Intégré dans `main` ; la CI doit confirmer le filtrage ULP/DAC sur ESP32-S3 et la non-régression MP3/streaming |
 | LibSSH-ESP32 | 5.9.0 | pas de release GitHub identifiée | élevé | valider le core moderne ; comparer wolfSSH sans perte client/SCP ni licence non vérifiée |
 | SdFat | absent | 2.3.1 | élevé | prototype sur carte de test FAT/exFAT ; ne pas remplacer avant lecture non destructive et arbitrage SPI |
 
-## 4. Lots d'intégration proposés
+## 4. État des lots d'intégration
+
+- **Audio — 2.4.3 intégré dans `main`** : suppression du contournement `SafeMP3`, conservation des allocations préallouées et du flux HTTP sur mesure. Validation CI en attente.
+- Framework 3.3.13/5.5.6, RadioLib 8.0.0 et FastLED 3.10.10 restent à intégrer après rétablissement d'un build stable.
+
+## 5. Lots d'intégration proposés
 
 ### Lot A — rendre la base actuelle compilable
 1. Remplacer l'usage de `STA_STARTED_BIT` dans Wardrive par les API publiques de gestion Wi-Fi adaptées au core réel.
@@ -77,12 +82,12 @@ Ne pas confondre pioarduino, qui est une plateforme communautaire, avec la plate
 
 ### Lot D — dépendances indépendantes
 - RadioLib 8.0.0 : configuration SX1262, réglages entiers, IRQ et codes retours.
-- ESP8266Audio 2.4.3 : décodeurs, ID3, I²S, buffers, streaming et coexistence micro/haut-parleur.
+- ESP8266Audio 2.4.3 : intégré ; vérifier décodeurs, ID3, I²S, buffers, streaming et coexistence micro/haut-parleur.
 - FastLED 3.10.10 : RMT, SK6812 GPIO21, timing et Flash/RAM.
 - LibSSH / wolfSSH : parité client/SCP, licence, mémoire TLS, compatibilité du core.
 - SdFat 2.3.1 : exFAT, format réel de la carte, SPI partagé et conservation des données.
 
-## 5. Contrôles applicatifs obligatoires
+## 6. Contrôles applicatifs obligatoires
 
 Les 40 entrées du menu doivent rester accessibles et testées :
 - TOOL : Time, IMU, Files, Spectrum, Calc, Converter, Player, Hash Oven.
@@ -95,7 +100,7 @@ Les 40 entrées du menu doivent rester accessibles et testées :
 
 Les fonctions réseau doivent rester facultatives. Les transports HTTP actuels de Weather, Planes, GeoLoc et Radio doivent faire l'objet d'un lot sécurité distinct. Chat ne doit jamais autoriser le mode sans validation de certificat dans une configuration de livraison normale. Sats doit conserver un chemin sans clé API ou expliciter sa dépendance comme facultative.
 
-## 6. Critères de fin de l'étape 2
+## 7. Critères de fin de l'étape 2
 
 - [ ] Compilation propre de la cible retenue et CI verte sur le SHA exact.
 - [ ] Toutes les suites de tests logicielles passées.

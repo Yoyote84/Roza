@@ -35,10 +35,10 @@ Le firmware actif est un projet PlatformIO + Arduino-ESP32. Les anciens fichiers
 | ArduinoJson | 7.4.3 |
 | RadioLib | 7.7.1 |
 | FastLED | 3.10.3 |
-| ESP8266Audio | tag Git 1.9.9 |
+| ESP8266Audio | tag Git 2.4.3 |
 | LibSSH-ESP32 | 5.9.0 |
 
-Les versions actuellement épinglées sont définies par `firmware/platformio.ini` et décrites dans `firmware/docs/dependency-pins.md`. Les versions amont disponibles et les changements proposés sont suivis dans `docs/FIRMWARE_REFRESH_STEP1_AUDIT.md`.
+Les versions actuellement épinglées sont définies par `firmware/platformio.ini` et décrites dans `firmware/docs/dependency-pins.md`. ESP8266Audio 2.4.3 est maintenant utilisé : son pilote ULP/DAC est conditionné par la capacité DAC du SoC. Les versions amont disponibles et les changements proposés sont suivis dans `docs/FIRMWARE_REFRESH_STEP1_AUDIT.md`.
 
 ## État de validation CI au 25 novembre 2026
 
