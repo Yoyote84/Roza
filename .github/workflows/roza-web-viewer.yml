@@ -8,6 +8,9 @@ on:
       - "firmware/tools/uisim/**"
       - "firmware/platformio.ini"
       - "firmware/partitions_8MB.csv"
+      - "firmware/sdkconfig.defaults"
+      - "firmware/tools/ota_security_test.py"
+      - "firmware/tools/create_ota_manifest.py"
       - ".github/workflows/roza-web-viewer.yml"
   workflow_dispatch:
 
@@ -122,7 +125,7 @@ jobs:
           BUILD=".pio/build/cardputer-adv"
           PACKAGE="$RUNNER_TEMP/roza-firmware-package"
           PIO_REPORT="$RUNNER_TEMP/platformio-memory-report.txt"
-          APP_PARTITION_BYTES=$((0x7E0000))
+          APP_PARTITION_BYTES=$((0x3F0000))
           FLASH_BYTES=$((8 * 1024 * 1024))
           mkdir -p "$PACKAGE"
 
@@ -153,7 +156,7 @@ jobs:
 
           FIRMWARE_BYTES="$(stat -c '%s' "$BUILD/firmware.bin")"
           if (( FIRMWARE_BYTES > APP_PARTITION_BYTES )); then
-            echo "::error::Firmware image ($FIRMWARE_BYTES bytes) exceeds the factory app partition ($APP_PARTITION_BYTES bytes)"
+            echo "::error::Firmware image ($FIRMWARE_BYTES bytes) exceeds the OTA app slot ($APP_PARTITION_BYTES bytes)"
             exit 1
           fi
 
@@ -171,19 +174,20 @@ jobs:
           python -m pip install --disable-pip-version-check "esptool==5.6.0"
           python -m esptool --help >/dev/null
 
-          # La partition factory commence a 0x10000 ; le binaire fusionne
-          # contient bootloader + table + application et se flashe a 0x0000.
+          # OTA_0 démarre à 0x20000 ; l'image complète est destinée au flash USB.
           python -m esptool --chip esp32s3 merge-bin \
-            --output "$PACKAGE/ROZA-Cardputer-ADV-factory.bin" \
+            --output "$PACKAGE/ROZA-Cardputer-ADV-full-flash.bin" \
             --flash-mode keep \
             --flash-size 8MB \
             0x0 "$BUILD/bootloader.bin" \
             0x8000 "$BUILD/partitions.bin" \
-            0x10000 "$BUILD/firmware.bin"
+            0x20000 "$BUILD/firmware.bin"
 
-          cp "$BUILD/firmware.bin" "$PACKAGE/ROZA-Cardputer-ADV-application.bin"
+          cp "$BUILD/firmware.bin" "$PACKAGE/firmware.bin"
           cp "$BUILD/bootloader.bin" "$PACKAGE/bootloader.bin"
           cp "$BUILD/partitions.bin" "$PACKAGE/partitions.bin"
+          cp "$GITHUB_WORKSPACE/firmware/tools/migrate_to_ota.sh" "$PACKAGE/migrate_to_ota.sh"
+          chmod +x "$PACKAGE/migrate_to_ota.sh"
 
           export FIRMWARE_BYTES APP_PARTITION_BYTES FLASH_BYTES RAM_LINE FLASH_LINE
           python - <<'PY'
@@ -195,7 +199,7 @@ jobs:
           app_partition_bytes = int(os.environ["APP_PARTITION_BYTES"])
           flash_bytes = int(os.environ["FLASH_BYTES"])
           manifest = {
-              "status": "factory_image_built_ci_hardware_test_pending",
+              "status": "full_flash_image_built_ci_hardware_test_pending",
               "commit": os.environ["GITHUB_SHA"],
               "workflow_run_id": os.environ["GITHUB_RUN_ID"],
               "target": {
@@ -204,16 +208,25 @@ jobs:
                   "flash_bytes": flash_bytes,
                   "psram": False
               },
-              "factory_image": {
-                  "filename": "ROZA-Cardputer-ADV-factory.bin",
+              "full_flash_image": {
+                  "filename": "ROZA-Cardputer-ADV-full-flash.bin",
                   "flash_address": "0x0000",
-                  "application_offset": "0x10000"
+                  "application_offset": "0x20000"
               },
               "application_partition": {
-                  "offset": "0x10000",
+                  "type": "ota_0",
+                  "offset": "0x20000",
                   "bytes": app_partition_bytes,
                   "firmware_bin_bytes": firmware_bytes,
                   "remaining_binary_bytes": app_partition_bytes - firmware_bytes
+              },
+              "ota_layout": {
+                  "otadata_offset": "0xF000",
+                  "otadata_bytes": 8192,
+                  "ota_0_offset": "0x20000",
+                  "ota_1_offset": "0x410000",
+                  "each_slot_bytes": app_partition_bytes,
+                  "rollback_enabled_in_sdkconfig": True
               },
               "platformio_linked_memory_summary": {
                   "ram": os.environ["RAM_LINE"],
@@ -233,37 +246,24 @@ jobs:
           cat > "$PACKAGE/INSTALLATION.txt" <<'EOF'
           ROZA — M5Stack Cardputer ADV (ESP32-S3FN8, 8 MB Flash, sans PSRAM)
 
-          IMAGE COMPLETE RECOMMANDEE
-          ROZA-Cardputer-ADV-factory.bin
-          Adresse de flash : 0x0000
+          IMAGE COMPLETE USB
+          ROZA-Cardputer-ADV-full-flash.bin — adresse 0x0000 (réinitialise NVS)
 
-          APPLICATION SEULE (uniquement si le bootloader et la table ROZA
-          correspondants sont deja installes)
-          ROZA-Cardputer-ADV-application.bin
-          Adresse de flash : 0x10000
+          MIGRATION USB QUI CONSERVE LES REGLAGES
+          Vérifier SHA256SUMS-migration.txt puis lancer migrate_to_ota.sh avec
+          le port série du Cardputer. Le script exige une confirmation et efface
+          uniquement otadata à 0xF000 / 0x2000. Il écrit ensuite bootloader,
+          table et firmware dans OTA_0 à 0x20000. NVS reste à 0x9000 / 0x5000 ;
+          la microSD n'est jamais touchée.
 
-          Images separees pour diagnostic :
-            bootloader.bin : 0x0000
-            partitions.bin : 0x8000
-            application : 0x10000
+          Fichiers séparés : bootloader.bin, partitions.bin, firmware.bin.
+          Ne pas flasher firmware.bin seul après cette migration initiale.
 
-          Le manifeste BUILD_MANIFEST.json indique le commit, la cible, la taille
-          de l'image, la capacite de la partition, le resume RAM/Flash PlatformIO
-          et les informations de validation CI. ELF_SECTIONS.txt detaille les sections liees.
-          PLATFORMIO_MEMORY.txt contient le resume de memoire du compilateur.
-          SHA256SUMS.txt verifie tous les fichiers de livraison.
-
-          La carte microSD sert au stockage ; copier un BIN sur la SD ne flashe
-          pas le microcontroleur. Le flash se fait par USB-C avec un outil ESP32-S3.
-
-          Cette image est compilee pour le Cardputer ADV 8 MB, sans PSRAM.
-          La compilation CI ne remplace pas un essai sur la carte reelle.
+          BUILD_MANIFEST.json décrit les deux slots OTA et les mesures du build.
+          La compilation CI ne remplace pas un essai sur le Cardputer ADV réel.
           EOF
 
-          (cd "$PACKAGE" && sha256sum \
-            *.bin BUILD_MANIFEST.json  \
-            PLATFORMIO_MEMORY.txt PLATFORMIO_BUILD_REPORT.txt ELF_SECTIONS.txt INSTALLATION.txt \
-            > SHA256SUMS.txt)
+          (cd "$PACKAGE" && sha256sum *.bin BUILD_MANIFEST.json PLATFORMIO_MEMORY.txt PLATFORMIO_BUILD_REPORT.txt ELF_SECTIONS.txt INSTALLATION.txt migrate_to_ota.sh > SHA256SUMS.txt)
           (cd "$PACKAGE" && sha256sum -c SHA256SUMS.txt)
           ls -lh "$PACKAGE"
 
@@ -295,8 +295,14 @@ jobs:
           chmod +x web/build-site.sh
           ./web/build-site.sh "$GITHUB_WORKSPACE/site"
           mkdir -p "$GITHUB_WORKSPACE/site/downloads"
-          cp "$RUNNER_TEMP/roza-firmware-package/ROZA-Cardputer-ADV-factory.bin" \
-            "$GITHUB_WORKSPACE/site/downloads/ROZA-Cardputer-ADV-factory.bin"
+          cp "$RUNNER_TEMP/roza-firmware-package/ROZA-Cardputer-ADV-full-flash.bin" \
+            "$GITHUB_WORKSPACE/site/downloads/ROZA-Cardputer-ADV-full-flash.bin"
+          mkdir -p "$GITHUB_WORKSPACE/site/downloads/migration"
+          cp "$RUNNER_TEMP/roza-firmware-package/bootloader.bin" \
+            "$RUNNER_TEMP/roza-firmware-package/partitions.bin" \
+            "$RUNNER_TEMP/roza-firmware-package/firmware.bin" \
+            "$RUNNER_TEMP/roza-firmware-package/migrate_to_ota.sh" \
+            "$GITHUB_WORKSPACE/site/downloads/migration/"
           cp "$RUNNER_TEMP/roza-firmware-package/INSTALLATION.txt" \
             "$GITHUB_WORKSPACE/site/downloads/INSTALLATION.txt"
           cp "$RUNNER_TEMP/roza-firmware-package/BUILD_MANIFEST.json" \
