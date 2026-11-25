@@ -89,6 +89,9 @@ static bool fetchManifest(OtaManifest& m,char* err,size_t errSize){
  if(!tlsClockReady()){snprintf(err,errSize,"Heure requise pour TLS");return false;}
  WiFiClientSecure client;tlsUseCaBundle(client);
  client.setHandshakeTimeout(10);client.setTimeout(12000);
+ // Même ordre que les autres clients HTTPS ROZA : créer le bundle CA avant la lease,
+ // puis libérer le grand canvas pendant le handshake TLS (Cardputer ADV sans PSRAM).
+ CanvasLease lease;
  HTTPClient http;http.useHTTP10(true);http.setConnectTimeout(8000);http.setTimeout(12000);
  http.setUserAgent("ROZA-OTA/1.0");
  if(!http.begin(client,MANIFEST_URL)){snprintf(err,errSize,"Ouverture HTTPS impossible");return false;}
@@ -132,6 +135,8 @@ static void installWorker(){
  if(!wifiEnsureConnected()||!tlsClockReady()){status(OTA_ERROR,"Wi-Fi ou horloge TLS indisponible");return;}
  WiFiClientSecure client;tlsUseCaBundle(client);
  client.setHandshakeTimeout(10);client.setTimeout(15000);
+ // Le bundle CA reste alloué avant la lease ; le canvas est libéré pendant le téléchargement.
+ CanvasLease lease;
  HTTPClient http;http.useHTTP10(true);http.setConnectTimeout(10000);http.setTimeout(15000);
  http.setUserAgent("ROZA-OTA/1.0");
  if(!http.begin(client,fresh.url)){status(OTA_ERROR,"Ouverture binaire impossible");return;}
