@@ -4,7 +4,7 @@
 
 Le mécanisme A/B OTA, la signature ECDSA P-256 du manifeste, la validation TLS, SHA-256, le contrôle de version, l'installation sur le slot inactif, et le rollback ESP-IDF étaient déjà présents dans le dépôt. Cette étape ne les réécrit pas à l'aveugle : elle renforce leurs tests de garde.
 
-Commit de renforcement : `37193e54a3a8dba20d4ba6d3fcaa6f993e3cbbab`.
+Les renforcements OTA et les corrections de tests sont intégrés sur `main`; le dernier état est suivi dans ce document et dans le workflow GitHub Actions.
 
 ## Protection déjà intégrée
 
@@ -44,7 +44,7 @@ Cette migration initiale est une opération de flashage et doit être exécutée
 
 ## Éléments qui nécessitent encore confirmation
 
-- [ ] CI du commit courant : tests OTA, compilation Cardputer ADV, packaging et rendu du simulateur doivent tous réussir ; l'échec précédent était arrêté avant la compilation par des références textuelles résiduelles dans le contrôle de retrait du jeu, désormais corrigées.
+- [ ] CI du commit courant : le run #228 du 25 novembre 2026 a été annulé par la limite de 45 minutes alors que la compilation PlatformIO continuait. Les journaux ne montrent pas d'erreur fatale du compilateur avant l'interruption, mais les tests OTA, le packaging et le rendu du simulateur n'ont donc pas été exécutés. Le workflow a été corrigé : délai porté à 120 minutes et cache des outils, dépendances et sorties intermédiaires PlatformIO. Le nouveau run doit réussir intégralement avant clôture logicielle.
 - [ ] Configuration GitHub Actions du secret `ROZA_OTA_SIGNING_KEY_PEM` : inaccessible depuis le connecteur, et non confirmée. Sans ce secret, le pipeline ne publie pas de manifeste OTA installable signé; ne pas utiliser de manifeste non signé.
 - [ ] Essai sur Cardputer ADV réel : migration USB, vérification, installation OTA, démarrage, retour arrière simulé si possible. À faire en étape 5.
 - [ ] Secure Boot et chiffrement flash : volontairement non activés automatiquement, car leur provisioning peut rendre la récupération difficile ou irréversible.
