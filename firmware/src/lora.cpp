@@ -13,9 +13,7 @@
 // SCK40/MISO39/MOSI14 就是 sd_files.cpp 里 SD 卡用的那条总线，这里不用再声明/初始化。
 static const int LORA_NSS = 5, LORA_BUSY = 6, LORA_DIO1 = 4, LORA_RST = 3;
 static const uint8_t LORA_IOEXP_ADDR = 0x43;   // 与 GNSS 共用；P0=1 打开 RF 天线开关
-// M5 的 SX1262 模组带 TCXO(1.6V)。若上电 init 返回 -706/-20（TCXO 相关）说明其实是无源晶振，
-// 把这里改成 0.0f 再试。
-static const float LORA_TCXO = 1.6f;
+// Cap LoRa-1262 的 SX1262 使用 1.6 V TCXO。RadioLib 8 将电压改为枚举配置。
 
 // LoRa 的 SCK/MISO/MOSI(40/39/14) 跟 sd_files.cpp 里 SD 卡用的完全一样——Cap 连接器和
 // SD 卡槽本来就接在同一条物理 SPI 总线上，只是各自的片选不同（SD=GPIO12，LoRa=GPIO5）。
@@ -94,6 +92,36 @@ static bool autoFound = false;                // 上一轮 AUTO 是否蹲中了�
 static const float ISM_LO = 863.0f, ISM_HI = 928.0f;   // 覆盖 EU868 + US915 子频段
 static const float VHF_LO = 161.5f, VHF_HI = 162.5f;   // 两个 AIS 信道 + 左右各留半兆当底噪参照
 static const float AIS1 = 161.975f, AIS2 = 162.025f;
+ 
+// RadioLib 8 uses integer physical units (Hz) and a configuration structure.
+// Keep the UI presets in MHz/kHz and convert only at this boundary.
+static int16_t loraBeginLoRa(float frequencyMHz, float bandwidthKHz,
+                             uint8_t spreadingFactor, uint8_t codingRate,
+                             uint8_t syncWord, uint16_t preambleLength) {
+  radio.tcxoVoltage = RadioLibTCXOVoltage_t::Voltage1V6;
+  ConfigLoRa_t config;
+  config.frequency = RADIOLIB_UNIT_MEGA(frequencyMHz);
+  config.bandwidth = RADIOLIB_UNIT_KILO(bandwidthKHz);
+  config.spreadingFactor = spreadingFactor;
+  config.codingRate = codingRate;
+  config.syncWord = syncWord;
+  config.power = 10;
+  config.preambleLength = preambleLength;
+  return radio.begin(config);
+}
+
+static int16_t loraBeginAisFsk() {
+  radio.tcxoVoltage = RadioLibTCXOVoltage_t::Voltage1V6;
+  ConfigFSK_t config;
+  config.frequency = RADIOLIB_UNIT_MEGA(AIS1);
+  config.bitRate = 9600;
+  config.frequencyDeviation = RADIOLIB_UNIT_KILO(2.4f);
+  config.receiverBandwidth = RADIOLIB_UNIT_KILO(23.4f);
+  config.power = 10;
+  config.preambleLength = 16;
+  return radio.beginFSK(config);
+}
+
 static bool vhfBand = false;
 static inline float scanLo() { return vhfBand ? VHF_LO : ISM_LO; }
 static inline float scanHi() { return vhfBand ? VHF_HI : ISM_HI; }
@@ -291,8 +319,8 @@ static void loraRfSwitchOn() {
 // 把电台配置成 activeModem 并开始接收（频率用 curFreq）
 static void loraStartListen() {
   radio.standby();
-  radio.setFrequency(curFreq);
-  radio.setBandwidth(activeModem.bw);
+  radio.setFrequency(RADIOLIB_UNIT_MEGA(curFreq));
+  radio.setBandwidth(RADIOLIB_UNIT_KILO(activeModem.bw));
   radio.setSpreadingFactor(activeModem.sf);
   radio.setCodingRate(activeModem.cr);
   radio.setSyncWord(activeModem.sync);
@@ -305,8 +333,8 @@ static void loraStartListen() {
 static void loraStartListenAuto() {
   const ModemPreset& m = MODEM_PRESETS[autoIdx];
   radio.standby();
-  radio.setFrequency(curFreq);
-  radio.setBandwidth(m.bw);
+  radio.setFrequency(RADIOLIB_UNIT_MEGA(curFreq));
+  radio.setBandwidth(RADIOLIB_UNIT_KILO(m.bw));
   radio.setSpreadingFactor(m.sf);
   radio.setCodingRate(m.cr);
   radio.setSyncWord(MESH_SYNC);
@@ -402,9 +430,9 @@ void loraEnter() {
   const LoraPreset& p = PRESETS[presetIdx];
   curFreq = p.freq;
   activeModem = { p.name, p.bw, p.sf, p.cr, p.sync, p.preamble };
-  loraErr = radio.begin(p.freq, p.bw, p.sf, p.cr, p.sync, 10, p.preamble, LORA_TCXO);
+  loraErr = loraBeginLoRa(p.freq, p.bw, p.sf, p.cr, p.sync, p.preamble);
   loraReady = (loraErr == RADIOLIB_ERR_NONE);
-  if (loraReady) radio.setDio1Action(onDio1);
+  if (loraReady) radio.setIrqAction(onDio1);
 
   for (int i = 0; i < NBINS; i++) { rssiBins[i] = RSSI_FLOOR; peakBins[i] = RSSI_FLOOR; }
   scanPos = 0;
@@ -432,10 +460,10 @@ static void loraApplyScanBand() {
   radio.standby();
   if (vhfBand) {
     // br=9.6kbps / freqDev=2.4kHz 就是 AIS 的调制参数；这里只读 RSSI，参数主要影响接收带宽
-    loraErr = radio.beginFSK(AIS1, 9.6f, 2.4f, 23.4f, 10, 16, LORA_TCXO);
+    loraErr = loraBeginAisFsk();
   } else {
     const LoraPreset& p = PRESETS[presetIdx];
-    loraErr = radio.begin(p.freq, p.bw, p.sf, p.cr, p.sync, 10, p.preamble, LORA_TCXO);
+    loraErr = loraBeginLoRa(p.freq, p.bw, p.sf, p.cr, p.sync, p.preamble);
   }
   loraReady = (loraErr == RADIOLIB_ERR_NONE);
   for (int i = 0; i < NBINS; i++) { rssiBins[i] = RSSI_FLOOR; peakBins[i] = RSSI_FLOOR; }
@@ -444,7 +472,7 @@ static void loraApplyScanBand() {
 
 void loraExit() {
   vhfWatch = false; vhfLogClose();   // 退 app 时必须把日志文件关掉，否则最后一段丢缓冲
-  if (loraReady) { radio.clearDio1Action(); radio.sleep(); }
+  if (loraReady) { radio.clearIrqAction(); radio.sleep(); }
   // 不能碰全局 SPI 总线（SD 卡还在用），退出时只要把 NSS 拉高、取消片选就行
   pinMode(LORA_NSS, OUTPUT); digitalWrite(LORA_NSS, HIGH);
 }
@@ -469,7 +497,7 @@ void loraSniffStop() {
     char endBuf[32];
     loraSniffFormatEnd(endBuf, sizeof(endBuf));
     Serial.println(endBuf);
-    radio.clearDio1Action();
+    radio.clearIrqAction();
     radio.sleep();
     pinMode(LORA_NSS, OUTPUT);
     digitalWrite(LORA_NSS, HIGH);
@@ -509,7 +537,7 @@ bool loraSniffStart(const LoraSniffConfig& cfg) {
   // 4. 打开 RF 天线开关并初始化 SX1262 射频芯片
   loraRfSwitchOn();
   radio.standby();
-  int st = radio.begin(cfg.mhz, cfg.bw, cfg.sf, cfg.cr, cfg.sync, 10, cfg.preamble, LORA_TCXO);
+  int st = loraBeginLoRa(cfg.mhz, cfg.bw, cfg.sf, cfg.cr, cfg.sync, cfg.preamble);
   if (st != RADIOLIB_ERR_NONE) {
     // 只有真找不到芯片才说 "no radio"；其它错误（参数被 RadioLib 拒、TCXO 等）照实报码，
     // 否则 PC 端会把"配置不对"当成"模块没插"去排查。
@@ -518,7 +546,7 @@ bool loraSniffStart(const LoraSniffConfig& cfg) {
     else snprintf(msg, sizeof(msg), "radio init failed: %d", st);
     loraSniffFormatErr(errBuf, sizeof(errBuf), msg);
     Serial.println(errBuf);
-    radio.clearDio1Action();
+    radio.clearIrqAction();
     radio.sleep();
     pinMode(LORA_NSS, OUTPUT);
     digitalWrite(LORA_NSS, HIGH);
@@ -526,7 +554,7 @@ bool loraSniffStart(const LoraSniffConfig& cfg) {
   }
 
   // 5. 挂载 DIO1 中断并启动接收
-  radio.setDio1Action(onDio1);
+  radio.setIrqAction(onDio1);
   rxFlag = false;
   radio.startReceive();
 
@@ -690,7 +718,7 @@ static void vhfProbeStats(float& a1, float& a2, float& floorDb) {
 // 在 f 上驻留采样 n 次，返回最大值——AIS 是突发，要的就是这段时间里的峰。
 // 三个槽都走这一个函数，统计量才统一（见 VHF_DWELL_N 那段注释）。
 static float vhfDwell(float f, int n) {
-  radio.setFrequency(f);
+  radio.setFrequency(RADIOLIB_UNIT_MEGA(f));
   radio.startReceive();
   delayMicroseconds(2500);        // 等 PLL 锁定 + AGC 稳定
   radio.getRSSI(false);           // 丢弃第一次读数（整定残留，偏高）
@@ -841,7 +869,7 @@ void loraUpdate() {
   if (mode == LORA_SCAN) {
     for (int n = 0; n < 2; n++) {                       // 每帧少扫几个，换取更充分的整定
       float f = scanLo() + (scanHi() - scanLo()) * scanPos / (NBINS - 1);
-      radio.setFrequency(f);
+      radio.setFrequency(RADIOLIB_UNIT_MEGA(f));
       radio.startReceive();
       delayMicroseconds(2500);                          // 等 PLL 锁定 + AGC 稳定（1.5ms 太短会虚高）
       radio.getRSSI(false);                             // 丢弃第一次读数（整定残留，偏高）

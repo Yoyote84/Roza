@@ -43,7 +43,7 @@ M5Unified/M5GFX 0.3.0 change la sémantique des rotations absolues : sur Cardput
 | NimBLE-Arduino | 2.5.2 | Nouvelle pile BLE sans Bluedroid direct; BLE scan/HID, annonces étendues et PHY Coded |
 | FastLED | 3.10.3 | Maintenu pour isoler cette migration ; revalider la version récente sous IDF 5.5.5 |
 | ArduinoJson | 7.4.3 | |
-| RadioLib | 7.7.1 | |
+| RadioLib | 8.0.0 | |
 | TinyGPSPlus | 1.1.0 | |
 | LibSSH-ESP32 | 5.9.0 | |
 | ESP8266Audio | 2.4.3 (git tag) | Mis à jour : pointeurs MP3 initialisés par l'amont ; pilote ULP conditionné par la capacité DAC du SoC |

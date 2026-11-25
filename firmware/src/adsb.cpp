@@ -14,7 +14,7 @@
 
 static const int   MAX_PLANES  = 12;
 static const int   RADIUS_NM   = 50;              // 查询半径（海里）
-static const uint32_t AUTO_MS  = 25000;           // 停在这页时的自动刷新间隔
+static const uint32_t AUTO_MS  = 180000;          // 3 min : 480 requêtes/jour max si la page reste ouverte 24 h
 
 struct Plane {
   char  cs[10], type[6], reg[10];
@@ -143,30 +143,39 @@ static void fetchPlanes() {
   GeoFix fix;
   if (!geoGet(fix, &errMsg)) { dirty = true; return; }
   fromGps = fix.fromGps;
+  errMsg.reserve(96);
 
-  // 明文 HTTP：跟地图瓦片同一个道理——公开数据、请求不带任何凭据，
-  // 而 TLS 握手要几百毫秒 + 40KB 连续堆（实测握手期间 largestBlock 从 90KB 掉到 47KB），
-  // 进这一页那"卡顿一秒"主要就是它。实测这个接口明文返回 200 且是 Content-Length
-  // 定长编码（不是 chunked），配下面的 getStream() 流式解析刚好。
+  // ADSB.lol documente ce point d'accès en HTTPS. Le flux est filtré pendant
+  // le parsing pour ne jamais charger le gros tableau complet en RAM (Cardputer sans PSRAM).
+  // Le certificat est vérifié avec le bundle racine embarqué ; l'heure doit donc être valide.
+  if (!tlsClockReady()) { errMsg = "clock not set for HTTPS"; dirty = true; return; }
+
   char url[128];
-  snprintf(url, sizeof(url), "http://api.adsb.lol/v2/lat/%.4f/lon/%.4f/dist/%d",
+  snprintf(url, sizeof(url), "https://api.adsb.lol/v2/lat/%.4f/lon/%.4f/dist/%d",
            fix.lat, fix.lon, RADIUS_NM);
 
-  WiFiClient client;
-  // 机场附近这个接口能返回一两百架、几十上百 KB。板子没有 PSRAM，整包 JSON 进堆很危险，
-  // 所以用 filter 边流式解析边扔——只留下面这几个字段，堆占用跟返回大小基本脱钩。
-  JsonDocument filter;
-  JsonObject fac = filter["ac"].add<JsonObject>();
-  fac["flight"] = true; fac["t"] = true; fac["r"] = true;
-  fac["lat"] = true; fac["lon"] = true; fac["alt_baro"] = true;
-  fac["gs"] = true; fac["track"] = true; fac["baro_rate"] = true;
-
-  JsonDocument doc;
-  HttpJsonOptions options(10000, 15000);   // UA 走 http_json.h 里的统一默认值
-  if (!fetchJsonHttp(client, url, doc, &filter, options, errMsg)) { dirty = true; return; }
+  // Le handshake TLS demande un grand bloc contigu. Libérer temporairement la toile
+  // évite de le faire échouer ; client est construit avant CanvasLease pour respecter
+  // l'ordre de libération des buffers TLS et de restauration de la toile.
+  WiFiClientSecure client;
+  tlsUseCaBundle(client);
+  client.setHandshakeTimeout(10);
 
   int n = 0;
-  for (JsonObject a : doc["ac"].as<JsonArray>()) {
+  {
+    CanvasLease lease;
+    // L'API peut renvoyer des dizaines de Ko. Ne garder que les champs affichés.
+    JsonDocument filter;
+    JsonObject fac = filter["ac"].add<JsonObject>();
+    fac["flight"] = true; fac["t"] = true; fac["r"] = true;
+    fac["lat"] = true; fac["lon"] = true; fac["alt_baro"] = true;
+    fac["gs"] = true; fac["track"] = true; fac["baro_rate"] = true;
+
+    JsonDocument doc;
+    HttpJsonOptions options(10000, 15000);
+    if (!fetchJsonHttp(client, url, doc, &filter, options, errMsg)) { dirty = true; return; }
+
+    for (JsonObject a : doc["ac"].as<JsonArray>()) {
     if (a["lat"].isNull() || a["lon"].isNull()) continue;
 
     Plane p{};
@@ -204,6 +213,7 @@ static void fetchPlanes() {
     }
     if (pos < MAX_PLANES) planes[pos] = p;
     if (n < MAX_PLANES) n++;
+    }
   }
   planeCount = n;
   if (selIdx >= planeCount) selIdx = 0;

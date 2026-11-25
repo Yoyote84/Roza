@@ -200,6 +200,7 @@ const AppDef APPS[] = {
   {"Apps",      APP_STORE},    {"Settings", APP_SETTINGS},
 };
 const int APP_COUNT = sizeof(APPS) / sizeof(APPS[0]);
+static_assert(APP_COUNT == 40, "ROZA must preserve all 40 menu applications");
 
 // ⚠️ 组名最多 6 个字符：tab 条是 SW/GROUP_COUNT 平分屏宽，6 组时每格 240/6 = 40px，
 // 而 Font0 是 6px/字符——"SIGNAL" 已经占到 36px，只剩 2px 边距。再加组或起更长的名字之前

@@ -19,14 +19,16 @@ Terminology:
 |---|---|---|---|---|
 | **TOOLS** | 8/8 | **0** | Time · IMU · Files · Spectrum · Calc · Converter · Player · Hash Oven | Local utility tools, no RF dependencies |
 | **SCAN** | 5/8 | 3 | WiFi Chan · Sniffer · Wardrive · Drone ID · BLE Scan | Passive discovery (promiscuous mode / scanning, connection not required) |
-| **NET** | 5/8 | 3 | Hotspot · LAN Scan · NetProbe · Router · SSH | Active networking (requires active connection or operating as AP) |
+| **NET** | 6/8 | 2 | Hotspot · LAN Scan · NetProbe · Router · SSH · ChatGPT | Active networking and connected services |
 | **HID** | 3/8 | 5 | BT Keys · BT Media · Ducky | Device acting as keyboard / remote controller to control host (BLE/USB) |
 | **SIG** | 4/8 | 4 | LoRa · GNSS · Map · IR | Other RF transceiver channels (over-the-air signals and positioning) |
 | **SKY** | 6/8 | 2 | Astro · Weather · Planes · Sats · Typhoon · Quake | Skyward observation (astronomy, meteorology, hazards, aerial traffic) |
-| **MORE** | 8/8 | **0** | ChatGPT · GitHub · Radio · FX · OKX · Reader · BadApple · Settings | Personal dashboards, multimedia, and system configuration |
+| **MORE** | 8/8 | **0** | GitHub · Radio · FX · OKX · Reader · BadApple · Apps · Settings | Personal dashboards, multimedia, package management, and system configuration |
 
 ⚠️ **Hard limit of 8 apps per group (4×2 grid; each group fits on a single screen without vertical scrolling)**. TOOLS and MORE are currently at full capacity (8/8).
-Total capacity: 56; currently used: 39; spare slots distributed across SCAN (3) / NET (3) / HID (5) / SIG (4) / SKY (2).
+Total capacity: 56; currently used: 40; spare slots distributed across SCAN (3) / NET (2) / HID (5) / SIG (4) / SKY (2).
+
+The table above is reconciled with the actual APPS[] and GROUPS[] arrays in firmware/src/globals.cpp. The detailed feature descriptions below are grouped by technical subsystem, not necessarily by menu tab.
 
 ---
 
@@ -197,7 +199,8 @@ Total capacity: 56; currently used: 39; spare slots distributed across SCAN (3) 
 
 ### Planes — 1 Screen
 - ADS-B aircraft radar; `;`/`.` selects aircraft, `r` refreshes (clearing route cache)
-- Aircraft list fetches via plaintext HTTP independent of NTP sync; route lookup (adsbdb.com) for selected aircraft uses HTTPS
+- Aircraft positions use the documented ADSB.lol HTTPS endpoint with root-certificate validation and filtered streaming JSON; a valid clock is required for TLS
+- Auto-refresh is limited to one request every three minutes (at most 480/day if left open continuously); route lookup (adsbdb.com) also uses verified HTTPS
 - Standardized `User-Agent: cardputer-adv/1.0` header prevents upstream 403 blocks
 
 ### Sats — 1 Screen
@@ -256,7 +259,12 @@ Total capacity: 56; currently used: 39; spare slots distributed across SCAN (3) 
 ### BadApple — 1 Screen
 - ASCII animation and audio playback: Automatically seeks ahead when playback lags by >1 frame to maintain strict synchronization with audio
 
-### Settings — 14 Items
+### Apps — SD Package Manager
+- Loads the ROZA catalogue from GitHub Raw over HTTPS with certificate verification
+- Installs declarative JSON mini-applications under /ROZA/apps/ on the microSD; no native code execution, firmware partition writes, or automatic SD formatting
+- Package limits are intentionally bounded (8 catalogue entries, 8 KiB per catalogue/package, 6 pages per package) to protect internal RAM and storage
+
+### Settings — 15 Items
 | Item | Presentation & Behavior |
 |---|---|
 | Wi-Fi | → Scan subscreen → Password prompt subscreen (saved to NVS, auto-connects on boot) |
