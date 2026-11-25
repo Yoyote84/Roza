@@ -71,6 +71,24 @@ class OtaSecurityTests(unittest.TestCase):
         self.assertIn("ota_1,     app,  ota_1,  0x410000, 0x3f0000", csv)
         self.assertEqual(package.validate_partition_table(partition_table()), 0x3F0000)
 
+    def test_embedded_public_key_is_valid_pem(self):
+        import re
+        source = (ROOT / "src" / "ota_public_key.h").read_text()
+        block = re.search(
+            r"ROZA_OTA_PUBLIC_KEY_PEM\\[\\]\\s*=\\s*(.*?);",
+            source, re.S
+        )
+        self.assertIsNotNone(block)
+        fragments = re.findall(r'"((?:\\\\.|[^"])*)"', block.group(1))
+        pem = "".join(bytes(item, "utf-8").decode("unicode_escape") for item in fragments)
+        with tempfile.TemporaryDirectory() as temp:
+            key_path = Path(temp) / "public.pem"
+            key_path.write_text(pem)
+            subprocess.run(
+                ["openssl", "pkey", "-pubin", "-in", str(key_path), "-noout"],
+                check=True, capture_output=True
+            )
+
     def test_bootloader_rollback_is_configured(self):
         self.assertIn("CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y",
                       (ROOT / "sdkconfig.defaults").read_text())
