@@ -108,6 +108,9 @@ jobs:
           echo "::group::NimBLE static migration test"
           python tools/bt_nimble_static_test.py
           echo "::endgroup::"
+          echo "::group::Stage-2 application modernization contracts"
+          python tools/app_modernization_contract_test.py
+          echo "::endgroup::"
           echo "::group::Flash package guard tests"
           python tools/package_flash_test.py
           echo "::endgroup::"
