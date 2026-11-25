@@ -43,6 +43,7 @@ String setValue(SetId id) {
     case SET_DEBUG:   return String(debugOn ? "OUI" : "NON");
     case SET_FORMAT:  return String(sdMounted ? "Effacer >" : "Pas de SD");
     case SET_ABOUT:   return String("Infos >");
+    case SET_OTA:     return String("OTA securisee >");
   }
   return String();
 }
@@ -151,7 +152,7 @@ void drawSettings() {
       cv.setTextColor(bcol, ROZA_INK);
       cv.setTextDatum(middle_center);
       cv.drawString(bb, bx + bw / 2, by + 7);
-    } else if (sid == SET_FORMAT || sid == SET_ABOUT || sid == SET_GNSS || sid == SET_PCMODE) {
+    } else if (sid == SET_FORMAT || sid == SET_ABOUT || sid == SET_OTA || sid == SET_GNSS || sid == SET_PCMODE) {
       String val = setValue(sid);
     } else {
       // 其它数值/档位项 (Bright, Vol, Sleep, Tz, Units)
