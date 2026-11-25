@@ -283,7 +283,8 @@ jobs:
           La compilation CI ne remplace pas un essai sur le Cardputer ADV réel.
           EOF
 
-          (cd "$PACKAGE" && sha256sum *.bin BUILD_MANIFEST.json PLATFORMIO_MEMORY.txt PLATFORMIO_BUILD_REPORT.txt ELF_SECTIONS.txt INSTALLATION.txt migrate_to_ota.sh > SHA256SUMS.txt)
+          (cd "$PACKAGE" && sha256sum bootloader.bin partitions.bin firmware.bin migrate_to_ota.sh > SHA256SUMS-migration.txt)
+          (cd "$PACKAGE" && sha256sum *.bin BUILD_MANIFEST.json PLATFORMIO_MEMORY.txt PLATFORMIO_BUILD_REPORT.txt ELF_SECTIONS.txt INSTALLATION.txt migrate_to_ota.sh SHA256SUMS-migration.txt > SHA256SUMS.txt)
           if [[ -s "$PACKAGE/ota-manifest.json" ]]; then
             (cd "$PACKAGE" && sha256sum ota-manifest.json >> SHA256SUMS.txt)
           fi
@@ -325,6 +326,8 @@ jobs:
             "$RUNNER_TEMP/roza-firmware-package/partitions.bin" \
             "$RUNNER_TEMP/roza-firmware-package/firmware.bin" \
             "$RUNNER_TEMP/roza-firmware-package/migrate_to_ota.sh" \
+            "$GITHUB_WORKSPACE/site/downloads/migration/"
+          cp "$RUNNER_TEMP/roza-firmware-package/SHA256SUMS-migration.txt" \
             "$GITHUB_WORKSPACE/site/downloads/migration/"
           if [[ -s "$RUNNER_TEMP/roza-firmware-package/ota-manifest.json" ]]; then
             cp "$RUNNER_TEMP/roza-firmware-package/ROZA-OTA.bin" \
