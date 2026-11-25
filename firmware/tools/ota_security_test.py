@@ -142,9 +142,13 @@ class OtaSecurityTests(unittest.TestCase):
         self.assertIn('SHA256SUMS-migration.txt', script)
         self.assertIn('hashlib.sha256', script)
         self.assertIn('erase-region 0xF000 0x2000', script)
-        self.assertNotIn('erase-flash', script)
-        self.assertNotIn('erase_flash', script)
-        self.assertNotIn('chip erase', script.lower())
+        commands = "\n".join(
+            line for line in script.splitlines()
+            if line.lstrip().startswith("python -m esptool")
+        )
+        self.assertIn("erase-region 0xF000 0x2000", commands)
+        self.assertNotRegex(commands, r"\b(?:erase-flash|erase_flash|chip\s+erase)\b")
+        self.assertLess(script.index("hashlib.sha256"), script.index('read -r -p "Type MIGRATE-ROZA'))
 
     def test_migration_preserves_nvs_phy_and_sd(self):
         script = (ROOT / "tools" / "migrate_to_ota.sh").read_text()

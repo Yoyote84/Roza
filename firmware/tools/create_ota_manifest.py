@@ -13,7 +13,7 @@ def canonical_payload(build: int, commit: str, size: int, digest: str, url: str 
             f"cardputer-adv\n{build}\n{commit}\n{size}\n{digest}\n{url}\n").encode("ascii")
 
 def embedded_public_key_pem(header: Path) -> str:
-    """Extract the exact PEM embedded in ota_public_key.h."""
+    """Extrait le PEM exact intégré dans ota_public_key.h."""
     source = header.read_text(encoding="utf-8")
     block = re.search(r"ROZA_OTA_PUBLIC_KEY_PEM\s*\[\s*\]\s*=\s*(.*?);", source, re.S)
     if block is None:
@@ -25,7 +25,7 @@ def embedded_public_key_pem(header: Path) -> str:
 
 
 def verify_signing_key_matches_public(private_key: Path, public_key_header: Path) -> None:
-    """Fail before publishing when CI's private key is not the firmware's key pair."""
+    """Refuse la publication si la clé privée CI ne correspond pas à la clé embarquée."""
     pem = embedded_public_key_pem(public_key_header)
     with tempfile.TemporaryDirectory(prefix="roza-ota-key-check-") as temp:
         root = Path(temp)
