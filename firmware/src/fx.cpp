@@ -62,43 +62,31 @@ static void ymd(char* out, size_t n, time_t t) {
   else                  snprintf(out, n, "1970-01-01");
 }
 
-// ⚠️⚠️ 只有这个函数依赖响应的具体形状。接口文档给的是：
-//   {"amount":1.0,"base":"USD","start_date":"...","end_date":"...",
-//    "rates":{"2026-08-04":{"CNY":7.1523},"2026-08-05":{"CNY":7.1610}, ...}}
-// 也就是 rates 是一个"日期 -> {币种: 值}"的对象。**还没对过真实响应**，
-// 换源或者字段对不上时，改这一个函数就够了，上面的绘制一行都不用动。
+// Frankfurter v2 renvoie un tableau de lignes {date, base, quote, rate}.
+// Ne garder que USD/CNY, ignorer les lignes incomplètes, puis trier les dates.
 static bool fxParse(JsonDocument& doc) {
-  JsonObject rates = doc["rates"];
-  if (rates.isNull()) { errMsg = "no 'rates' in reply"; return false; }
+  JsonArray rates = doc.as<JsonArray>();
+  if (rates.isNull()) { errMsg = "expected Frankfurter v2 array"; return false; }
 
   if (!pts) pts = (FxPt*)malloc(sizeof(FxPt) * FX_MAX_PTS);
   if (!pts) { errMsg = "out of memory"; return false; }
 
   ptN = 0;
-  for (JsonPair kv : rates) {
+  for (JsonObject row : rates) {
     if (ptN >= FX_MAX_PTS) break;
-    // ⚠️ 两种形状都收：
-    //   {"2026-08-04":{"CNY":7.15}}   文档里时间序列的样子
-    //   {"2026-08-04":7.15}           只问一个币种时有些接口会把那层对象省掉
-    // 这不是过度设计——解析器还没对过真实响应（见文件顶上），而这两种是最可能的分歧。
-    // 多认一种的代价是三行；认错了的代价是整页空白，而且从屏幕上看不出是形状问题。
-    float v = 0.0f;
-    JsonVariant val = kv.value();
-    if (val.is<JsonObject>()) v = val["CNY"] | 0.0f;
-    else                      v = val | 0.0f;
-    if (v <= 0) continue;                       // 缺这一天就跳过，不要画成 0
-    strncpy(pts[ptN].date, kv.key().c_str(), sizeof(pts[ptN].date) - 1);
+    const char* date = row["date"] | "";
+    const char* base = row["base"] | "";
+    const char* quote = row["quote"] | "";
+    const float value = row["rate"] | 0.0f;
+    if (strlen(date) != 10 || strcmp(base, "USD") != 0 ||
+        strcmp(quote, "CNY") != 0 || value <= 0.0f) continue;
+    strncpy(pts[ptN].date, date, sizeof(pts[ptN].date) - 1);
     pts[ptN].date[sizeof(pts[ptN].date) - 1] = 0;
-    pts[ptN].rate = v;
+    pts[ptN].rate = value;
     ptN++;
   }
-  // 走到这儿说明 rates 在、但一个点都没解出来 —— 十有八九是形状跟预期不一样。
-  // 屏幕上直接把下一步写出来，别让人对着一句"没有数据"猜是接口挂了还是解析错了。
-  if (ptN == 0) { errMsg = "rates present but empty - try FXDUMP on serial"; return false; }
+  if (ptN == 0) { errMsg = "Frankfurter v2 returned no USD/CNY rates"; return false; }
 
-  // 按日期升序排一遍。**不假设接口按顺序返回**——JSON 对象本来就没有顺序保证，
-  // 而这里顺序错了不会报错，只会画出一条乱七八糟的折线，很难看出是数据的锅。
-  // YYYY-MM-DD 定长补零，直接字符串比较就是日期序。点数最多 70，插入排序足够。
   for (int i = 1; i < ptN; i++) {
     FxPt k = pts[i];
     int j = i - 1;
@@ -116,9 +104,8 @@ void fxBuildUrl(char* out, size_t n) {
   char from[12], to[12];
   ymd(to, sizeof(to), now);
   ymd(from, sizeof(from), now - (time_t)(WINDOWS[winIdx].days + 3) * 86400);
-  // ⚠️ 2026-09-03：api.frankfurter.app 已 301 到 api.frankfurter.dev/v1/，而 HTTPClient
-  // 默认不跟重定向，于是这一页只会报 "http 301"。响应结构没变，改 URL 就够了。
-  snprintf(out, n, "https://api.frankfurter.dev/v1/%s..%s?from=USD&to=CNY", from, to);
+  // Frankfurter v2 est l'API actuelle : les paramètres de période renvoient un tableau compact.
+  snprintf(out, n, "https://api.frankfurter.dev/v2/rates?from=%s&to=%s&base=USD&quotes=CNY", from, to);
 }
 
 static void fetchFx() {
@@ -147,11 +134,15 @@ static void fetchFx() {
   client.setHandshakeTimeout(8);
 
   CanvasLease lease;
-  // ⚠️ 这一页可以走 fetchJsonHttp（不像 GitHub / Quake 要逐元素流式解析）：
-  // 一个交易日只有 `"2026-08-04":{"CNY":7.1523},` 二十来个字节，90 天窗口整包也就
-  // 1.7KB 左右，配上过滤器进堆的更少。TLS 那 40KB 峰值躲不掉，但至少没有再叠一份大 JSON。
+  // Réponse v2 limitée à la période et à USD/CNY ; le filtre garde seulement quatre champs.
+  // Le corps reste petit (fenêtre 30/90 jours) et est borné par HttpJsonOptions.
   JsonDocument filter;
-  filter["rates"] = true;
+  JsonArray filterRows = filter.to<JsonArray>();
+  JsonObject rowFilter = filterRows.add<JsonObject>();
+  rowFilter["date"] = true;
+  rowFilter["base"] = true;
+  rowFilter["quote"] = true;
+  rowFilter["rate"] = true;
 
   JsonDocument doc;
   HttpJsonOptions options(8000, 12000);
