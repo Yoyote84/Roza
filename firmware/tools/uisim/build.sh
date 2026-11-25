@@ -29,8 +29,30 @@ fi
 
 mkdir -p out build
 
-# LovyanGFX 的核心 + SDL 平台层（只要能建 sprite、量字宽、画图元就够，不开窗口）
-GFX_SRC="
+# M5GFX 0.3.0 a regroupé les implémentations LovyanGFX en unités de compilation
+# lgfx_v1*.cpp qui incluent les anciens .inl. Les releases 0.2.x gardent les .cpp séparés.
+# Garder les deux chemins permet de comparer des branches/dépendances sans casser le simulateur.
+if [ -f "$GFX/lgfx/v1/lgfx_v1.cpp" ]; then
+  GFX_SRC="
+$GFX/lgfx/v1/LGFXBase.cpp
+$GFX/lgfx/v1/lgfx_fonts.cpp
+$GFX/lgfx/v1/lgfx_v1.cpp
+$GFX/lgfx/v1/lgfx_v1_panel.cpp
+$GFX/lgfx/v1/lgfx_v1_platforms.cpp
+$GFX/lgfx/v1/lgfx_v1_touch.cpp
+$GFX/lgfx/utility/lgfx_pngle.c
+$GFX/lgfx/utility/lgfx_qoi.c
+$GFX/lgfx/utility/lgfx_qrcode.c
+$GFX/lgfx/utility/lgfx_miniz.c
+$GFX/lgfx/Fonts/IPA/lgfx_font_japan.c
+$GFX/lgfx/Fonts/efont/lgfx_efont_cn.c
+$GFX/lgfx/Fonts/efont/lgfx_efont_ja.c
+$GFX/lgfx/Fonts/efont/lgfx_efont_kr.c
+$GFX/lgfx/Fonts/efont/lgfx_efont_tw.c
+$GFX/lgfx/utility/lgfx_tjpgd.c
+"
+else
+  GFX_SRC="
 $GFX/lgfx/v1/LGFXBase.cpp
 $GFX/lgfx/v1/LGFX_Sprite.cpp
 $GFX/lgfx/v1/misc/common_function.cpp
@@ -51,6 +73,14 @@ $GFX/lgfx/utility/lgfx_tjpgd.c
 $GFX/lgfx/v1/panel/Panel_Device.cpp
 $GFX/lgfx/v1/platforms/sdl/common.cpp
 "
+fi
+
+for source in $GFX_SRC; do
+  if [ ! -f "$source" ]; then
+    echo "Source M5GFX introuvable pour cette version : $source" >&2
+    exit 1
+  fi
+done
 
 # CXX 可覆盖：Mac 上默认 clang++，Linux 上是 g++。原来写死 /usr/bin/clang++。
 : "${CXX:=c++}"
@@ -95,6 +125,10 @@ done
 
 # ⚠️ 先把 PNG 拷出来再传播退出码：自检挂了照样要能看图，否则"哪儿画错了"反而没法查。
 cd build && mkdir -p out
-./uisim; rc=$?
+# set -e ne doit pas interrompre le script avant la copie des PNG si un autotest échoue.
+set +e
+./uisim
+rc=$?
+set -e
 cp out/*.png ../out/ 2>/dev/null || true
-exit $rc
+exit "$rc"
