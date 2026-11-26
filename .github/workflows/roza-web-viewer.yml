@@ -8,7 +8,7 @@ on:
       - "firmware/tools/uisim/**"
       - "firmware/platformio.ini"
       - "firmware/partitions_8MB.csv"
-      - "firmware/sdkconfig.defaults"
+      - "firmware/sdkconfig.roza.defaults"
       - "firmware/tools/ota_security_test.py"
       - "firmware/tools/create_ota_manifest.py"
       - ".github/workflows/roza-web-viewer.yml"
@@ -51,7 +51,7 @@ jobs:
             ~/.platformio/.cache
             firmware/.pio/libdeps/cardputer-adv
             firmware/.pio/build/cardputer-adv
-          key: roza-platformio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini', 'firmware/sdkconfig.defaults', 'firmware/tools/roza_build_info.py') }}
+          key: roza-platformio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini', 'firmware/sdkconfig.roza.defaults', 'firmware/tools/roza_build_info.py') }}
 
       - name: Verify PlatformIO and resolved dependency versions
         working-directory: firmware

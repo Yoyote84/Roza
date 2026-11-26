@@ -105,9 +105,18 @@ class OtaSecurityTests(unittest.TestCase):
                 check=True, capture_output=True
             )
 
+    def test_custom_sdkconfig_uses_separate_source_file(self):
+        ini = (ROOT / "platformio.ini").read_text(encoding="utf-8")
+        self.assertIn("custom_sdkconfig = file://sdkconfig.roza.defaults", ini)
+        self.assertNotIn("custom_sdkconfig = file://sdkconfig.defaults", ini)
+        source = (ROOT / "sdkconfig.roza.defaults").read_text(encoding="utf-8")
+        self.assertIn("CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y", source)
+        gitignore = (ROOT.parent / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("/firmware/sdkconfig.defaults", gitignore)
+
     def test_bootloader_rollback_is_configured(self):
         self.assertIn("CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y",
-                      (ROOT / "sdkconfig.defaults").read_text())
+                      (ROOT / "sdkconfig.roza.defaults").read_text())
 
     def test_manifest_parser_fails_closed_and_pins_binary_url(self):
         source = (ROOT / "src" / "ota_update.cpp").read_text()
